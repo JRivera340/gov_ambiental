@@ -4,13 +4,15 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import { Icon } from 'leaflet';
 
 import { activityService } from '../services/activity.service';
+import { catalogService } from '../services/catalog.service';
+import { usersService } from '../services/users.service';
 import { BoundaryLayer } from '../components/BoundaryLayer';
 import { BarriosLayer } from '../components/BarriosLayer';
 import { Toast } from '../components/Toast';
 import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
 import { ActaUpload } from '../components/ActaUpload';
-import type { Activity, ResiduoEntry } from '../types';
+import type { Activity, Catalogs, ResiduoEntry, User } from '../types';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
 import { loadSantaFeBoundaries, isPointInBoundaries, isPointInCandelaria, findBarrioByPoint } from '../utils/boundaryValidation';
 import type { GeoJSON } from 'geojson';
@@ -58,9 +60,17 @@ export const EditActivity: React.FC = () => {
   const [nuevoResiduoValues, setNuevoResiduoValues] = useState<Record<string, any>>({});
   const [editingResiduoId, setEditingResiduoId] = useState<string | null>(null);
 
+  const [entidadResponsable, setEntidadResponsable] = useState('');
+  const [entidadesAcompanantes, setEntidadesAcompanantes] = useState<string[]>([]);
+  const [gestoresInvolucradosIds, setGestoresInvolucradosIds] = useState<string[]>([]);
+  const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
+  const [gestores, setGestores] = useState<User[]>([]);
+
   useEffect(() => {
     loadData();
     loadSantaFeBoundaries().then(setBoundaries);
+    catalogService.getAll().then(setCatalogs).catch(() => setCatalogs(null));
+    usersService.getGestores().then(setGestores).catch(() => setGestores([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -80,6 +90,9 @@ export const EditActivity: React.FC = () => {
       setPhotos(data.photos || []);
       setActaPdfUrl(data.actaPdfUrl || '');
       setResiduos(data.residuos || []);
+      setEntidadResponsable(data.entidadResponsable || '');
+      setEntidadesAcompanantes(data.entidadesAcompanantes || []);
+      setGestoresInvolucradosIds((data.gestoresInvolucrados || []).map((g) => g.id));
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al cargar el punto', type: 'error' });
       setTimeout(() => navigate('/gestor-ambiental/dashboard'), 2000);
@@ -112,7 +125,10 @@ export const EditActivity: React.FC = () => {
     }
     setSaving(true);
     try {
-      await activityService.update(activity.id, { lat, lng, barrio, photos, actaPdfUrl, residuos } as any);
+      await activityService.update(activity.id, {
+        lat, lng, barrio, photos, actaPdfUrl, residuos,
+        entidadResponsable, entidadesAcompanantes, gestoresInvolucradosIds,
+      } as any);
       if (thenSend) {
         await activityService.send(activity.id);
         setToast({ message: 'Punto corregido y reenviado a validación', type: 'success' });
@@ -176,6 +192,52 @@ export const EditActivity: React.FC = () => {
           <div>
             <label className="block text-sm font-semibold text-neutral-700 mb-2">Acta (opcional)</label>
             <ActaUpload onUploadSuccess={setActaPdfUrl} existingUrl={actaPdfUrl} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100 space-y-6">
+          <h2 className="text-lg font-bold text-primary">Entidades y Gestores</h2>
+
+          <div>
+            <label className="block text-sm font-semibold text-neutral-700 mb-2">Entidad responsable</label>
+            <select value={entidadResponsable} onChange={(e) => setEntidadResponsable(e.target.value)} className="input-field">
+              <option value="">Seleccionar entidad</option>
+              {(catalogs?.entidades || []).map((e) => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-neutral-700 mb-2">Entidades acompañantes</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(catalogs?.entidades || []).map((e) => (
+                <label key={e} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer ${entidadesAcompanantes.includes(e) ? 'border-primary bg-primary/5' : 'border-neutral-200'}`}>
+                  <input
+                    type="checkbox"
+                    checked={entidadesAcompanantes.includes(e)}
+                    onChange={() => setEntidadesAcompanantes((prev) => prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e])}
+                    className="accent-primary"
+                  />
+                  <span className="text-sm">{e}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-neutral-700 mb-2">Gestores acompañantes</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {gestores.map((g) => (
+                <label key={g.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer ${gestoresInvolucradosIds.includes(g.id) ? 'border-primary bg-primary/5' : 'border-neutral-200'}`}>
+                  <input
+                    type="checkbox"
+                    checked={gestoresInvolucradosIds.includes(g.id)}
+                    onChange={() => setGestoresInvolucradosIds((prev) => prev.includes(g.id) ? prev.filter((x) => x !== g.id) : [...prev, g.id])}
+                    className="accent-primary"
+                  />
+                  <span className="text-sm">{g.name} {g.lastname}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -15,8 +15,9 @@ import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
 import { ActaUpload } from '../components/ActaUpload';
 import { useAuthStore } from '../store/authStore';
+import { usersService } from '../services/users.service';
 import { surveyService, type SurveySchema, type SurveyQuestion } from '../services/survey.service';
-import type { Catalogs, ResiduoEntry } from '../types';
+import type { Catalogs, ResiduoEntry, User } from '../types';
 import { CATEGORIA_ENCUESTAS_NAME, SUBTYPE_MAPPING, resolveSubtipo } from '../config/areasCatalog';
 import { isFieldVisible } from '../lib/fieldVisibility';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
@@ -28,12 +29,12 @@ import type { GeoJSON } from 'geojson';
 // este repo (recortado del `CreateActivity` genérico del monolito, que
 // también manejaba IVC/Espacio Público/PYBA). Acá la categoría y el subtipo
 // siempre son AMBIENTAL / AMBIENTAL_PUNTOS_ACUMULACION — no hay selector.
-//
-// Nota: `entidad_responsable`/`entidades_acompanantes`/gestores acompañantes
-// no se envían al backend todavía — la entidad `PuntoResiduo` de este repo
-// no tiene esos campos (no existían en el diseño original de la extracción).
-// Si la encuesta los pide, el formulario los muestra pero no se guardan;
-// pendiente para una fase futura si se necesitan.
+
+const ROLE_LABEL: Record<string, string> = {
+  GESTOR_AMBIENTAL: 'Ambiental',
+  VALIDADOR_AMBIENTAL: 'Validador Ambiental',
+  ADMIN: 'Admin',
+};
 
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -64,6 +65,8 @@ interface DynamicFieldsProps {
   values: Record<string, any>;
   onChange: (key: string, value: any) => void;
   catalogs: Catalogs | null;
+  gestores: User[];
+  currentUserId?: string;
   boundaries: GeoJSON | null;
   layerVisibility: LayerVisibility;
   onLayerVisibilityChange: (layer: keyof LayerVisibility, visible: boolean) => void;
@@ -79,10 +82,12 @@ interface DynamicFieldsProps {
 }
 
 const DynamicFields: React.FC<DynamicFieldsProps> = ({
-  questions, values, onChange, catalogs, boundaries, layerVisibility,
+  questions, values, onChange, catalogs, gestores, currentUserId, boundaries, layerVisibility,
   onLayerVisibilityChange, onToggleAllLayers, setLat, setLng, setBarrio,
   getLocation, gettingLocation, locationAccuracy, locationError, barrio,
 }) => {
+  const [openSelectors, setOpenSelectors] = useState<Record<string, boolean>>({});
+  const [searchTerm, setSearchTerm] = useState<Record<string, string>>({});
   const isQuestionVisible = (q: SurveyQuestion) =>
     isFieldVisible(q.config?.visibleIf, (name: string) => {
       const targetQ = questions.find(prevQ => prevQ.name === name);
@@ -195,6 +200,116 @@ const DynamicFields: React.FC<DynamicFieldsProps> = ({
                         <span className="text-sm font-bold text-emerald-800">{barrio || 'Toca el mapa para detectar el barrio'}</span>
                       </div>
                     </div>
+                  ) : (type === 'ENTITY_SELECT' || type === 'MULTISELECT') ? (
+                    <div className="space-y-3">
+                      {q.config?.multiple || type === 'MULTISELECT' ? (
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <div
+                              className="input-field flex items-center justify-between cursor-pointer bg-white group hover:border-primary/30"
+                              onClick={() => setOpenSelectors(prev => ({ ...prev, [q.id]: !prev[q.id] }))}
+                            >
+                              <span className={Array.isArray(values[q.id]) && values[q.id].length > 0 ? "text-neutral-900 font-medium text-sm" : "text-neutral-400 text-sm"}>
+                                {Array.isArray(values[q.id]) && values[q.id].length > 0
+                                  ? `${values[q.id].length} seleccionados`
+                                  : `Seleccionar ${q.label}...`}
+                              </span>
+                              <svg className={`w-5 h-5 text-neutral-400 transition-transform ${openSelectors[q.id] ? 'rotate-180 text-primary' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+
+                            {openSelectors[q.id] && (
+                              <div className="absolute z-[100] left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden">
+                                <div className="p-3 border-b border-neutral-50 bg-neutral-50/30">
+                                  <input
+                                    type="text"
+                                    placeholder="Escribe para buscar..."
+                                    className="w-full px-4 py-2 text-sm bg-white border border-neutral-200 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all shadow-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => setSearchTerm(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                    value={searchTerm[q.id] || ''}
+                                    autoFocus
+                                  />
+                                </div>
+
+                                <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                                  {(() => {
+                                    let rawList: any = [];
+                                    if (type === 'MULTISELECT') rawList = q.options || [];
+                                    else if (q.config?.entityType === 'GESTORES') {
+                                      rawList = (gestores || []).filter(g => g && g.id !== currentUserId).map(g => ({ value: `${g.name} ${g.lastname}`, label: `${g.name} ${g.lastname} [${ROLE_LABEL[g.role] ?? g.role}]` }));
+                                    } else {
+                                      rawList = (catalogs?.entidades || []).map(e => ({ value: e, label: e }));
+                                    }
+
+                                    let finalOptions = Array.isArray(rawList) ? rawList : [];
+                                    finalOptions = finalOptions.map((opt: any) => typeof opt === 'string' ? { value: opt, label: opt } : opt);
+                                    const term = (searchTerm[q.id] || '').toLowerCase().trim();
+                                    const words = term.split(/\s+/).filter(Boolean);
+                                    const filtered = finalOptions.filter((opt: any) => {
+                                      const label = opt.label.toLowerCase();
+                                      return words.length === 0 || words.every((w: string) => label.includes(w));
+                                    });
+
+                                    if (filtered.length === 0) return <div className="py-8 text-center"><p className="text-xs text-neutral-400">No se encontraron resultados</p></div>;
+
+                                    return filtered.map((opt: any) => (
+                                      <div
+                                        key={opt.value}
+                                        onClick={() => {
+                                          const current = Array.isArray(values[q.id]) ? values[q.id] : [];
+                                          if (current.includes(opt.value)) onChange(q.id, current.filter((i: string) => i !== opt.value));
+                                          else onChange(q.id, [...current, opt.value]);
+                                        }}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${Array.isArray(values[q.id]) && values[q.id].includes(opt.value) ? 'bg-primary/5 text-primary shadow-sm' : 'hover:bg-neutral-50 text-neutral-600'}`}
+                                      >
+                                        <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${Array.isArray(values[q.id]) && values[q.id].includes(opt.value) ? 'bg-primary border-primary shadow-inner' : 'border-neutral-300 bg-white'}`}>
+                                          {Array.isArray(values[q.id]) && values[q.id].includes(opt.value) && (
+                                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
+                                        </div>
+                                        <span className="text-sm font-semibold">{opt.label}</span>
+                                      </div>
+                                    ));
+                                  })()}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {Array.isArray(values[q.id]) && values[q.id].length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3 p-2 bg-white rounded-xl border border-neutral-50 shadow-inner">
+                              {values[q.id].map((val: string) => (
+                                <span key={val} className="inline-flex items-center gap-2 px-3 py-1 bg-neutral-100 text-neutral-700 text-[10px] font-bold rounded-lg border border-neutral-200">
+                                  {val}
+                                  <button type="button" onClick={() => onChange(q.id, values[q.id].filter((v: string) => v !== val))} className="hover:text-red-500 transition-colors">
+                                    &times;
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <select value={values[q.id] ?? ''} onChange={(e) => onChange(q.id, e.target.value)} className="input-field">
+                          <option value="">Seleccionar {q.label}</option>
+                          {(() => {
+                            let opts: { value: string; label: string }[];
+                            if (q.config?.entityType === 'GESTORES') {
+                              opts = (gestores || []).filter(g => g && g.id !== currentUserId).map(g => ({ value: `${g.name} ${g.lastname}`, label: `${g.name} ${g.lastname} [${ROLE_LABEL[g.role] ?? g.role}]` }));
+                            } else if (q.options && q.options.length > 0) {
+                              opts = q.options.map((o: any) => ({ value: o.value, label: o.label }));
+                            } else {
+                              opts = (catalogs?.entidades || []).map((e: string) => ({ value: e, label: e }));
+                            }
+                            return opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>);
+                          })()}
+                        </select>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-3">
                       <input type="checkbox" id={q.id} checked={values[q.id] ?? false} onChange={(e) => onChange(q.id, e.target.checked)} className="w-4 h-4 text-primary border-neutral-300 rounded focus:ring-primary" />
@@ -239,6 +354,7 @@ export const CreateActivity: React.FC = () => {
   const [nuevoResiduoValues, setNuevoResiduoValues] = useState<Record<string, any>>({});
   const [editingResiduoId, setEditingResiduoId] = useState<string | null>(null);
 
+  const [gestores, setGestores] = useState<User[]>([]);
   const [operativoSubtipo, setOperativoSubtipo] = useState<string>('AMBIENTAL_PUNTOS_ACUMULACION');
   const [surveySchema, setSurveySchema] = useState<SurveySchema | null>(null);
   const [surveyLoading, setSurveyLoading] = useState(false);
@@ -248,6 +364,7 @@ export const CreateActivity: React.FC = () => {
   useEffect(() => {
     loadCatalogs();
     loadBoundaries();
+    usersService.getGestores().then(setGestores).catch(() => setGestores([]));
   }, []);
 
   useEffect(() => {
@@ -415,6 +532,22 @@ export const CreateActivity: React.FC = () => {
       );
       const actaRaw = actaQuestion ? operativoDataValues[actaQuestion.id] : undefined;
       const actaUrl = Array.isArray(actaRaw) ? actaRaw[0] : (actaRaw || undefined);
+      const resultsVal = findValue('descripcion_general');
+      const entidadResponsableVal = findValue('entidad_responsable');
+      const entidadesAcompanantesVal = findValue('entidades_acompanantes');
+
+      // Gestores acompañantes: la(s) pregunta(s) multiselect con entityType GESTORES
+      // guardan NOMBRES ("Nombre Apellido"). Hay que resolverlos a IDs.
+      const gestorNameQuestions = surveySchema.questions.filter((q: any) => q.config?.entityType === 'GESTORES');
+      const selectedGestorNames: string[] = gestorNameQuestions.flatMap((q: any) => {
+        const v = operativoDataValues[q.id];
+        return Array.isArray(v) ? v : (v ? [v] : []);
+      });
+      const gestoresInvolucradosIds = Array.from(new Set(
+        selectedGestorNames
+          .map((name) => gestores.find((g) => `${g.name} ${g.lastname}` === name)?.id)
+          .filter((id): id is string => !!id),
+      ));
 
       const dto: any = {
         dateTime: new Date(dateTimeVal).toISOString(),
@@ -423,6 +556,10 @@ export const CreateActivity: React.FC = () => {
         barrio: barrioVal,
         photos: photosVal,
         actaPdfUrl: actaUrl,
+        results: resultsVal,
+        entidadResponsable: entidadResponsableVal,
+        entidadesAcompanantes: entidadesAcompanantesVal,
+        ...(gestoresInvolucradosIds.length > 0 ? { gestoresInvolucradosIds } : {}),
         ...(esPuntosAcumulacion ? { residuos } : {}),
       };
       if (processId) dto.processId = processId;
@@ -490,6 +627,8 @@ export const CreateActivity: React.FC = () => {
                       values={operativoDataValues}
                       onChange={handleOperativoDataChange}
                       catalogs={catalogs}
+                      gestores={gestores}
+                      currentUserId={user?.id}
                       boundaries={boundaries}
                       layerVisibility={layerVisibility}
                       onLayerVisibilityChange={(l, v) => setLayerVisibility(p => ({ ...p, [l]: v }))}
