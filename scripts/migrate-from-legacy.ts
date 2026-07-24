@@ -8,6 +8,14 @@ import { PuntoResiduo, EstadoPunto, ResiduoEntry } from '../src/puntos/entities/
 
 // Carga .env.migration además del .env normal (credenciales de la BD vieja,
 // de solo lectura, nunca commiteadas).
+//
+// Variables esperadas en .env.migration:
+//   OLD_DB_HOST=...
+//   OLD_DB_PORT=5432
+//   OLD_DB_USERNAME=...
+//   OLD_DB_PASSWORD=...
+//   OLD_DB_DATABASE=...
+//   OLD_DB_SSL=true   (default true; poner false solo si la BD vieja no usa SSL)
 const migrationEnvPath = path.join(__dirname, '..', '.env.migration');
 if (fs.existsSync(migrationEnvPath)) {
   for (const line of fs.readFileSync(migrationEnvPath, 'utf-8').split('\n')) {
@@ -85,12 +93,18 @@ async function migrate() {
 
   // Conexión de SOLO LECTURA a la BD vieja — este cliente nunca ejecuta
   // INSERT/UPDATE/DELETE, solo el SELECT de abajo.
+  //
+  // OLD_DB_SSL ('true'/'false', default 'true'): el endpoint público de
+  // Postgres en Railway generalmente exige SSL, así que por seguridad
+  // asumimos que hace falta salvo que se ponga OLD_DB_SSL=false explícito.
+  const oldDbSsl = process.env.OLD_DB_SSL !== 'false';
   const oldClient = new Client({
     host: process.env.OLD_DB_HOST,
     port: Number(process.env.OLD_DB_PORT || 5432),
     user: process.env.OLD_DB_USERNAME,
     password: process.env.OLD_DB_PASSWORD,
     database: process.env.OLD_DB_DATABASE,
+    ssl: oldDbSsl ? { rejectUnauthorized: false } : undefined,
   });
   await oldClient.connect();
 

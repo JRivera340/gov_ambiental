@@ -7,7 +7,7 @@ Backend independiente del módulo Ambiental (puntos de residuos, procesos, rutas
 1. Copiar `.env.example` a `.env` (los valores de ejemplo alcanzan para desarrollo local).
 2. Levantar Postgres: `docker compose up -d`
 3. Instalar dependencias: `npm install`
-4. Levantar el backend: `npm run start:dev`
+4. Levantar el backend: `npm run start:dev` (queda corriendo en modo watch — abrí una segunda terminal para los pasos 5 en adelante)
 5. Poblar con datos ficticios: `npm run seed`
 6. Generar un token de prueba (nunca se necesita el secreto real de producción):
    `npm run token:test GESTOR_AMBIENTAL`
