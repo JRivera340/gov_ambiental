@@ -20,9 +20,21 @@ export const activityService = {
     return normalizeActivity(activity);
   },
 
+  // GESTOR_AMBIENTAL: Corregir un punto en BORRADOR/RECHAZADA antes de reenviar
+  async update(id: string, data: Partial<CreateActivityDTO>): Promise<Activity> {
+    const { data: activity } = await api.patch<Activity>(`/puntos/${id}`, data);
+    return normalizeActivity(activity);
+  },
+
   // GESTOR_AMBIENTAL: Enviar el punto a validación
   async send(id: string): Promise<Activity> {
     const { data } = await api.post<Activity>(`/puntos/${id}/send`);
+    return normalizeActivity(data);
+  },
+
+  // Obtener un punto por id (para editar / revisar)
+  async getById(id: string): Promise<Activity> {
+    const { data } = await api.get<Activity>(`/puntos/${id}`);
     return normalizeActivity(data);
   },
 

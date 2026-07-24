@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { GestorAmbientalDashboard } from './pages/gestor-ambiental/GestorAmbientalDashboard';
 import { CreateActivity } from './pages/CreateActivity';
+import { EditActivity } from './pages/EditActivity';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 
@@ -39,6 +40,10 @@ function App() {
       <Route
         path="/gestor-ambiental/crear-actividad"
         element={<RutaProtegida><CreateActivity /></RutaProtegida>}
+      />
+      <Route
+        path="/gestor-ambiental/editar-actividad/:id"
+        element={<RutaProtegida><EditActivity /></RutaProtegida>}
       />
 
       <Route

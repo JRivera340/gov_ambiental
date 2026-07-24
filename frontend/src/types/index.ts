@@ -257,6 +257,10 @@ export interface Activity {
   fechaRevision?: string | null;
   pointNumber?: number;
   categorySeq?: number;
+
+  // Este backend guarda `residuos` como columna propia de nivel superior
+  // (no anidada en `operativoData` como en el monolito).
+  residuos?: ResiduoEntry[];
 }
 
 export interface Process {

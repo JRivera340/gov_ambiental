@@ -69,9 +69,9 @@ export function isPuntoEmergencia(activity: Activity): boolean {
 
 // Un punto está recogido si todos sus residuos lo están.
 export function isPuntoRecogido(activity: Activity): boolean {
-  if (activity.status === 'Recogido') return true;
+  if ((activity.status as string) === 'Recogido') return true;
   if (activity.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
   const residuos = getResiduos(activity);
   if (residuos.length === 0) return false;
-  return residuos.every((r) => r.recogido || r.status === 'Recogido');
+  return residuos.every((r) => r.recogido || (r as any).status === 'Recogido');
 }

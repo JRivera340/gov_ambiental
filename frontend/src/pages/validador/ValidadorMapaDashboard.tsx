@@ -312,7 +312,7 @@ export const ValidadorMapaDashboard: React.FC = () => {
                 >
                   <Popup>
                     <div className="min-w-[180px] p-1">
-                      {activity.pointNumber > 0 && (
+                      {(activity.pointNumber ?? 0) > 0 && (
                         <span className="inline-block text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full mb-1">#{activity.pointNumber}</span>
                       )}
                       <h4 className="font-bold text-neutral-800 text-sm mb-1">{activity.barrio}</h4>
