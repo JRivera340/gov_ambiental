@@ -5,9 +5,11 @@ import { PuntosController } from './puntos.controller';
 import { PuntosService } from './puntos.service';
 import { TypeOrmPuntosRepository } from './puntos.repository.typeorm';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
+import { AsignacionesModule } from '../asignaciones/asignaciones.module';
+import { ProcesosModule } from '../procesos/procesos.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PuntoResiduo])],
+  imports: [TypeOrmModule.forFeature([PuntoResiduo]), AsignacionesModule, ProcesosModule],
   controllers: [PuntosController],
   providers: [
     PuntosService,

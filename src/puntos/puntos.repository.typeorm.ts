@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PuntosRepository } from './puntos.repository';
-import { PuntoResiduo } from './entities/punto-residuo.entity';
+import { EstadoPunto, PuntoResiduo } from './entities/punto-residuo.entity';
 
 @Injectable()
 export class TypeOrmPuntosRepository implements PuntosRepository {
@@ -18,5 +18,26 @@ export class TypeOrmPuntosRepository implements PuntosRepository {
 
   async findByCreator(userId: string): Promise<PuntoResiduo[]> {
     return this.repo.find({ where: { createdByUserId: userId }, order: { createdAt: 'DESC' } });
+  }
+
+  async findById(id: string): Promise<PuntoResiduo | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
+  async findPending(): Promise<PuntoResiduo[]> {
+    return this.repo.find({ where: { status: EstadoPunto.ENVIADA } });
+  }
+
+  async findPublished(): Promise<PuntoResiduo[]> {
+    return this.repo.find({ where: { status: EstadoPunto.PUBLICADA } });
+  }
+
+  async save(punto: PuntoResiduo): Promise<PuntoResiduo> {
+    return this.repo.save(punto);
+  }
+
+  async deleteMany(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.repo.delete(ids);
   }
 }

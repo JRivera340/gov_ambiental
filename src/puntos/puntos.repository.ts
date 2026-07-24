@@ -3,4 +3,9 @@ import { PuntoResiduo } from './entities/punto-residuo.entity';
 export interface PuntosRepository {
   create(data: Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>): Promise<PuntoResiduo>;
   findByCreator(userId: string): Promise<PuntoResiduo[]>;
+  findById(id: string): Promise<PuntoResiduo | null>;
+  findPending(): Promise<PuntoResiduo[]>;
+  findPublished(): Promise<PuntoResiduo[]>;
+  save(punto: PuntoResiduo): Promise<PuntoResiduo>;
+  deleteMany(ids: string[]): Promise<void>;
 }
