@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -8,11 +8,12 @@ import { CreatePuntoDto } from './dto/create-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { MergeResiduosDto } from './dto/merge-residuos.dto';
 import { AprobarResiduoDto } from './dto/aprobar-residuo.dto';
+import { ReporteService } from '../reporte/reporte.service';
 
 @Controller('puntos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PuntosController {
-  constructor(private readonly puntosService: PuntosService) {}
+  constructor(private readonly puntosService: PuntosService, private readonly reporteService: ReporteService) {}
 
   @Post()
   @Roles(Role.GESTOR_AMBIENTAL)
@@ -35,6 +36,18 @@ export class PuntosController {
   @Get('public/:id')
   findOnePublic(@Param('id') id: string) {
     return this.puntosService.findOne(id);
+  }
+
+  @Get('report-xlsx')
+  @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
+  async reportXlsx(@Res() res: any, @Query('frontendUrl') frontendUrl?: string) {
+    const puntos = await this.puntosService.findPublished();
+    const buffer = this.reporteService.generateXlsxReport(puntos, frontendUrl || 'https://ambiental.bogotaneidapp.com');
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="pendientes-recogida.xlsx"',
+    });
+    res.send(buffer);
   }
 
   @Get(':id')

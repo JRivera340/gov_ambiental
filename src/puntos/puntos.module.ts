@@ -7,12 +7,14 @@ import { TypeOrmPuntosRepository } from './puntos.repository.typeorm';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
 import { AsignacionesModule } from '../asignaciones/asignaciones.module';
 import { ProcesosModule } from '../procesos/procesos.module';
+import { ReporteService } from '../reporte/reporte.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PuntoResiduo]), AsignacionesModule, ProcesosModule],
   controllers: [PuntosController],
   providers: [
     PuntosService,
+    ReporteService,
     { provide: PUNTOS_REPOSITORY, useClass: TypeOrmPuntosRepository },
   ],
 })
