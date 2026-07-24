@@ -166,23 +166,6 @@ export class KmzParserService {
     return sectors;
   }
 
-  async findSectorsContaining(lat: number, lng: number): Promise<SectorFeature[]> {
-    const booleanPointInPolygon = (await import('@turf/boolean-point-in-polygon')).default;
-    const { point } = await import('@turf/helpers');
-    const sectors = await this.getSectors();
-    const pt = point([lng, lat]);
-    const matches: SectorFeature[] = [];
-    for (const sector of sectors) {
-      if (booleanPointInPolygon(pt, sector as any)) matches.push(sector);
-    }
-    return matches;
-  }
-
-  async findSectorContaining(lat: number, lng: number): Promise<SectorFeature | null> {
-    const matches = await this.findSectorsContaining(lat, lng);
-    return matches.length > 0 ? matches[0] : null;
-  }
-
   async getSectorById(sectorId: string): Promise<SectorFeature | null> {
     const sectors = await this.getSectors();
     return sectors.find((s) => s.id === sectorId) || null;

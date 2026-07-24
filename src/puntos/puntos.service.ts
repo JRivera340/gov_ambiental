@@ -2,11 +2,57 @@ import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PuntosRepository } from './puntos.repository';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
-import { EstadoPunto, PuntoResiduo } from './entities/punto-residuo.entity';
+import { EstadoPunto, PuntoResiduo, ResiduoEntry } from './entities/punto-residuo.entity';
 import { CreatePuntoDto } from './dto/create-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
+
+export type PublicResiduo = Pick<
+  ResiduoEntry,
+  'id' | 'tipoResiduo' | 'areaLinealMetros' | 'percibeOlores' | 'percibeVectores' | 'observaciones' | 'photos' | 'recogido' | 'fechaRecogida' | 'photosRecogida'
+>;
+
+export type PublicPunto = {
+  id: string;
+  lat: number;
+  lng: number;
+  barrio: string;
+  status: EstadoPunto;
+  dateTime: Date;
+  photos: string[];
+  photosFase2?: string[];
+  pointNumber?: number;
+  publishedAt?: Date;
+  residuos: PublicResiduo[];
+};
+
+export function toPublicPunto(punto: PuntoResiduo): PublicPunto {
+  return {
+    id: punto.id,
+    lat: punto.lat,
+    lng: punto.lng,
+    barrio: punto.barrio,
+    status: punto.status,
+    dateTime: punto.dateTime,
+    photos: punto.photos,
+    photosFase2: punto.photosFase2,
+    pointNumber: punto.pointNumber,
+    publishedAt: punto.publishedAt,
+    residuos: (punto.residuos || []).map((r) => ({
+      id: r.id,
+      tipoResiduo: r.tipoResiduo,
+      areaLinealMetros: r.areaLinealMetros,
+      percibeOlores: r.percibeOlores,
+      percibeVectores: r.percibeVectores,
+      observaciones: r.observaciones,
+      photos: r.photos,
+      recogido: r.recogido,
+      fechaRecogida: r.fechaRecogida,
+      photosRecogida: r.photosRecogida,
+    })),
+  };
+}
 
 @Injectable()
 export class PuntosService {
@@ -77,6 +123,11 @@ export class PuntosService {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
     return punto;
+  }
+
+  async findOnePublic(id: string): Promise<PublicPunto> {
+    const punto = await this.findOne(id);
+    return toPublicPunto(punto);
   }
 
   async seguimiento(userId: string, email: string, id: string, body: SeguimientoDto) {

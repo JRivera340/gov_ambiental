@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, Use
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { Role } from '../common/enums/role.enum';
 import { PuntosService } from './puntos.service';
 import { CreatePuntoDto } from './dto/create-punto.dto';
@@ -34,8 +35,9 @@ export class PuntosController {
   }
 
   @Get('public/:id')
+  @Public()
   findOnePublic(@Param('id') id: string) {
-    return this.puntosService.findOne(id);
+    return this.puntosService.findOnePublic(id);
   }
 
   @Get('report-xlsx')

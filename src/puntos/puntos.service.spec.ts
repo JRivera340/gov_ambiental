@@ -1,5 +1,6 @@
-import { PuntosService } from './puntos.service';
+import { PuntosService, toPublicPunto } from './puntos.service';
 import { InMemoryPuntosRepository } from './puntos.repository.memory';
+import { EstadoPunto } from './entities/punto-residuo.entity';
 
 const asignacionesStub = { asignarACreador: async () => {} };
 const procesosStub = { recalculateStatus: async () => {} };
@@ -115,5 +116,118 @@ describe('PuntosService — ciclo de vida', () => {
     const nuevos = [{ id: 'r1', tipoResiduo: 'PLANTAS', quienDispuso: '', dateTime: new Date().toISOString(), percibeOlores: false, percibeVectores: false, areaLinealMetros: 1, photos: [], recogido: true }];
     const actualizado = await service.aprobarResiduo(punto.id, nuevos as any);
     expect(actualizado.residuos).toEqual(nuevos);
+  });
+});
+
+describe('PuntosService — proyeccion publica', () => {
+  const makeService = () => {
+    const repo = new InMemoryPuntosRepository();
+    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
+  };
+
+  const puntoConDatosInternos = (id: string) => ({
+    id,
+    createdByUserId: 'user-1',
+    status: EstadoPunto.PUBLICADA,
+    dateTime: new Date('2026-01-01T00:00:00.000Z'),
+    lat: 4.05,
+    lng: -74.05,
+    barrio: 'Centro',
+    photos: ['foto1.jpg'],
+    photosFase2: undefined,
+    fechaFinalizacion: undefined,
+    actaPdfUrl: undefined,
+    validatorUserId: 'validador-1',
+    validatedAt: new Date(),
+    validationNotes: 'Notas internas de validacion',
+    publishedAt: new Date(),
+    processId: undefined,
+    descripcionAntes: 'antes',
+    descripcionDespues: 'despues',
+    revisadoPorUserId: 'revisor-1',
+    revisadoPorNombre: 'revisor@ejemplo.com',
+    fechaRevision: new Date(),
+    pointNumber: 7,
+    categorySeq: 1,
+    residuos: [
+      {
+        id: 'r1',
+        tipoResiduo: 'ORDINARIOS',
+        quienDispuso: 'COMUNIDAD',
+        dateTime: new Date().toISOString(),
+        percibeOlores: true,
+        percibeVectores: false,
+        areaLinealMetros: 3,
+        observaciones: 'obs',
+        photos: ['r1.jpg'],
+        recogido: true,
+        fechaRecogida: new Date().toISOString(),
+        photosRecogida: ['rec1.jpg'],
+        createdByUserId: 'user-1',
+        createdByNombre: 'user1@ejemplo.com',
+        recogidoByUserId: 'staff-1',
+        recogidoByNombre: 'staff@ejemplo.com',
+        notas: [{ id: 'n1', fecha: new Date().toISOString(), autorId: 'user-1', autorNombre: 'user1@ejemplo.com', texto: 'nota interna' }],
+      },
+    ],
+    ultimoSeguimientoAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  it('toPublicPunto no expone campos internos del punto', () => {
+    const punto = puntoConDatosInternos('p1');
+    const publico = toPublicPunto(punto as any);
+
+    expect(publico).not.toHaveProperty('createdByUserId');
+    expect(publico).not.toHaveProperty('validatorUserId');
+    expect(publico).not.toHaveProperty('validatedAt');
+    expect(publico).not.toHaveProperty('validationNotes');
+    expect(publico).not.toHaveProperty('processId');
+    expect(publico).not.toHaveProperty('descripcionAntes');
+    expect(publico).not.toHaveProperty('descripcionDespues');
+    expect(publico).not.toHaveProperty('revisadoPorUserId');
+    expect(publico).not.toHaveProperty('revisadoPorNombre');
+    expect(publico).not.toHaveProperty('fechaRevision');
+    expect(publico).not.toHaveProperty('categorySeq');
+    expect(publico).not.toHaveProperty('ultimoSeguimientoAt');
+    expect(publico).not.toHaveProperty('createdAt');
+    expect(publico).not.toHaveProperty('updatedAt');
+    expect(publico).not.toHaveProperty('actaPdfUrl');
+    expect(publico).not.toHaveProperty('fechaFinalizacion');
+  });
+
+  it('toPublicPunto no expone campos internos de cada residuo', () => {
+    const punto = puntoConDatosInternos('p1');
+    const publico = toPublicPunto(punto as any);
+    const residuoPublico = publico.residuos[0];
+
+    expect(residuoPublico).not.toHaveProperty('quienDispuso');
+    expect(residuoPublico).not.toHaveProperty('createdByUserId');
+    expect(residuoPublico).not.toHaveProperty('createdByNombre');
+    expect(residuoPublico).not.toHaveProperty('recogidoByUserId');
+    expect(residuoPublico).not.toHaveProperty('recogidoByNombre');
+    expect(residuoPublico).not.toHaveProperty('notas');
+    expect(residuoPublico.id).toBe('r1');
+    expect(residuoPublico.tipoResiduo).toBe('ORDINARIOS');
+  });
+
+  it('findOnePublic devuelve la proyeccion publica de un punto existente', async () => {
+    const { service, repo } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await repo.save(puntoConDatosInternos(punto.id) as any);
+
+    const publico = await service.findOnePublic(punto.id);
+
+    expect(publico.id).toBe(punto.id);
+    expect(publico).not.toHaveProperty('createdByUserId');
+    expect(publico).not.toHaveProperty('validationNotes');
+    expect(publico.residuos[0]).not.toHaveProperty('recogidoByNombre');
+    expect(publico.residuos[0]).not.toHaveProperty('notas');
+  });
+
+  it('findOnePublic lanza NotFoundException si el punto no existe', async () => {
+    const { service } = makeService();
+    await expect(service.findOnePublic('no-existe')).rejects.toThrow();
   });
 });

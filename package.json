@@ -23,8 +23,6 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/typeorm": "^11.0.0",
-    "@turf/boolean-point-in-polygon": "^7.3.5",
-    "@turf/helpers": "^7.3.5",
     "@xmldom/xmldom": "^0.9.10",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
