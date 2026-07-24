@@ -11,7 +11,35 @@ describe('PuntosService', () => {
     return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
   };
 
+  it('crea un punto con entidad responsable, acompanantes y gestores involucrados', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', {
+      lat: 1, lng: 1, barrio: 'A',
+      results: 'Descripcion general',
+      entidadResponsable: 'ALCALDIA_LOCAL',
+      entidadesAcompanantes: ['POLICIA', 'BOMBEROS'],
+      gestoresInvolucradosIds: ['gestor-2', 'gestor-3'],
+    });
+    expect(punto.results).toBe('Descripcion general');
+    expect(punto.entidadResponsable).toBe('ALCALDIA_LOCAL');
+    expect(punto.entidadesAcompanantes).toEqual(['POLICIA', 'BOMBEROS']);
+    expect(punto.gestoresInvolucradosIds).toEqual(['gestor-2', 'gestor-3']);
+    expect(punto.isGroupOperativo).toBe(true);
+  });
+
   describe('update', () => {
+    it('permite editar entidad responsable y gestores involucrados', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      const actualizado = await service.update(punto.id, 'user-1', {
+        entidadResponsable: 'CVP',
+        gestoresInvolucradosIds: ['gestor-9'],
+      });
+      expect(actualizado.entidadResponsable).toBe('CVP');
+      expect(actualizado.gestoresInvolucradosIds).toEqual(['gestor-9']);
+      expect(actualizado.isGroupOperativo).toBe(true);
+    });
+
     it('permite al creador editar un punto en BORRADOR', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });

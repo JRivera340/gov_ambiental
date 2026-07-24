@@ -82,6 +82,21 @@ export class PuntoResiduo {
   @Column({ type: 'text', nullable: true })
   actaPdfUrl?: string;
 
+  @Column({ type: 'text', nullable: true })
+  results?: string;
+
+  @Column({ type: 'text', nullable: true })
+  entidadResponsable?: string;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  entidadesAcompanantes?: string[];
+
+  @Column({ type: 'boolean', default: false })
+  isGroupOperativo!: boolean;
+
+  @Column({ type: 'uuid', array: true, nullable: true })
+  gestoresInvolucradosIds?: string[];
+
   @Column({ type: 'uuid', nullable: true })
   validatorUserId?: string;
 

@@ -79,6 +79,11 @@ export class PuntosService {
       barrio: dto.barrio,
       photos: dto.photos || [],
       actaPdfUrl: dto.actaPdfUrl,
+      results: dto.results,
+      entidadResponsable: dto.entidadResponsable,
+      entidadesAcompanantes: dto.entidadesAcompanantes || [],
+      isGroupOperativo: dto.isGroupOperativo || (dto.gestoresInvolucradosIds?.length ?? 0) > 0,
+      gestoresInvolucradosIds: dto.gestoresInvolucradosIds || [],
       residuos,
     } as Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>);
     await this.asignacionesService.asignarACreador(punto.id, userId);
@@ -106,6 +111,13 @@ export class PuntosService {
     if (dto.dateTime !== undefined) punto.dateTime = new Date(dto.dateTime);
     if (dto.photos !== undefined) punto.photos = dto.photos;
     if (dto.actaPdfUrl !== undefined) punto.actaPdfUrl = dto.actaPdfUrl;
+    if (dto.results !== undefined) punto.results = dto.results;
+    if (dto.entidadResponsable !== undefined) punto.entidadResponsable = dto.entidadResponsable;
+    if (dto.entidadesAcompanantes !== undefined) punto.entidadesAcompanantes = dto.entidadesAcompanantes;
+    if (dto.gestoresInvolucradosIds !== undefined) {
+      punto.gestoresInvolucradosIds = dto.gestoresInvolucradosIds;
+      punto.isGroupOperativo = dto.gestoresInvolucradosIds.length > 0;
+    }
     if (dto.residuos !== undefined) {
       punto.residuos = dto.residuos.map((r: any) => ({
         id: r.id || randomUUID(),

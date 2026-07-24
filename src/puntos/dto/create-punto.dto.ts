@@ -25,4 +25,23 @@ export class CreatePuntoDto {
   @IsOptional()
   @IsArray()
   residuos?: unknown[];
+
+  @IsOptional()
+  @IsString()
+  results?: string;
+
+  @IsOptional()
+  @IsString()
+  entidadResponsable?: string;
+
+  @IsOptional()
+  @IsArray()
+  entidadesAcompanantes?: string[];
+
+  @IsOptional()
+  isGroupOperativo?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  gestoresInvolucradosIds?: string[];
 }
