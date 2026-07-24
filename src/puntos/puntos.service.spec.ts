@@ -19,6 +19,26 @@ describe('PuntosService', () => {
     expect(punto.residuos).toEqual([]);
   });
 
+  it('crea un punto con residuos/fotos/acta iniciales (flujo de registro completo)', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', {
+      lat: 4.1,
+      lng: -74.2,
+      barrio: 'Centro',
+      dateTime: '2026-07-01T10:00:00.000Z',
+      photos: ['foto1.jpg'],
+      actaPdfUrl: 'acta.pdf',
+      residuos: [{ tipoResiduo: 'ESCOMBROS', quienDispuso: 'COMUNIDAD', areaLinealMetros: 5, percibeOlores: false, percibeVectores: false, photos: [] }],
+    });
+    expect(punto.photos).toEqual(['foto1.jpg']);
+    expect(punto.actaPdfUrl).toBe('acta.pdf');
+    expect(punto.dateTime.toISOString()).toBe('2026-07-01T10:00:00.000Z');
+    expect(punto.residuos).toHaveLength(1);
+    expect(punto.residuos[0].tipoResiduo).toBe('ESCOMBROS');
+    expect(punto.residuos[0].id).toBeTruthy();
+    expect(punto.residuos[0].recogido).toBe(false);
+  });
+
   it('findMine devuelve solo los puntos del usuario que pregunta', async () => {
     const { service } = makeService();
     await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });

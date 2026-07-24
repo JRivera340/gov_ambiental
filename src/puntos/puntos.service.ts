@@ -63,15 +63,22 @@ export class PuntosService {
   ) {}
 
   async create(userId: string, dto: CreatePuntoDto): Promise<PuntoResiduo> {
+    const residuos = (dto.residuos || []).map((r) => ({
+      id: randomUUID(),
+      ...(r as any),
+      recogido: false,
+      createdByUserId: userId,
+    }));
     const punto = await this.repo.create({
       createdByUserId: userId,
       status: EstadoPunto.BORRADOR,
-      dateTime: new Date(),
+      dateTime: dto.dateTime ? new Date(dto.dateTime) : new Date(),
       lat: dto.lat,
       lng: dto.lng,
       barrio: dto.barrio,
-      photos: [],
-      residuos: [],
+      photos: dto.photos || [],
+      actaPdfUrl: dto.actaPdfUrl,
+      residuos,
     } as Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>);
     await this.asignacionesService.asignarACreador(punto.id, userId);
     return punto;
