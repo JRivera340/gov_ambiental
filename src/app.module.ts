@@ -6,10 +6,11 @@ import { AuthModule } from './auth/auth.module';
 import { PuntosModule } from './puntos/puntos.module';
 import { ProcesosModule } from './procesos/procesos.module';
 import { AsignacionesModule } from './asignaciones/asignaciones.module';
+import { RutasSemanalesModule } from './rutas-semanales/rutas-semanales.module';
 import { typeOrmConfig } from './config/typeorm.config';
 
 @Module({
-  imports: [TypeOrmModule.forRootAsync(typeOrmConfig), AuthModule, PuntosModule, ProcesosModule, AsignacionesModule],
+  imports: [TypeOrmModule.forRootAsync(typeOrmConfig), AuthModule, PuntosModule, ProcesosModule, AsignacionesModule, RutasSemanalesModule],
   controllers: [AppController],
   providers: [AppService],
 })
