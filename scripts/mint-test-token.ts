@@ -1,13 +1,20 @@
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import { getEnv } from '../src/config/env';
+import { TEST_IDENTITIES, type TestRole } from '../src/config/test-identities';
 
 const env = getEnv();
 
-const role = process.argv[2] ?? 'GESTOR_AMBIENTAL';
+const role = (process.argv[2] as TestRole) ?? 'GESTOR_AMBIENTAL';
+const identity = TEST_IDENTITIES[role];
+if (!identity) {
+  console.error(`Rol desconocido: "${role}". Usar uno de: ${Object.keys(TEST_IDENTITIES).join(', ')}`);
+  process.exit(1);
+}
+
 const payload = {
-  sub: '00000000-0000-0000-0000-000000000001',
-  email: 'gestor.prueba@ejemplo.com',
+  sub: identity.id,
+  email: identity.email,
   role,
 };
 
