@@ -30,6 +30,19 @@ export class InMemoryPuntosRepository implements PuntosRepository {
     return Array.from(this.puntos.values()).filter((p) => p.status === EstadoPunto.PUBLICADA);
   }
 
+  async findAll(filters?: { desde?: string; hasta?: string }): Promise<PuntoResiduo[]> {
+    let all = Array.from(this.puntos.values());
+    if (filters?.desde) {
+      const desde = new Date(filters.desde);
+      all = all.filter((p) => p.dateTime >= desde);
+    }
+    if (filters?.hasta) {
+      const hasta = new Date(filters.hasta);
+      all = all.filter((p) => p.dateTime <= hasta);
+    }
+    return all;
+  }
+
   async save(punto: PuntoResiduo): Promise<PuntoResiduo> {
     const updated = { ...punto, updatedAt: new Date() };
     this.puntos.set(updated.id, updated);

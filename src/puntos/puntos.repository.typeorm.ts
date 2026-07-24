@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { PuntosRepository } from './puntos.repository';
 import { EstadoPunto, PuntoResiduo } from './entities/punto-residuo.entity';
 
@@ -30,6 +30,18 @@ export class TypeOrmPuntosRepository implements PuntosRepository {
 
   async findPublished(): Promise<PuntoResiduo[]> {
     return this.repo.find({ where: { status: EstadoPunto.PUBLICADA } });
+  }
+
+  async findAll(filters?: { desde?: string; hasta?: string }): Promise<PuntoResiduo[]> {
+    const where: any = {};
+    if (filters?.desde && filters?.hasta) {
+      where.dateTime = Between(new Date(filters.desde), new Date(filters.hasta));
+    } else if (filters?.desde) {
+      where.dateTime = MoreThanOrEqual(new Date(filters.desde));
+    } else if (filters?.hasta) {
+      where.dateTime = LessThanOrEqual(new Date(filters.hasta));
+    }
+    return this.repo.find({ where });
   }
 
   async save(punto: PuntoResiduo): Promise<PuntoResiduo> {

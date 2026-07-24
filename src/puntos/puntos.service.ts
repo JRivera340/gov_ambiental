@@ -126,6 +126,10 @@ export class PuntosService {
     return this.repo.findPublished();
   }
 
+  async findAll(filters?: { desde?: string; hasta?: string }) {
+    return this.repo.findAll(filters);
+  }
+
   async findOne(id: string) {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');

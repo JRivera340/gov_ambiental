@@ -28,6 +28,12 @@ export class PuntosController {
     return this.puntosService.findMine(req.user.userId);
   }
 
+  @Get()
+  @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
+  findAll(@Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.puntosService.findAll({ desde, hasta });
+  }
+
   @Get('pending')
   @Roles(Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
   findPending() {

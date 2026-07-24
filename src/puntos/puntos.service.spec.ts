@@ -49,6 +49,26 @@ describe('PuntosService', () => {
     expect(mios[0].createdByUserId).toBe('user-1');
   });
 
+  it('findAll devuelve los puntos de todos los usuarios, no solo los propios', async () => {
+    const { service } = makeService();
+    await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await service.create('user-2', { lat: 2, lng: 2, barrio: 'B' });
+
+    const todos = await service.findAll();
+    expect(todos).toHaveLength(2);
+  });
+
+  it('findAll filtra por rango de fechas cuando se pasan desde/hasta', async () => {
+    const { service, repo } = makeService();
+    const viejo = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await repo.save({ ...viejo, dateTime: new Date('2020-01-01T00:00:00.000Z') } as any);
+    await service.create('user-2', { lat: 2, lng: 2, barrio: 'B', dateTime: '2026-01-01T00:00:00.000Z' } as any);
+
+    const filtrados = await service.findAll({ desde: '2025-01-01T00:00:00.000Z' });
+    expect(filtrados).toHaveLength(1);
+    expect(filtrados[0].barrio).toBe('B');
+  });
+
   it('create asigna el punto a su creador automaticamente', async () => {
     const repo = new InMemoryPuntosRepository();
     const asignado: { puntoId?: string; userId?: string } = {};
