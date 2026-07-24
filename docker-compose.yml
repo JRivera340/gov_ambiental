@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ambiental-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-ambiental}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ambiental}
+      POSTGRES_DB: ${DB_DATABASE:-ambiental}
+    ports:
+      - '5432:5432'
+    volumes:
+      - ambiental-db-data:/var/lib/postgresql/data
+
+volumes:
+  ambiental-db-data:
