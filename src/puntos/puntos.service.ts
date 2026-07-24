@@ -4,6 +4,7 @@ import { PuntosRepository } from './puntos.repository';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
 import { EstadoPunto, PuntoResiduo, ResiduoEntry } from './entities/punto-residuo.entity';
 import { CreatePuntoDto } from './dto/create-punto.dto';
+import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
@@ -86,6 +87,34 @@ export class PuntosService {
 
   async findMine(userId: string): Promise<PuntoResiduo[]> {
     return this.repo.findByCreator(userId);
+  }
+
+  // Solo el creador puede editar, y solo mientras el punto no esté publicado
+  // (BORRADOR o RECHAZADA — para corregir y reenviar). Una vez ENVIADA o
+  // PUBLICADA, los cambios pasan por seguimiento/aprobar-residuo, no por acá.
+  async update(id: string, userId: string, dto: UpdatePuntoDto): Promise<PuntoResiduo> {
+    const punto = await this.repo.findById(id);
+    if (!punto) throw new NotFoundException('Punto no encontrado');
+    if (punto.createdByUserId !== userId) throw new ForbiddenException('Solo el creador puede editar el punto');
+    if (punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
+      throw new BadRequestException('Solo se puede editar un punto en borrador o rechazado');
+    }
+
+    if (dto.lat !== undefined) punto.lat = dto.lat;
+    if (dto.lng !== undefined) punto.lng = dto.lng;
+    if (dto.barrio !== undefined) punto.barrio = dto.barrio;
+    if (dto.dateTime !== undefined) punto.dateTime = new Date(dto.dateTime);
+    if (dto.photos !== undefined) punto.photos = dto.photos;
+    if (dto.actaPdfUrl !== undefined) punto.actaPdfUrl = dto.actaPdfUrl;
+    if (dto.residuos !== undefined) {
+      punto.residuos = dto.residuos.map((r: any) => ({
+        id: r.id || randomUUID(),
+        recogido: false,
+        createdByUserId: userId,
+        ...r,
+      }));
+    }
+    return this.repo.save(punto);
   }
 
   async send(id: string, userId: string) {

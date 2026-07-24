@@ -1,0 +1,31 @@
+import { IsArray, IsISO8601, IsNumber, IsOptional, IsString } from 'class-validator';
+
+export class UpdatePuntoDto {
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+
+  @IsOptional()
+  @IsString()
+  barrio?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dateTime?: string;
+
+  @IsOptional()
+  @IsArray()
+  photos?: string[];
+
+  @IsOptional()
+  @IsString()
+  actaPdfUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  residuos?: unknown[];
+}

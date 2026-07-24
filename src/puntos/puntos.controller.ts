@@ -6,6 +6,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { Role } from '../common/enums/role.enum';
 import { PuntosService } from './puntos.service';
 import { CreatePuntoDto } from './dto/create-punto.dto';
+import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { MergeResiduosDto } from './dto/merge-residuos.dto';
 import { AprobarResiduoDto } from './dto/aprobar-residuo.dto';
@@ -62,6 +63,12 @@ export class PuntosController {
   @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
   findOne(@Param('id') id: string) {
     return this.puntosService.findOne(id);
+  }
+
+  @Patch(':id')
+  @Roles(Role.GESTOR_AMBIENTAL)
+  update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdatePuntoDto) {
+    return this.puntosService.update(id, req.user.userId, dto);
   }
 
   @Post(':id/send')

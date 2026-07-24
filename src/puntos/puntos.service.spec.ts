@@ -11,6 +11,49 @@ describe('PuntosService', () => {
     return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
   };
 
+  describe('update', () => {
+    it('permite al creador editar un punto en BORRADOR', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      const actualizado = await service.update(punto.id, 'user-1', { barrio: 'B', lat: 2 });
+      expect(actualizado.barrio).toBe('B');
+      expect(actualizado.lat).toBe(2);
+    });
+
+    it('permite al creador editar un punto RECHAZADA (corregir y reenviar)', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      await service.send(punto.id, 'user-1');
+      await service.reject(punto.id, 'validador-1', 'Faltan fotos');
+      const actualizado = await service.update(punto.id, 'user-1', { barrio: 'Corregido' });
+      expect(actualizado.barrio).toBe('Corregido');
+    });
+
+    it('rechaza editar un punto ya ENVIADA', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      await service.send(punto.id, 'user-1');
+      await expect(service.update(punto.id, 'user-1', { barrio: 'X' })).rejects.toThrow();
+    });
+
+    it('rechaza editar si quien edita no es el creador', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      await expect(service.update(punto.id, 'otro-user', { barrio: 'X' })).rejects.toThrow();
+    });
+
+    it('reemplaza el array de residuos cuando se pasa uno nuevo', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      const actualizado = await service.update(punto.id, 'user-1', {
+        residuos: [{ tipoResiduo: 'PLANTAS', quienDispuso: 'COMUNIDAD', areaLinealMetros: 2, percibeOlores: false, percibeVectores: false, photos: [] }],
+      });
+      expect(actualizado.residuos).toHaveLength(1);
+      expect(actualizado.residuos[0].tipoResiduo).toBe('PLANTAS');
+      expect(actualizado.residuos[0].id).toBeTruthy();
+    });
+  });
+
   it('crea un punto asignando el creador desde el usuario autenticado', async () => {
     const { service } = makeService();
     const punto = await service.create('user-1', { lat: 4.1, lng: -74.2, barrio: 'Centro' });
