@@ -1,7 +1,7 @@
 export interface ParadaRuta {
   numeroGlobal: number;
   numeroSegmento: number;
-  activityId: string;
+  puntoId: string;
   lat: number;
   lng: number;
   barrio: string;

@@ -63,7 +63,7 @@ export const IndicadoresAmbientalPanel: React.FC<{ actividades: Activity[] }> = 
         {reincidentes.length === 0 && <p className="text-xs text-neutral-400">Ninguno</p>}
         <div className="space-y-1 max-h-48 overflow-y-auto">
           {reincidentes.slice(0, 10).map(p => (
-            <div key={p.activityId} className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-neutral-50">
+            <div key={p.puntoResiduoId} className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-neutral-50">
               <span className="text-neutral-700 truncate">{p.barrio}</span>
               <span className="font-bold text-red-600">{p.ciclos} ciclos</span>
             </div>

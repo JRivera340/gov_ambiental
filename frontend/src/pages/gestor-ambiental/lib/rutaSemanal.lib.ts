@@ -5,17 +5,17 @@ const BOGOTA_OFFSET_MS = 5 * 3600000;
 const DAY = 86400000;
 
 export function paradaLiteFromParadaRuta(p: ParadaRuta): ParadaLite {
-  return { activityId: p.activityId, lat: p.lat, lng: p.lng, barrio: p.barrio, visitado: p.visitado };
+  return { puntoId: p.puntoId, lat: p.lat, lng: p.lng, barrio: p.barrio, visitado: p.visitado };
 }
 
 export function hidratarParadas(dto: RutaSemanalDTO, puntos: ParadaRuta[]): ParadaRuta[] {
-  const porId = new Map(puntos.map(p => [p.activityId, p]));
+  const porId = new Map(puntos.map(p => [p.puntoId, p]));
   return dto.paradas.map((lite, idx) => {
-    const base = porId.get(lite.activityId);
+    const base = porId.get(lite.puntoId);
     return {
       numeroGlobal: idx + 1,
       numeroSegmento: base?.numeroSegmento ?? 0,
-      activityId: lite.activityId,
+      puntoId: lite.puntoId,
       lat: lite.lat,
       lng: lite.lng,
       barrio: lite.barrio,

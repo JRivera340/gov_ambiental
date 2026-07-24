@@ -11,14 +11,14 @@ vi.mock('../lib/ruta', () => ({
   getHistorialRutas: vi.fn(() => []),
   deleteFromHistorial: vi.fn(),
   buildSegmentos: vi.fn(() => [
-    { id: 'A', paradas: [{ activityId: 'x', visitado: false }], estado: 'pendiente' },
+    { id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' },
   ]),
   getUnvisitedActivityIds: vi.fn(() => new Set<string>()),
 }));
 vi.mock('../lib/geo', () => ({
   nearestNeighborRoute: vi.fn((_o: any, pts: any[]) => pts),
 }));
-const candidatoDefault = { activityId: 'x', lat: 4, lng: -74, barrio: 'B', diasVencido: 0, tiposResiduo: [], visitado: false, diasSinSeguimiento: 0 };
+const candidatoDefault = { puntoId: 'x', lat: 4, lng: -74, barrio: 'B', diasVencido: 0, tiposResiduo: [], visitado: false, diasSinSeguimiento: 0 };
 vi.mock('../lib/rutaModos', () => ({
   getPuntosPorModo: vi.fn(() => [candidatoDefault]),
 }));
@@ -58,7 +58,7 @@ const setup = (initialRuta: any = null) => {
 
 const rutaConParada = () => ({
   id: 'r1', gestorId: 'g1', estado: 'en_progreso',
-  segmentos: [{ id: 'A', paradas: [{ activityId: 'x', visitado: false }], estado: 'pendiente' }],
+  segmentos: [{ id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' }],
 });
 
 describe('useRutaAmbiental', () => {
@@ -67,7 +67,7 @@ describe('useRutaAmbiental', () => {
     (ruta.getRutaActiva as any).mockReturnValue(null);
     (ruta.getHistorialRutas as any).mockReturnValue([]);
     (ruta.buildSegmentos as any).mockReturnValue([
-      { id: 'A', paradas: [{ activityId: 'x', visitado: false }], estado: 'pendiente' },
+      { id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' },
     ]);
   });
 
@@ -127,7 +127,7 @@ describe('useRutaAmbiental', () => {
     vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
       id: 'rs-hidratada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
       estado: 'en_progreso',
-      paradas: [{ activityId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
+      paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
       segmentos: [], arrastre: [],
     });
     const { result } = setup();
@@ -141,7 +141,7 @@ describe('useRutaAmbiental', () => {
     vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
       id: 'rs-cancelada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
       estado: 'cancelada',
-      paradas: [{ activityId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
+      paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
       segmentos: [], arrastre: [],
     });
     const { result } = setup();
@@ -161,8 +161,8 @@ describe('useRutaAmbiental', () => {
     vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
       id: 'rs-stale-segmentos', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
       estado: 'en_progreso',
-      paradas: [{ activityId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: true }],
-      segmentos: [{ id: 'A', paradas: [{ activityId: 'x', visitado: false }], estado: 'pendiente' }],
+      paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: true }],
+      segmentos: [{ id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' }],
       arrastre: [],
     });
     const { result } = setup();
@@ -171,7 +171,7 @@ describe('useRutaAmbiental', () => {
     });
     const parada = result.current.rutaActiva!.segmentos
       .flatMap(s => s.paradas)
-      .find(p => p.activityId === 'x');
+      .find(p => p.puntoId === 'x');
     expect(parada?.visitado).toBe(true);
   });
 });

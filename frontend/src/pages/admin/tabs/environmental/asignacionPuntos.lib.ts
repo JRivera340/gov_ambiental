@@ -6,7 +6,7 @@ export function groupAsignacionesByGestor(rows: AsignacionRow[]): Record<string,
   for (const row of rows) {
     if (!row.gestorId) continue;
     if (!out[row.gestorId]) out[row.gestorId] = [];
-    out[row.gestorId].push(row.activityId);
+    out[row.gestorId].push(row.puntoResiduoId);
   }
   return out;
 }

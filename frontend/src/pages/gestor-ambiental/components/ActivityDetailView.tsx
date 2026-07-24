@@ -604,7 +604,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
       {selectedResiduoForNota && (
         <NotasResiduoModal
           residuo={selectedResiduoForNota}
-          activityId={activity.id}
+          puntoId={activity.id}
           canAdd={canAddNota}
           onClose={() => setSelectedResiduoForNota(null)}
           onUpdated={(updated) => {

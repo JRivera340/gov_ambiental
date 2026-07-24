@@ -51,21 +51,21 @@ describe('calcularOrigenRecomendado', () => {
 
   it('elige el punto más periférico (mayor distancia media a los demás)', () => {
     const puntos: any[] = [
-      { activityId: 'c1', lat: 0, lng: 0, diasVencido: 0 },
-      { activityId: 'c2', lat: 0, lng: 0.001, diasVencido: 0 },
-      { activityId: 'c3', lat: 0, lng: 0.002, diasVencido: 0 },
-      { activityId: 'far', lat: 1, lng: 1, diasVencido: 0 },
+      { puntoId: 'c1', lat: 0, lng: 0, diasVencido: 0 },
+      { puntoId: 'c2', lat: 0, lng: 0.001, diasVencido: 0 },
+      { puntoId: 'c3', lat: 0, lng: 0.002, diasVencido: 0 },
+      { puntoId: 'far', lat: 1, lng: 1, diasVencido: 0 },
     ];
-    expect(calcularOrigenRecomendado(puntos)?.activityId).toBe('far');
+    expect(calcularOrigenRecomendado(puntos)?.puntoId).toBe('far');
   });
 
   it('prioriza los puntos vencidos como candidatos', () => {
     const puntos: any[] = [
-      { activityId: 'vencido', lat: 0, lng: 0, diasVencido: 6 },
-      { activityId: 'far', lat: 1, lng: 1, diasVencido: 0 },
-      { activityId: 'c', lat: 0, lng: 0.001, diasVencido: 0 },
+      { puntoId: 'vencido', lat: 0, lng: 0, diasVencido: 6 },
+      { puntoId: 'far', lat: 1, lng: 1, diasVencido: 0 },
+      { puntoId: 'c', lat: 0, lng: 0.001, diasVencido: 0 },
     ];
-    expect(calcularOrigenRecomendado(puntos)?.activityId).toBe('vencido');
+    expect(calcularOrigenRecomendado(puntos)?.puntoId).toBe('vencido');
   });
 });
 

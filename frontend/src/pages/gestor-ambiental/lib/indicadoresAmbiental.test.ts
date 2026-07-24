@@ -55,7 +55,7 @@ describe('puntosReincidentes', () => {
       punto('b', 'Y', [r('ORD', true)]),                                   // 1 ciclo
     ];
     const out = puntosReincidentes(ps, 2);
-    expect(out.map(p => p.activityId)).toEqual(['a']);
+    expect(out.map(p => p.puntoResiduoId)).toEqual(['a']);
     expect(out[0].ciclos).toBe(3);
   });
 });

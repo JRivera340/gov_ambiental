@@ -7,7 +7,7 @@ import { tipoResiduoLabels } from '../lib/constants';
 
 interface NotasResiduoModalProps {
   residuo: ResiduoEntry;
-  activityId: string;
+  puntoId: string;
   canAdd: boolean;
   onClose: () => void;
   onUpdated: (updated: Activity) => void;
@@ -16,7 +16,7 @@ interface NotasResiduoModalProps {
 
 export const NotasResiduoModal: React.FC<NotasResiduoModalProps> = ({
   residuo,
-  activityId,
+  puntoId,
   canAdd,
   onClose,
   onUpdated,
@@ -31,7 +31,7 @@ export const NotasResiduoModal: React.FC<NotasResiduoModalProps> = ({
   const handleDelete = async (notaId: string) => {
     setDeletingId(notaId);
     try {
-      const updated = await activityService.eliminarNotaResiduo(activityId, residuo.id, notaId);
+      const updated = await activityService.eliminarNotaResiduo(puntoId, residuo.id, notaId);
       onUpdated(updated);
       setToast({ message: 'Nota eliminada', type: 'success' });
       onClose();
@@ -47,7 +47,7 @@ export const NotasResiduoModal: React.FC<NotasResiduoModalProps> = ({
     if (!texto.trim()) return;
     setSaving(true);
     try {
-      const updated = await activityService.agregarNotaResiduo(activityId, residuo.id, texto.trim());
+      const updated = await activityService.agregarNotaResiduo(puntoId, residuo.id, texto.trim());
       onUpdated(updated);
       setToast({ message: 'Nota agregada correctamente', type: 'success' });
       setTexto('');

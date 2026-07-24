@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 
 interface ResiduoPublico {
   tipoResiduo: string;
@@ -63,8 +63,8 @@ export default function PublicPuntoPage() {
 
   useEffect(() => {
     if (!id) return;
-    axios
-      .get(`/api/sorver/public/actividad/${id}`)
+    api
+      .get(`/puntos/public/${id}`)
       .then((r) => setPunto(r.data))
       .catch(() => setError('No se encontró el punto o hubo un error al cargarlo.'))
       .finally(() => setLoading(false));

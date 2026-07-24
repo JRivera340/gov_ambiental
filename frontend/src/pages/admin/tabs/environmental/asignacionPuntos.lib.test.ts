@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { groupAsignacionesByGestor } from './asignacionPuntos.lib';
 
 describe('groupAsignacionesByGestor', () => {
-  it('agrupa activityIds por gestorId', () => {
+  it('agrupa puntoResiduoIds por gestorId', () => {
     const rows = [
-      { activityId: 'a1', gestorId: 'g1' },
-      { activityId: 'a2', gestorId: 'g1' },
-      { activityId: 'a3', gestorId: 'g2' },
+      { puntoResiduoId: 'a1', gestorId: 'g1' },
+      { puntoResiduoId: 'a2', gestorId: 'g1' },
+      { puntoResiduoId: 'a3', gestorId: 'g2' },
     ];
     expect(groupAsignacionesByGestor(rows)).toEqual({
       g1: ['a1', 'a2'],
@@ -16,8 +16,8 @@ describe('groupAsignacionesByGestor', () => {
 
   it('ignora filas sin gestor asignado', () => {
     const rows = [
-      { activityId: 'a1', gestorId: null },
-      { activityId: 'a2', gestorId: 'g1' },
+      { puntoResiduoId: 'a1', gestorId: null },
+      { puntoResiduoId: 'a2', gestorId: 'g1' },
     ];
     expect(groupAsignacionesByGestor(rows)).toEqual({ g1: ['a2'] });
   });

@@ -45,7 +45,7 @@ export const RutaPolylineLayer: React.FC<RutaPolylineLayerProps> = ({
 
         return (
           <Marker
-            key={parada.activityId}
+            key={parada.puntoId}
             position={[parada.lat, parada.lng]}
             icon={icon}
             eventHandlers={onMarkerClick ? { click: () => onMarkerClick(parada) } : {}}

@@ -1,11 +1,11 @@
 import api from './api';
 
 export interface AsignacionRow {
-  activityId: string;
+  puntoResiduoId: string;
   gestorId: string | null;
 }
 export interface ParadaLite {
-  activityId: string;
+  puntoId: string;
   lat: number;
   lng: number;
   barrio: string;
@@ -26,35 +26,35 @@ export interface RutaSemanalDTO {
 
 export const ambientalService = {
   async getMisPuntos(): Promise<string[]> {
-    const { data } = await api.get<string[]>('/sorver/ambiental/asignacion/mine');
+    const { data } = await api.get<string[]>('/asignaciones/mine');
     return Array.isArray(data) ? data : [];
   },
   async getAsignacionAll(): Promise<AsignacionRow[]> {
-    const { data } = await api.get<AsignacionRow[]>('/sorver/ambiental/asignacion/all');
+    const { data } = await api.get<AsignacionRow[]>('/asignaciones/all');
     return Array.isArray(data) ? data : [];
   },
   async getSinAsignar(): Promise<string[]> {
-    const { data } = await api.get<string[]>('/sorver/ambiental/asignacion/sin-asignar');
+    const { data } = await api.get<string[]>('/asignaciones/sin-asignar');
     return Array.isArray(data) ? data : [];
   },
-  async reasignarPunto(activityId: string, gestorId: string | null): Promise<AsignacionRow> {
-    const { data } = await api.patch<AsignacionRow>('/sorver/ambiental/asignacion/punto', { activityId, gestorId });
+  async reasignarPunto(puntoResiduoId: string, gestorId: string | null): Promise<AsignacionRow> {
+    const { data } = await api.patch<AsignacionRow>('/asignaciones/punto', { puntoResiduoId, gestorId });
     return data;
   },
   async getRutaSemanal(): Promise<RutaSemanalDTO | null> {
-    const { data } = await api.get<RutaSemanalDTO | null>('/sorver/ambiental/ruta-semanal/mine');
+    const { data } = await api.get<RutaSemanalDTO | null>('/rutas-semanales/mine');
     return data ?? null;
   },
   async crearRutaSemana(paradas: ParadaLite[], segmentos: any[]): Promise<RutaSemanalDTO> {
-    const { data } = await api.post<RutaSemanalDTO>('/sorver/ambiental/ruta-semanal', { paradas, segmentos });
+    const { data } = await api.post<RutaSemanalDTO>('/rutas-semanales', { paradas, segmentos });
     return data;
   },
   async cancelarRutaSemana(rutaId: string): Promise<RutaSemanalDTO> {
-    const { data } = await api.patch<RutaSemanalDTO>(`/sorver/ambiental/ruta-semanal/${rutaId}/cancelar`);
+    const { data } = await api.patch<RutaSemanalDTO>(`/rutas-semanales/${rutaId}/cancelar`);
     return data;
   },
   async getArrastre(): Promise<string[]> {
-    const { data } = await api.get<string[]>('/sorver/ambiental/ruta-semanal/arrastre/mine');
+    const { data } = await api.get<string[]>('/rutas-semanales/arrastre/mine');
     return Array.isArray(data) ? data : [];
   },
 };

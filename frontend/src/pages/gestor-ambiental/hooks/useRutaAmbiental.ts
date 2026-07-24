@@ -107,7 +107,7 @@ export function useRutaAmbiental(
       return {
         numeroGlobal: idx + 1,
         numeroSegmento: 0,
-        activityId: a.id,
+        puntoId: a.id,
         lat: a.lat,
         lng: a.lng,
         barrio: a.barrio,

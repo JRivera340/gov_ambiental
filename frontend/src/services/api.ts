@@ -5,13 +5,13 @@ import { shouldRetry, backoffDelay } from './lib/retry';
 const MAX_RETRIES = 2;
 
 const getApiBaseURL = () => {
-  // En desarrollo local: usar proxy nginx
-  if (typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return '/api';
-  }
-  
-  // En producción: usar el mismo dominio con /api (nginx hace proxy al backend)
-  // Esto funciona tanto para railway.app como para dominios personalizados como BogotaneidApp.com
+  // Repo standalone: el backend de Ambiental vive en un origen propio, no en
+  // el mismo dominio que este frontend (a diferencia del monolito, que
+  // proxeaba /api vía nginx al mismo host). En local, el proxy de Vite
+  // (vite.config.ts) redirige /api al backend en localhost:3001; en
+  // producción, VITE_AMBIENTAL_API_URL apunta al backend desplegado.
+  const envUrl = import.meta.env.VITE_AMBIENTAL_API_URL as string | undefined;
+  if (envUrl) return `${envUrl.replace(/\/$/, '')}/api`;
   return '/api';
 };
 

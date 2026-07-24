@@ -145,7 +145,7 @@ export function calcularOrigenRecomendado(
   const candidatos = vencidos.length > 0 ? vencidos : puntos;
 
   return candidatos.reduce<ParadaRuta | null>((best, candidate) => {
-    const others = puntos.filter(p => p.activityId !== candidate.activityId);
+    const others = puntos.filter(p => p.puntoId !== candidate.puntoId);
     const sorted = others
       .map(p => haversineDistance(candidate.lat, candidate.lng, p.lat, p.lng))
       .sort((a, b) => a - b);
@@ -153,7 +153,7 @@ export function calcularOrigenRecomendado(
       sorted.slice(0, 5).reduce((s, d) => s + d, 0) / Math.min(5, sorted.length || 1);
 
     if (!best) return candidate;
-    const bestOthers = puntos.filter(p => p.activityId !== best.activityId);
+    const bestOthers = puntos.filter(p => p.puntoId !== best.puntoId);
     const bestSorted = bestOthers
       .map(p => haversineDistance(best.lat, best.lng, p.lat, p.lng))
       .sort((a, b) => a - b);

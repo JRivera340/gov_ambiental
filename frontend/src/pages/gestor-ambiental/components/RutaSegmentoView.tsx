@@ -43,8 +43,8 @@ export const RutaSegmentoView: React.FC = () => {
       ? [segmento.paradas[0].lat, segmento.paradas[0].lng]
       : [4.5981, -74.0758];
 
-  const handleVerDetalle = (activityId: string) => {
-    const act = activities.find(a => a.id === activityId);
+  const handleVerDetalle = (puntoId: string) => {
+    const act = activities.find(a => a.id === puntoId);
     if (act) openActivity(act);
     setParadaSeleccionada(null);
   };
@@ -105,7 +105,7 @@ export const RutaSegmentoView: React.FC = () => {
           <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1">Paradas</p>
           {segmento.paradas.map(parada => (
             <div
-              key={parada.activityId}
+              key={parada.puntoId}
               className={`p-3 rounded-xl border transition-all ${
                 parada.visitado
                   ? 'border-green-100 bg-green-50 opacity-60'
@@ -147,7 +147,7 @@ export const RutaSegmentoView: React.FC = () => {
                     </span>
                   )}
                   <button
-                    onClick={() => handleVerDetalle(parada.activityId)}
+                    onClick={() => handleVerDetalle(parada.puntoId)}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-all"
                   >
                     Ver detalle
@@ -225,7 +225,7 @@ export const RutaSegmentoView: React.FC = () => {
             </span>
           )}
           <button
-            onClick={() => handleVerDetalle(paradaSeleccionada.activityId)}
+            onClick={() => handleVerDetalle(paradaSeleccionada.puntoId)}
             className="w-full py-2 rounded-xl text-[11px] font-bold border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-all"
           >
             Ver detalle

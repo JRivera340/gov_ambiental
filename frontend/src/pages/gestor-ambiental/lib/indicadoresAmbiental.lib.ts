@@ -48,14 +48,14 @@ export function residuosPorTipo(puntos: Activity[]): { tipo: string; total: numb
 export function puntosReincidentes(
   puntos: Activity[],
   minCiclos = 2,
-): { activityId: string; barrio: string; ciclos: number }[] {
-  const out: { activityId: string; barrio: string; ciclos: number }[] = [];
+): { puntoResiduoId: string; barrio: string; ciclos: number }[] {
+  const out: { puntoResiduoId: string; barrio: string; ciclos: number }[] = [];
   for (const p of puntos) {
     const res = getResiduos(p);
     const recogidos = res.filter(x => x.recogido).length;
     const pendientes = res.some(x => !x.recogido) ? 1 : 0;
     const ciclos = recogidos + pendientes;
-    if (ciclos >= minCiclos) out.push({ activityId: p.id, barrio: p.barrio, ciclos });
+    if (ciclos >= minCiclos) out.push({ puntoResiduoId: p.id, barrio: p.barrio, ciclos });
   }
   return out.sort((a, b) => b.ciclos - a.ciclos);
 }

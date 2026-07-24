@@ -88,7 +88,7 @@ export function getUnvisitedActivityIds(gestorId: string): Set<string> {
   for (const ruta of historial) {
     for (const seg of ruta.segmentos) {
       for (const p of seg.paradas) {
-        if (!p.visitado) ids.add(p.activityId);
+        if (!p.visitado) ids.add(p.puntoId);
       }
     }
   }

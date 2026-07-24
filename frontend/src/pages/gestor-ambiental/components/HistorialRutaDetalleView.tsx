@@ -77,7 +77,7 @@ export const HistorialRutaDetalleView: React.FC = () => {
             <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1">Paradas</p>
             {selectedSeg.paradas.map(p => (
               <div
-                key={p.activityId}
+                key={p.puntoId}
                 className={`p-3 rounded-xl border transition-all ${
                   p.visitado ? 'border-green-100 bg-green-50' : 'border-neutral-100 bg-white'
                 }`}

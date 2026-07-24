@@ -2,28 +2,28 @@ import { describe, it, expect } from 'vitest';
 import { paradaLiteFromParadaRuta, hidratarParadas, diasRestantesSemana, esLunesBogota } from './rutaSemanal.lib';
 
 const PR = (id: string, barrio: string, visitado = false) => ({
-  numeroGlobal: 1, numeroSegmento: 0, activityId: id, lat: 4.6, lng: -74.07,
+  numeroGlobal: 1, numeroSegmento: 0, puntoId: id, lat: 4.6, lng: -74.07,
   barrio, diasVencido: 3, tiposResiduo: ['RESIDUOS_ORDINARIOS'], visitado, diasSinSeguimiento: Infinity,
 });
 
 describe('paradaLiteFromParadaRuta', () => {
   it('reduce a los campos ParadaLite', () => {
     expect(paradaLiteFromParadaRuta(PR('a', 'LOURDES', true))).toEqual({
-      activityId: 'a', lat: 4.6, lng: -74.07, barrio: 'LOURDES', visitado: true,
+      puntoId: 'a', lat: 4.6, lng: -74.07, barrio: 'LOURDES', visitado: true,
     });
   });
 });
 
 describe('hidratarParadas', () => {
   it('cruza dto.paradas con puntos actuales y prefiere el visitado recalculado en vivo', () => {
-    const dto: any = { paradas: [{ activityId: 'a', lat: 4.6, lng: -74.07, barrio: 'LOURDES', visitado: true }] };
+    const dto: any = { paradas: [{ puntoId: 'a', lat: 4.6, lng: -74.07, barrio: 'LOURDES', visitado: true }] };
     const puntos = [PR('a', 'LOURDES', false)];
     const out = hidratarParadas(dto, puntos);
     expect(out[0].visitado).toBe(false);
     expect(out[0].tiposResiduo).toEqual(['RESIDUOS_ORDINARIOS']); // enriquecido del punto
   });
   it('cae al snapshot del backend cuando el punto ya no está en el pool actual', () => {
-    const dto: any = { paradas: [{ activityId: 'unknown-id', lat: 4.7, lng: -74.08, barrio: 'OTRO', visitado: true }] };
+    const dto: any = { paradas: [{ puntoId: 'unknown-id', lat: 4.7, lng: -74.08, barrio: 'OTRO', visitado: true }] };
     const puntos = [PR('a', 'LOURDES', false)];
     const out = hidratarParadas(dto, puntos);
     expect(out[0].diasVencido).toBe(0);

@@ -5,7 +5,7 @@ import type { ParadaRuta } from './ruta.types';
 const parada = (overrides?: Partial<ParadaRuta>): ParadaRuta => ({
   numeroGlobal: 1,
   numeroSegmento: 1,
-  activityId: 'test-activity',
+  puntoId: 'test-activity',
   lat: 0,
   lng: 0,
   barrio: 'test-barrio',
@@ -17,7 +17,7 @@ const parada = (overrides?: Partial<ParadaRuta>): ParadaRuta => ({
 });
 
 const paradas = (n: number): any[] =>
-  Array.from({ length: n }, (_, i) => ({ activityId: `a${i}`, numeroGlobal: i + 1 }));
+  Array.from({ length: n }, (_, i) => ({ puntoId: `a${i}`, numeroGlobal: i + 1 }));
 
 describe('buildSegmentos', () => {
   it('devuelve [] sin paradas', () => {
