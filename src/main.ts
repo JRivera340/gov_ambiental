@@ -29,7 +29,6 @@ async function bootstrap() {
       if (origin.endsWith('.railway.app') || origin.endsWith('.up.railway.app')) {
         return callback(null, true);
       }
-      if (origin.includes('bogotaneidapp.com')) return callback(null, true);
       return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,

@@ -4,6 +4,9 @@ export const envSchema = z.object({
   NODE_ENV: z.string().optional(),
   PORT: z.coerce.number().default(3001),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  // URL del frontend propio, usada como fallback en el link publico del reporte
+  // XLSX cuando el cliente no lo manda explicito. Cada despliegue pone la suya.
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
 
   JWT_SECRET: z.string(),
 

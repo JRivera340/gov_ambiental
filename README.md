@@ -1,6 +1,15 @@
 # gov_ambiental_publico
 
-Backend independiente del módulo Ambiental (puntos de residuos, procesos, rutas de gestores, sectores de recolección). Se conecta a `bogotaneidapp.com` compartiendo únicamente el `JWT_SECRET` — no comparte base de datos ni tabla de usuarios con el sistema principal.
+Backend independiente del módulo Ambiental (puntos de residuos, procesos, rutas de gestores, sectores de recolección). Puede compartir sesión con otro sistema de login usando el mismo `JWT_SECRET` (variable de entorno) — no comparte base de datos ni tabla de usuarios con nadie.
+
+## Correrlo standalone, sin depender de ningún otro sistema
+
+Nada en el código está atado a un dominio o secreto específico — todo lo que cambia entre despliegues es variable de entorno:
+- `JWT_SECRET`: cualquier valor propio. Solo tiene que coincidir con el de otro sistema si vas a aceptar tokens que ese sistema emite (para compartir sesión sin duplicar usuarios). Si no, generá el tuyo y listo — cero conflicto posible, cada despliegue tiene el suyo.
+- `CORS_ORIGIN`: el dominio de tu frontend.
+- `FRONTEND_URL`: para el link del reporte XLSX.
+
+No hay ningún dominio ni secreto hardcodeado en el código fuente — se puede confirmar corriendo `grep -r "bogotaneidapp" src` (debe dar vacío, salvo comentarios/tests).
 
 ## Correrlo en tu máquina (sin ningún dato ni credencial real)
 

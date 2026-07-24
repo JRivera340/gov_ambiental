@@ -11,6 +11,7 @@ import { SeguimientoDto } from './dto/seguimiento.dto';
 import { MergeResiduosDto } from './dto/merge-residuos.dto';
 import { AprobarResiduoDto } from './dto/aprobar-residuo.dto';
 import { ReporteService } from '../reporte/reporte.service';
+import { getEnv } from '../config/env';
 
 @Controller('puntos')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -51,7 +52,7 @@ export class PuntosController {
   @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
   async reportXlsx(@Res() res: any, @Query('frontendUrl') frontendUrl?: string) {
     const puntos = await this.puntosService.findPublished();
-    const buffer = this.reporteService.generateXlsxReport(puntos, frontendUrl || 'https://ambiental.bogotaneidapp.com');
+    const buffer = this.reporteService.generateXlsxReport(puntos, frontendUrl || getEnv().FRONTEND_URL);
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename="pendientes-recogida.xlsx"',
