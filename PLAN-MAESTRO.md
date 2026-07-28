@@ -677,7 +677,7 @@ los hitos anteriores ya estén cerradas.
 - Endpoints ya rotos en el hub: `editar-residuo`, `import-ambiental-excel` —
   no se replican, son deuda del origen, no de la extracción. Detalle completo
   (archivo/línea, impacto, esfuerzo) movido a `DEUDA-TECNICA.md` en el repo
-  del hub, ítem 2 — no se repite aquí.
+  del hub, ítem 3 — no se repite aquí.
 - Cualquier feature nueva no presente hoy en el hub — este plan es paridad +
   independencia, no expansión de alcance funcional.
 - Migración de HS256 (secreto compartido) a firma asimétrica (RS256) para la
@@ -687,5 +687,5 @@ los hitos anteriores ya estén cerradas.
 - `tsc --noEmit` del frontend del hub tiene 61 errores preexistentes,
   confirmado el 2026-07-28, sin relación con esta extracción (mismo conteo
   con y sin los cambios de la rama del sidebar). Es deuda del hub, no de
-  ambiental — movida a `DEUDA-TECNICA.md` en el repo del hub, ítem 4, con el
+  ambiental — movida a `DEUDA-TECNICA.md` en el repo del hub, ítem 5, con el
   detalle completo. No se repite aquí.
