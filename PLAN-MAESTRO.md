@@ -682,3 +682,13 @@ los hitos anteriores ya estén cerradas.
   emisión de tokens del hub — es trabajo de plataforma (afecta a todos los
   módulos presentes y futuros, no solo a ambiental), no de esta extracción.
   Queda registrado como deuda en Decisiones abiertas, se resuelve aparte.
+- **`tsc --noEmit` del frontend del hub (`packages/frontend`) tiene 61
+  errores preexistentes**, confirmado el 2026-07-28 antes de tocar nada de
+  la rama `feature/ambiental-handoff-sidebar` (mismo conteo con y sin los
+  cambios de esa rama — no los introdujo ni los agrava). Incluye tipos de
+  encuestas (`Survey`, `submitSurveyResults` faltantes en
+  `survey.service.ts`), comparaciones de enums sin overlap
+  (`ResiduoEntry.status`, roles `VALIDADOR` vs. el enum real),
+  `pointNumber`/props posiblemente `undefined` sin narrowing, y una prop CSS
+  inválida en `LineChart.tsx`. Es deuda del hub, no de la extracción de
+  ambiental — fuera de alcance de este proyecto, no se toca aquí.
