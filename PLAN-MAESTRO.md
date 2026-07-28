@@ -54,6 +54,16 @@ encuestas):
 - `Postgres-_hTA` — base de datos propia de ambiental (nombre autogenerado,
   sin impacto funcional)
 
+**Incidente de seguridad 2026-07-28**: al conectar ambiental al `JWT_SECRET`
+real del hub se encontró que ese valor (y las credenciales de Cloudflare R2
+del hub) estaban expuestos en texto plano en el historial de git de
+`gov-espacio-publico` (privado) desde enero 2026, en archivos de documentación
+ya borrados del árbol pero recuperables del historial. `gov_ambiental`
+(público) se auditó completo — sin exposición, limpio. `JWT_SECRET` ya se
+rotó y se verificó en ambos servicios (hub y ambiental). R2 en proceso.
+Detalle completo fuera de este documento (es un incidente, no un hito del
+plan) — ver resumen para la Alcaldía.
+
 Verificado end-to-end contra Railway: `/api/health` del backend responde
 200; el frontend sirve 200; `POST /api/handoff` con un JWT firmado con el
 `JWT_SECRET` REAL de producción del hub (leído de `backend-api` en Railway,
