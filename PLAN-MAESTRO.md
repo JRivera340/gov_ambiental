@@ -1,5 +1,5 @@
 # Plan maestro — Módulo ambiental independiente
-Última actualización: 2026-07-27 (HITO 0 verificado en local)
+Última actualización: 2026-07-28 (HITO 0 desplegado y verificado en Railway)
 
 ## Objetivo y criterio de terminado
 Convertir el módulo ambiental en un servicio independiente, desplegado aparte
@@ -41,14 +41,62 @@ el hub, y el ambiental opera de forma autónoma desde su propio subdominio.
 **Objetivo:** validar la cadena completa de auth cross-dominio con el módulo
 casi vacío, cuando cambiar de rumbo todavía es barato.
 
-**Estado: LOCAL verificado 2026-07-27, falta Railway.** Tareas 1-3 y 6
-implementadas y probadas de punta a punta con hosts locales
-(`bogotaneidapp.local` / `ambiental.bogotaneidapp.local`): un ADMIN entra por
-el hub, click en "Manejo de Residuos (nuevo)", llega autenticado a ambiental,
-ve email + rol. Implementado en rama `feature/ambiental-handoff-sidebar` del
-hub (gestión de tabs + form auto-submit) y rama `test` de este repo
-(`HandoffController`, `HandoffPage`). Tareas 7-10 (Railway) NO empezadas —
-requieren confirmación explícita antes de tocar la nube.
+**Estado: LOCAL y Railway verificados 2026-07-28. Falta solo el merge del
+sidebar del hub y el dominio custom.** Tareas 1-3, 5, 6, 7 hechas. Tarea 8
+(subdominio custom `ambiental.bogotaneidapp.com`) pendiente — requiere acceso
+a DNS de `bogotaneidapp.com`, no se hizo todavía.
+
+Servicios Railway creados en el proyecto `gov-espacio-publico` (mismo
+proyecto que el hub, decisión del usuario — ya aloja también los servicios de
+encuestas):
+- `ambiental-backend` — https://ambiental-backend-production.up.railway.app
+- `ambiental-frontend` — https://ambiental-frontend-production.up.railway.app
+- `Postgres-_hTA` — base de datos propia de ambiental (nombre autogenerado,
+  sin impacto funcional)
+
+Verificado end-to-end contra Railway: `/api/health` del backend responde
+200; el frontend sirve 200; `POST /api/handoff` con un JWT firmado con el
+`JWT_SECRET` REAL de producción del hub (leído de `backend-api` en Railway,
+no inventado) devuelve 302 con el fragmento `#token=...` apuntando al
+frontend de ambiental — la cadena de verificación de JWT funciona igual en
+la nube que en local. No se probó con login real de un admin de producción
+del hub (no hay credenciales de prueba en producción, `bootstrapAdmin` se
+desactiva explícitamente si `NODE_ENV=production`) — falta esa prueba final,
+que solo puede hacerla un ADMIN real, y solo tiene sentido una vez el sidebar
+esté mergeado a `main` del hub.
+
+Bugs reales encontrados y corregidos durante la verificación local (ninguno
+es parte del diseño del handoff en sí, pero bloqueaban probarlo):
+- `HandoffPage.tsx`: `React.StrictMode` duplica efectos en desarrollo — sin
+  guard (`useRef`), la segunda ejecución encontraba el hash ya limpiado por
+  la primera y pisaba la sesión exitosa con un error falso.
+- `packages/frontend/vite.config.ts` del hub: leía `process.env.BACKEND_URL`
+  sin cargar `.env` (Vite no lo hace automático en el config file, solo en
+  código de cliente vía `import.meta.env`) — el proxy `/api` apuntaba al
+  hostname de Docker (`backend:3000`) y nunca llegaba al backend real en
+  desarrollo local sin contenedores.
+- `src/config/typeorm.config.ts` en la rama `test` de este repo: `import path
+  from 'path'` (default import) rompía en runtime — ya estaba corregido a
+  `import * as path` en `version1` pero no se había propagado a `test`.
+- CORS del hub (`packages/backend/.env`, local): no incluía
+  `bogotaneidapp.local`, solo `localhost` — bloqueaba el login desde el
+  hostname que imita el subdominio real.
+
+Bugs reales encontrados y corregidos durante el despliegue a Railway:
+- `tsconfig.json` de este repo: `include: ["src", "scripts"]` sin `rootDir`
+  explícito hacía que TypeScript infiriera la raíz común del proyecto en vez
+  de `src`, y `nest build` emitía a `dist/src/main.js` en vez de
+  `dist/main.js`. El Dockerfile busca `dist/main` — el contenedor nunca había
+  arrancado en un build de producción real (nunca se había hecho uno hasta
+  ahora). Arreglado quitando `scripts` del `include` — ese directorio ya se
+  ejecuta vía `ts-node` directo sobre el fuente, no depende del build.
+- Railway aplicaba el `railway.toml` de la raíz del repo (config del backend:
+  Dockerfile + healthcheck `/api/health`) también al servicio
+  `ambiental-frontend`, pese a tener `rootDirectory=/frontend` — rompía su
+  build (no hay Dockerfile ahí) y su healthcheck (esa ruta no existe en un
+  sitio estático). Arreglado con un `frontend/railway.toml` propio
+  (`builder = "RAILPACK"`), que Railway prioriza dentro del `rootDirectory`
+  del servicio.
 
 Bugs reales encontrados y corregidos durante la verificación local (ninguno
 es parte del diseño del handoff en sí, pero bloqueaban probarlo):
@@ -105,18 +153,23 @@ es parte del diseño del handoff en sí, pero bloqueaban probarlo):
    ya usan, no hay que escribirlo de cero, solo confirmarlo apuntando al mismo
    secreto en ambos servicios.
 6. Pantalla mínima post-login: nombre y rol del usuario autenticado, nada más.
-7. Servicio backend + base de datos de ambiental en Railway (usar
-   `railway.toml` ya existente). Servicio frontend de ambiental en Railway
-   (no existe config todavía — crearla).
+7. ~~Servicio backend + base de datos de ambiental en Railway. Servicio
+   frontend de ambiental en Railway.~~ HECHO 2026-07-28: `ambiental-backend`
+   + `Postgres-_hTA` + `ambiental-frontend` creados en el proyecto
+   `gov-espacio-publico` (mismo proyecto que el hub), rama `test`, ambos con
+   dominio Railway propio y en `SUCCESS`. `JWT_SECRET` de ambiental-backend
+   igual al real de producción del hub (leído de `backend-api`, no
+   inventado). `CORS_ORIGIN`/`FRONTEND_URL` de ambiental-backend apuntan al
+   dominio Railway del frontend.
 8. Subdominio `ambiental.bogotaneidapp.com` apuntando al servicio Railway del
-   frontend.
-9. CORS del backend ambiental: añadir `ambiental.bogotaneidapp.com` a
-   `CORS_ORIGIN` (ya soporta wildcard `*.railway.app` vía `main.ts:25-35`, hay
-   que añadir el dominio de producción explícitamente).
-10. Entorno local: `hosts` con entradas que imiten subdominios (ej.
-   `127.0.0.1 hub.local` / `127.0.0.1 ambiental.local`) — probar el flujo de
-   handoff ahí, no en `localhost`, porque el comportamiento de storage/origen
-   por puerto puede dar falsos positivos que no repiten en producción.
+   frontend. **PENDIENTE** — requiere acceso a DNS de `bogotaneidapp.com`,
+   no se hizo todavía.
+9. ~~CORS del backend ambiental~~ HECHO 2026-07-28 con el dominio Railway del
+   frontend (`ambiental-frontend-production.up.railway.app`). Falta agregar
+   `ambiental.bogotaneidapp.com` cuando se resuelva la tarea 8.
+10. ~~Entorno local: hosts con entradas que imiten subdominios~~ HECHO
+    2026-07-27: `bogotaneidapp.local` / `ambiental.bogotaneidapp.local`,
+    flujo de handoff verificado ahí antes de tocar Railway.
 
 **Criterio de terminado (verificable en pantalla):** un ADMIN entra por
 `bogotaneidapp.com`, pulsa la entrada nueva del sidebar, llega a
@@ -125,7 +178,9 @@ pantalla que muestra su nombre y su rol.
 
 **Se despliega y se comprueba:** ambos servicios (frontend/backend de
 ambiental) visibles y healthy en el dashboard de Railway; healthcheck
-`/api/health` en verde; flujo de handoff repetido en producción, no solo local.
+`/api/health` en verde; flujo de handoff repetido en producción, no solo
+local. HECHO 2026-07-28 salvo la prueba con login real de un ADMIN (bloqueada
+hasta que el sidebar del hub esté mergeado — ver arriba).
 
 **Riesgos:**
 - El mecanismo interino (POST + fragmento) reduce la exposición del JWT en
