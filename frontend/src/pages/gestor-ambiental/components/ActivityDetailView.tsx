@@ -476,7 +476,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                             </div>
                           </div>
                           {(hasNotas || canAddNota) && (
-                            <div className="px-4 pb-3 pt-0 flex items-center gap-2 border-t border-amber-200/50 mt-0 pt-2">
+                            <div className="px-4 pb-3 flex items-center gap-2 border-t border-amber-200/50 mt-0 pt-2">
                               {hasNotas && (
                                 <button
                                   onClick={() => setSelectedResiduoForNota(r as ResiduoEntry)}
@@ -558,7 +558,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                               {r.recogidoByNombre && <p className="text-[11px] text-green-700/70 font-bold uppercase break-words">Por: {r.recogidoByNombre}</p>}
                             </div>
                             {(hasNotasRec || canAddNota) && (
-                              <div className="px-3 pb-2 pt-0 flex items-center gap-1.5 border-t border-green-200/50 pt-2">
+                              <div className="px-3 pb-2 flex items-center gap-1.5 border-t border-green-200/50 pt-2">
                                 {hasNotasRec && (
                                   <button
                                     onClick={() => setSelectedResiduoForNota(r as ResiduoEntry)}

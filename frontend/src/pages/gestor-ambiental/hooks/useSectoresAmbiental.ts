@@ -146,7 +146,7 @@ export function useSectoresAmbiental(activities: Activity[], user: SectoresUser)
                    const p = coords[0];
                    return `${Number(p[0]).toFixed(6)}_${Number(p[1]).toFixed(6)}`;
                  }
-               } catch(e) {}
+               } catch { /* geometria malformada, cae a 'no-geom' */ }
                return 'no-geom';
             };
 

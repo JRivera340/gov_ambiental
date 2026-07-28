@@ -148,11 +148,11 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                 <span className="text-lg font-black text-neutral-800 leading-none">{ambientalInsightsData.totalIdentified.toLocaleString()}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-neutral-400 text-[8px] uppercase font-bold leading-none mb-1 text-emerald-600">Recog.</span>
+                <span className="text-[8px] uppercase font-bold leading-none mb-1 text-emerald-600">Recog.</span>
                 <span className="text-lg font-black text-emerald-600 leading-none">{ambientalInsightsData.totalCollected.toLocaleString()}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-neutral-400 text-[8px] uppercase font-bold leading-none mb-1 text-blue-600">Tasa</span>
+                <span className="text-[8px] uppercase font-bold leading-none mb-1 text-blue-600">Tasa</span>
                 <span className="text-lg font-black text-blue-600 leading-none">
                   {ambientalInsightsData.totalIdentified > 0
                     ? Math.round((ambientalInsightsData.totalCollected / ambientalInsightsData.totalIdentified) * 100)
@@ -160,7 +160,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-neutral-400 text-[8px] uppercase font-bold leading-none mb-1 text-purple-600">Radio</span>
+                <span className="text-[8px] uppercase font-bold leading-none mb-1 text-purple-600">Radio</span>
                 <span className="text-lg font-black text-purple-600 leading-none">30m</span>
               </div>
             </div>
