@@ -5,3 +5,5 @@ dist/
 .env.migration
 *.log
 coverage/
+INCIDENTE-*.md
+.screenshots/
