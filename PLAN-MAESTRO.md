@@ -387,10 +387,11 @@ Filtro para aislar filas ambientales: `activities."operativoCategoria" =
 'AMBIENTAL'` (enum `OperativoCategoria`, `enums/operativo.enum.ts`). Hay un
 discriminador más estrecho, `operativoSubtipo = 'AMBIENTAL_PUNTOS_ACUMULACION'`
 — es el que `residuos.service.ts` exige para permitir seguimiento de residuos.
-**Decisión abierta:** confirmar antes de migrar si el alcance es
-`operativoCategoria = 'AMBIENTAL'` (todo lo ambiental, más amplio) o solo el
-subtipo de puntos de acumulación (más estrecho, 1:1 con `PuntoResiduo` de este
-repo) — ver tabla de decisiones abiertas.
+**Decisión CERRADA 2026-07-28: se migra con el criterio amplio,
+`operativoCategoria = 'AMBIENTAL'`.** Motivo: el criterio estrecho excluiría
+1 punto `PUBLICADA` que sí es ambiental por categoría (subtipo genérico
+`AMBIENTAL`, no `AMBIENTAL_PUNTOS_ACUMULACION`) — perder una fila publicada
+por usar el discriminador estrecho no tiene justificación. Decidido por Josh.
 
 `ruta_semanal` y `processes` no tienen columna de categoría propia: son
 ambientales por convención de código (ningún otro dominio escribe ahí), no
@@ -428,16 +429,15 @@ Desglose por estado, `operativoSubtipo = 'AMBIENTAL_PUNTOS_ACUMULACION'` (criter
 `PUBLICADA` con `operativoCategoria = 'AMBIENTAL'` pero
 `operativoSubtipo = 'AMBIENTAL'` (subtipo genérico, no
 `AMBIENTAL_PUNTOS_ACUMULACION`). Es decir, el criterio estrecho excluiría
-exactamente 1 punto publicado que sí es ambiental por categoría. Dado que la
-diferencia es mínima (1 de 346) y el criterio amplio no deja nada relevante
-fuera, **se recomienda migrar con `operativoCategoria = 'AMBIENTAL'`** (el
-más amplio) para no perder esa fila — decisión pendiente de confirmación de
-Josh.
+exactamente 1 punto publicado que sí es ambiental por categoría. Confirmado:
+se migra con `operativoCategoria = 'AMBIENTAL'` (ver decisión cerrada arriba).
 
 Registros corruptos de import Excel: `results = 'Importado desde Excel'` →
-**0 filas** dentro de `operativoCategoria = 'AMBIENTAL'`. No hay nada que
-descartar por este motivo en el dominio ambiental — el problema de import
-roto, si existe, no afecta a estas 346 filas.
+**0 filas** dentro de `operativoCategoria = 'AMBIENTAL'`. **Riesgo eliminado:
+no hay nada que descartar por este motivo en el dominio ambiental** — el
+import roto del hub, si existe, no toca ninguna de estas 346 filas. No volver
+a plantear este chequeo salvo que cambien los datos de origen antes del
+corte.
 
 Otras tablas/entidades relacionadas:
 
@@ -469,8 +469,8 @@ Notas sobre estos números:
 **Tareas:**
 1. Correr `migrate-from-legacy.ts` (ya existe como embrión) contra un dump de
    staging, nunca contra producción directamente en el primer intento.
-2. Contar registros con `results = 'Importado desde Excel'` (import roto en el
-   hub) y decidir explícitamente qué se descarta ANTES de migrar.
+2. ~~Contar registros con `results = 'Importado desde Excel'`~~ — CERRADO
+   2026-07-28: 0 filas dentro del alcance ambiental, nada que descartar.
 3. Aplanar `gestoresInvolucrados` (relación `ManyToMany` en el hub → `uuid[]`
    en ambiental).
 4. Decidir manejo de adjuntos (fotos/actas): mover a storage propio o
