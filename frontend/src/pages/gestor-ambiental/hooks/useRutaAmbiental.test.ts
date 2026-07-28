@@ -137,7 +137,7 @@ describe('useRutaAmbiental', () => {
     expect(result.current.rutaActiva).not.toBeNull();
   });
 
-  it('mapea el estado cancelada del backend al reconstruir la ruta activa', async () => {
+  it('una ruta cancelada del backend no se muestra como activa, se archiva a historial', async () => {
     vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
       id: 'rs-cancelada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
       estado: 'cancelada',
@@ -148,7 +148,13 @@ describe('useRutaAmbiental', () => {
     await waitFor(() => {
       expect(result.current.rutaSemanalId).toBe('rs-cancelada');
     });
-    expect(result.current.rutaActiva?.estado).toBe('cancelada');
+    // Una ruta cancelada no es una ruta "en curso" - el hook no la reactiva,
+    // la archiva a historial (ver useRutaAmbiental.ts, rama dto.estado !== 'en_progreso').
+    expect(result.current.rutaActiva).toBeNull();
+    expect(ruta.cancelarRutaAndAddToHistorial).toHaveBeenCalledWith(
+      expect.objectContaining({ estado: 'cancelada' }),
+      expect.anything(),
+    );
   });
 
   it('reconstruye segmentos desde las paradas hidratadas, no desde dto.segmentos congelado', async () => {
