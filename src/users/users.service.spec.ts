@@ -1,4 +1,4 @@
-import { HttpException } from '@nestjs/common';
+import { HttpException, ServiceUnavailableException } from '@nestjs/common';
 import { UsersService } from './users.service';
 
 const mockUser = {
@@ -44,7 +44,7 @@ describe('UsersService', () => {
     expect(result).toEqual(mockUser);
     expect(fetchMock).toHaveBeenCalledWith(
       'https://hub.test/api/users/user-1',
-      { headers: { Authorization: 'Bearer token-abc' } },
+      expect.objectContaining({ headers: { Authorization: 'Bearer token-abc' } }),
     );
   });
 
@@ -72,6 +72,27 @@ describe('UsersService', () => {
 
     const service = new UsersService();
     await expect(service.findById('user-x', 'token-abc')).rejects.toThrow(HttpException);
+  });
+
+  it('findById falla rapido (no se cuelga) si el hub nunca responde', async () => {
+    jest.useFakeTimers();
+    const fetchMock = jest.fn((_url: string, opts: any) => new Promise((_resolve, reject) => {
+      opts.signal.addEventListener('abort', () => {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        reject(err);
+      });
+    }));
+    global.fetch = fetchMock as any;
+
+    const service = new UsersService();
+    const pending = service.findById('user-1', 'token-abc');
+    const assertion = expect(pending).rejects.toThrow(ServiceUnavailableException);
+
+    await jest.advanceTimersByTimeAsync(4_000);
+    await assertion;
+
+    jest.useRealTimers();
   });
 
   it('findGestores cachea por rol del que llama', async () => {

@@ -38,18 +38,27 @@ export const AsignacionPuntosPanel: React.FC<AsignacionPuntosPanelProps> = ({ ac
     setLoading(true);
     setError(null);
     try {
-      const [asignaciones, sinAsignarRows, todosLosUsuarios] = await Promise.all([
+      // getGestores() se resuelve aparte: depende del hub (ver
+      // PLAN-MAESTRO.md HITO 2 - proxy de usuarios), y si el hub esta caido
+      // no debe tumbar la vista de asignaciones/sin-asignar, que son datos
+      // propios de ambiental y no dependen de eso.
+      const [asignaciones, sinAsignarRows] = await Promise.all([
         ambientalService.getAsignacionAll(),
         ambientalService.getSinAsignar(),
-        usersService.getGestores(),
       ]);
       setGrouped(groupAsignacionesByGestor(asignaciones));
       setSinAsignar(sinAsignarRows);
-      setGestores(todosLosUsuarios.filter(u => u.role === 'GESTOR_AMBIENTAL'));
     } catch (e) {
       setError('No se pudo cargar la asignación de puntos. Intenta de nuevo.');
     } finally {
       setLoading(false);
+    }
+
+    try {
+      const todosLosUsuarios = await usersService.getGestores();
+      setGestores(todosLosUsuarios.filter(u => u.role === 'GESTOR_AMBIENTAL'));
+    } catch (e) {
+      setGestores([]);
     }
   }, []);
 

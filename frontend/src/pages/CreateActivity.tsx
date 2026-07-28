@@ -364,7 +364,14 @@ export const CreateActivity: React.FC = () => {
   useEffect(() => {
     loadCatalogs();
     loadBoundaries();
-    usersService.getGestores().then(setGestores).catch(() => setGestores([]));
+    // El hub filtra la lista segun el rol del que llama: si es
+    // GESTOR_AMBIENTAL ya vuelve acotada, pero VALIDADOR_AMBIENTAL/ADMIN
+    // reciben gestores de TODOS los dominios (IVC/ESPACIO_PUBLICO/PYBA
+    // incluidos) - se filtra aca para no mezclar gestores de otros dominios
+    // en "gestores involucrados".
+    usersService.getGestores()
+      .then((users) => setGestores(users.filter((u) => u.role === 'GESTOR_AMBIENTAL')))
+      .catch(() => setGestores([]));
   }, []);
 
   useEffect(() => {

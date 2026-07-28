@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { getEnv } from '../config/env';
 import { HubUser } from './dto/hub-user.dto';
 
@@ -8,6 +8,9 @@ interface CacheEntry<T> {
 }
 
 const CACHE_TTL_MS = 60_000;
+// Si el hub no responde, este proxy debe fallar rapido (no colgarse) para que
+// el llamador degrade con un valor por defecto en vez de bloquear la pantalla.
+const HUB_TIMEOUT_MS = 4_000;
 
 // Proxy hacia el hub (gov-espacio-publico): los usuarios no tienen tabla
 // propia en ambiental, se resuelven contra la fuente de verdad. Cache simple
@@ -41,9 +44,23 @@ export class UsersService {
 
   private async fetchFromHub<T>(path: string, bearerToken: string): Promise<T> {
     const env = getEnv();
-    const response = await fetch(`${env.HUB_API_URL}${path}`, {
-      headers: { Authorization: `Bearer ${bearerToken}` },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), HUB_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(`${env.HUB_API_URL}${path}`, {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+        signal: controller.signal,
+      });
+    } catch (e) {
+      // Cubre tanto el abort por timeout como fallas de red (DNS, conexion
+      // rechazada) contra el hub - en ambos casos el hub no respondio a
+      // tiempo, no hay nada mas que reintentar aqui.
+      throw new ServiceUnavailableException('El hub no respondio a tiempo.');
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');

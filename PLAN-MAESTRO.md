@@ -329,6 +329,50 @@ sesión nocturna:
   rol del caller). Tests en `users.service.spec.ts` (4 nuevos, cache hit/miss
   y propagación de error). `jest`/`tsc` verdes (72 tests, 17 suites).
 
+  **Verificación de degradación y permisos, 2026-07-28:**
+  - *Hub caído/colgado:* `crear`/`editar` punto (`PuntosController`) NO
+    dependen de `UsersService` — módulos completamente desacoplados, ya
+    estaban a salvo estructuralmente. El gap real era que `fetchFromHub` no
+    tenía timeout: si el hub aceptaba la conexión y nunca respondía, la
+    promesa se colgaba indefinidamente (no un simple error rápido). Corregido:
+    `AbortController` con timeout de 4s en el backend (`HUB_TIMEOUT_MS`,
+    `users.service.ts`) — ante timeout o error de red lanza
+    `ServiceUnavailableException` de inmediato en vez de colgarse. Test nuevo
+    que simula un hub que nunca responde y confirma que falla rápido
+    (`users.service.spec.ts`, fake timers). Además, timeout de 6s en el
+    cliente axios del frontend (`frontend/src/services/users.service.ts`)
+    como red de seguridad adicional.
+  - Con el timeout corregido, la degradación en pantalla ya funciona como se
+    pedía: `ValidadorActividadPanel.tsx` cae a "Información de creador no
+    disponible" en vez de spinner infinito; `CreateActivity.tsx`/
+    `EditActivity.tsx` ya tenían `.catch(() => setGestores([]))`.
+  - **Bug encontrado y corregido en `AsignacionPuntosPanel.tsx`:** el fetch de
+    gestores estaba en el mismo `Promise.all` que las asignaciones/sin-asignar
+    (datos propios, sin relación con el hub) — si el hub fallaba, el panel
+    entero mostraba error y ocultaba datos que sí estaban disponibles.
+    Desacoplado: `getGestores()` ahora se resuelve aparte, con su propio
+    catch → `[]`, sin bloquear el resto del panel.
+  - **Permisos por rol — probado contra el hub real con un token real por
+    rol** (`GET /api/users/gestores/list`): el endpoint del hub **no
+    restringe por rol** (cualquier JWT válido con
+    GESTOR_AMBIENTAL/VALIDADOR_AMBIENTAL/ADMIN devuelve 200). Pero el
+    contenido SÍ varía y ahí apareció un problema real: con
+    `GESTOR_AMBIENTAL` el hub ya filtra a los 13 gestores ambientales, pero
+    con `VALIDADOR_AMBIENTAL` o `ADMIN` devuelve los 90 gestores de TODOS los
+    dominios (IVC/ESPACIO_PUBLICO/AMBIENTAL/PYBA), sin acotar. Como
+    `PATCH /puntos/:id` ahora permite editar a los 3 roles, un
+    VALIDADOR_AMBIENTAL o ADMIN editando un punto veía la lista de "gestores
+    involucrados" mezclada con gente de otros dominios.
+    **Corregido:** `CreateActivity.tsx` y `EditActivity.tsx` ahora filtran
+    `.filter(u => u.role === 'GESTOR_AMBIENTAL')` client-side sobre la
+    respuesta del hub, igual que ya hacía `AsignacionPuntosPanel.tsx`.
+  - Confirmado: el JWT reenviado al hub no queda en ningún log — no hay
+    logging de requests/headers en `main.ts` (sin morgan, sin interceptor),
+    `users.service.ts`/`users.controller.ts` no tienen ningún `console.*`.
+  - `tsc --noEmit` limpio en backend y frontend; `jest` 73/73; `vitest` sin
+    regresiones nuevas (2 fallos preexistentes en `navConfig.test.ts`, no
+    relacionados, confirmado corriendo la suite antes de este cambio).
+
 **Tareas, en este orden (ROTO → AUSENTE → PARCIAL):**
 1. **ROTO primero:**
    - ~~`getUserById` llama `GET /users/:id`, que no existe en el backend~~ —
