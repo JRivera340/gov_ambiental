@@ -313,6 +313,10 @@ sesión nocturna:
   como NO-gap (contrato cross-repo esperado).
 - `getUserById` sigue roto (llama `GET /users/:id`, no existe en backend) —
   **NO se tocó esta noche**, fuera del alcance explícito de las tareas C11-C14.
+- Esquema de la base de producción de ambiental (`Postgres-_hTA`) — creado con
+  migraciones TypeORM versionadas (no `synchronize`). Ver detalle completo y
+  el checkbox de salida cumplido en `ESTADO-EXTRACCION.md`, sección "Fase 2 —
+  Independencia de código".
 
 **Tareas, en este orden (ROTO → AUSENTE → PARCIAL):**
 1. **ROTO primero:**

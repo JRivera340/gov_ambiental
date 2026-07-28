@@ -109,10 +109,17 @@ del AdminDashboard siempre vacía contra datos reales; corregido a leer
 Auth propia, despliegue autónomo, variables de entorno completas.
 
 Condición de salida:
-- [ ] `synchronize: false` y migraciones versionadas. Hoy `synchronize: true` es
-  aceptable porque la base de desarrollo es desechable, pero debe cambiar ANTES
-  de que existan datos que conservar y antes de la fase 3, que necesita un
-  esquema determinista.
+- [x] `synchronize: false` y migraciones versionadas. CUMPLIDO 2026-07-28:
+  producción ya tenía `synchronize: false`; se generaron migraciones TypeORM
+  versionadas (`src/migrations/1785238458998-InitialSchema.ts`, commiteada) a
+  partir de las entidades, y se corrieron contra `Postgres-_hTA` en Railway
+  (la base de producción de ambiental, generada/validada primero contra una
+  Postgres vacía local para no arriesgar nada). `GET /puntos` responde 200
+  con lista vacía — esquema real, sin datos, sin `synchronize` de por medio.
+  Pendiente menor: en LOCAL `synchronize` sigue en `true` (`env.NODE_ENV !==
+  'production'`) — se deja así a propósito por ahora, la base de desarrollo
+  sigue siendo desechable; cuando se quiera cerrar del todo, cambiarlo a
+  `false` también en local y correr `npm run migration:run` ahí.
 
 ### Fase 3 — Migración de datos (NO trabajar hasta terminar fases 1 y 2)
 
