@@ -1,5 +1,5 @@
 # Plan maestro — Módulo ambiental independiente
-Última actualización: 2026-07-28 (HITO 0 desplegado y verificado en Railway)
+Última actualización: 2026-07-28 (sesión nocturna autónoma: HITO 1 replicado, HITO 2 avanzado)
 
 ## Objetivo y criterio de terminado
 Convertir el módulo ambiental en un servicio independiente, desplegado aparte
@@ -221,6 +221,33 @@ token (HS256 compartido vs. asimétrica) son las dos principales.
 **Objetivo:** fijar el sistema de diseño antes de construir vistas en volumen,
 para no retocar 15 pantallas después.
 
+**Estado: REPLICADO 2026-07-28** (sesión nocturna autónoma, rama `test`).
+Tareas 1-2 ya estaban hechas de una sesión anterior (`tailwind.config.js`
+idéntico byte a byte al hub, `cva`/`clsx`/`tailwind-merge` instalados,
+`src/lib/utils.ts` con `cn()`). Se completó esta noche:
+- Tarea 3: primitivas `Button`/`Card`/`Input`/`Select` creadas con `cva` en
+  TODAS (el hub solo lo usa en 2 de 9) — ver `INVENTARIO-COMPONENTES.md`.
+  **IMPLEMENTADO — SIN VERIFICAR EN USO REAL**: 0 consumidores todavía (no se
+  hizo el refactor de reemplazar HTML crudo por estas primitivas en el resto
+  del código — habría sido un cambio de alcance no pedido).
+  `tsc --noEmit` limpio, no rompe el build.
+- Tarea 4: ESLint con `eslint-plugin-tailwindcss` (`no-contradicting-classname`
+  error, `no-arbitrary-value`/`classnames-order` warning) y
+  `eslint-plugin-react-hooks` (set clásico, no el `recommended` v7 completo —
+  ver Riesgos). Corridos y REPLICADOS: 45 errores reales encontrados y
+  corregidos (3 clases contradictorias genuinas, 2 catch vacíos, `no-undef`
+  desactivado en TS por falsos positivos). 1592 warnings quedan sin tocar
+  (instrucción explícita: solo errores).
+- `scripts/check-responsive.mjs` con Playwright: REPLICADO — corrido contra
+  las 7 rutas existentes de `App.tsx` en 375/768/1440px, 0 desbordamientos,
+  20 capturas en `.screenshots/` (gitignored). Nota: `waitUntil: 'networkidle'`
+  no sirve en esta app (mapas Leaflet no dejan de hacer requests) — se usa
+  `'load'` + espera fija de 1.5s.
+
+Verificado con backend+frontend levantados en local (Docker Postgres +
+`npm run start:dev` + `npm run dev`), tokens JWT reales por rol para probar
+rutas protegidas — no solo la pantalla "sin sesión".
+
 **Tareas:**
 1. Copiar la paleta/tokens de `tailwind.config.js` del hub (colores `primary`,
    `success`, `institutional`, `status`, `neutral`, `surface`; tipografía
@@ -263,6 +290,21 @@ trivial sin afectar lógica.
 ## HITO 2 — Paridad funcional
 
 **Objetivo:** cerrar la matriz de paridad de `ESTADO-EXTRACCION.md`.
+
+**Estado: PARCIAL, avanzado 2026-07-28.** De las tareas priorizadas por la
+sesión nocturna:
+- Edición de punto (VALIDADOR_AMBIENTAL/ADMIN) — **REPLICADO**, con tests
+  (`puntos.service.spec.ts`, 2 tests nuevos). `jest`/`tsc`/`build` verdes.
+- Recalculo de estado de `Proceso` al aprobar — **REPLICADO**, ya estaba
+  implementado, se le agregaron 2 tests que faltaban para confirmarlo.
+- Código muerto de `users.service.ts` (5 métodos + 2 DTOs sin consumidores,
+  verificado con `rg`) — eliminado. `getUserById`/`getGestores` intactos.
+- `files.service.ts`/`survey.service.ts` — solo análisis (no implementado,
+  como se pidió). Documentado en `ESTADO-EXTRACCION.md` con endpoints
+  exactos, consumidores, y qué haría falta para `files`; `survey` confirmado
+  como NO-gap (contrato cross-repo esperado).
+- `getUserById` sigue roto (llama `GET /users/:id`, no existe en backend) —
+  **NO se tocó esta noche**, fuera del alcance explícito de las tareas C11-C14.
 
 **Tareas, en este orden (ROTO → AUSENTE → PARCIAL):**
 1. **ROTO primero:**
