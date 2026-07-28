@@ -63,25 +63,44 @@ Rama de trabajo: `test` (gov_ambiental). Nada tocado en `main` de gov-espacio-pu
   `ESTADO-EXTRACCION.md`.
 
 ### D. Cierre
+- El `git push` finalmente completó solo (el proceso en background que
+  llevaba colgado toda la noche resolvió al final de la sesión). Con eso:
+  redeploy de `ambiental-backend` y `ambiental-frontend` en Railway con el
+  código de HITO 1 y HITO 2 — ambos `SUCCESS`, healthchecks en 200.
 - `PLAN-MAESTRO.md`, `ESTADO-EXTRACCION.md`, `INVENTARIO-COMPONENTES.md`
   actualizados con distinción REPLICADO vs IMPLEMENTADO-SIN-VERIFICAR en cada
   entrada nueva.
-- Todo commiteado en `test`, en commits atómicos por tarea (ver `git log`).
+- Todo commiteado en `test` y pusheado a `origin/test`, en commits atómicos
+  por tarea (ver `git log`).
+
+## Hallazgo importante verificando el redeploy
+
+**La base de datos de producción de `ambiental-backend` (`Postgres-_hTA` en
+Railway) nunca tuvo el esquema creado.** `synchronize` está desactivado en
+producción (correcto, es la config normal), pero nadie corrió una
+sincronización/migración inicial contra esa base — quedó completamente vacía
+desde que se creó en HITO 0. Consecuencia: `/api/health` responde 200 (no
+toca la base), y `/api/handoff` también funciona (tampoco toca la base) — por
+eso el healthcheck del redeploy dio verde y pareció que todo estaba bien —
+pero **cualquier endpoint que sí toque datos reales (`GET /puntos`, etc.)
+responde 500** con `relation "puntos_residuo" does not exist`.
+
+No lo toqué: crear el esquema en una base de producción es una operación
+sobre datos/schema de producción, y aunque técnicamente NO es "la migración
+de datos del HITO 3" (eso es traer los datos históricos del hub; esto es solo
+crear las tablas vacías), está lo bastante cerca de esa línea prohibida como
+para no asumir que puedo decidirlo solo. **Necesitás decidir**: ¿corro un
+`synchronize` puntual contra `Postgres-_hTA` para crear el esquema vacío
+(sin ningún dato, sin tocar el hub), o preferís hacerlo vos / esperar a que
+el HITO 3 completo se planifique?
 
 ## Bloqueado / no se pudo hacer
 
-1. **`git push origin test` cuelga indefinidamente** desde la mitad de la
-   noche — el gestor de credenciales de Windows (Git Credential Manager)
-   parece esperar una confirmación interactiva que no puedo completar sin
-   consola. Los commits de HITO 1 y HITO 2 (todo B y C de esta sesión) están
-   en el `test` LOCAL pero probablemente NO llegaron a GitHub, y por lo tanto
-   **Railway no los desplegó** — los servicios `ambiental-backend`/
-   `ambiental-frontend` en Railway siguen sirviendo el código de HITO 0
-   únicamente (verificado: ambos responden 200 en sus healthchecks/página
-   principal, pero es el código de anoche, no el de esta sesión).
-   **Acción tuya**: correr `git push origin test` vos mismo (puede pedirte
-   loguear de nuevo en GitHub), y avisarme para que yo dispare el redeploy en
-   Railway con `railway redeploy`.
+1. ~~`git push origin test` colgado~~ RESUELTO al final de la sesión — el
+   Git Credential Manager tardó pero terminó resolviendo solo. Todo está en
+   `origin/test`, y ya redesplegué `ambiental-backend`/`ambiental-frontend`
+   en Railway con el código de esta noche (`SUCCESS` en ambos). Ver el
+   hallazgo de la base de datos vacía arriba — eso sí sigue pendiente.
 2. **DNS de `ambiental.bogotaneidapp.com`** — sigue sin crearse (no tengo
    acceso a la consola DNS). Registros exactos que faltan, tal cual los pide
    Railway:
