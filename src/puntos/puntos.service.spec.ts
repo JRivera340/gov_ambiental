@@ -1,6 +1,7 @@
 import { PuntosService, toPublicPunto } from './puntos.service';
 import { InMemoryPuntosRepository } from './puntos.repository.memory';
 import { EstadoPunto } from './entities/punto-residuo.entity';
+import { Role } from '../common/enums/role.enum';
 
 const asignacionesStub = { asignarACreador: async () => {} };
 const procesosStub = { recalculateStatus: async () => {} };
@@ -31,7 +32,7 @@ describe('PuntosService', () => {
     it('permite editar entidad responsable y gestores involucrados', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
-      const actualizado = await service.update(punto.id, 'user-1', {
+      const actualizado = await service.update(punto.id, 'user-1', Role.GESTOR_AMBIENTAL, {
         entidadResponsable: 'CVP',
         gestoresInvolucradosIds: ['gestor-9'],
       });
@@ -43,7 +44,7 @@ describe('PuntosService', () => {
     it('permite al creador editar un punto en BORRADOR', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
-      const actualizado = await service.update(punto.id, 'user-1', { barrio: 'B', lat: 2 });
+      const actualizado = await service.update(punto.id, 'user-1', Role.GESTOR_AMBIENTAL, { barrio: 'B', lat: 2 });
       expect(actualizado.barrio).toBe('B');
       expect(actualizado.lat).toBe(2);
     });
@@ -53,7 +54,7 @@ describe('PuntosService', () => {
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
       await service.send(punto.id, 'user-1');
       await service.reject(punto.id, 'validador-1', 'Faltan fotos');
-      const actualizado = await service.update(punto.id, 'user-1', { barrio: 'Corregido' });
+      const actualizado = await service.update(punto.id, 'user-1', Role.GESTOR_AMBIENTAL, { barrio: 'Corregido' });
       expect(actualizado.barrio).toBe('Corregido');
     });
 
@@ -61,19 +62,33 @@ describe('PuntosService', () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
       await service.send(punto.id, 'user-1');
-      await expect(service.update(punto.id, 'user-1', { barrio: 'X' })).rejects.toThrow();
+      await expect(service.update(punto.id, 'user-1', Role.GESTOR_AMBIENTAL, { barrio: 'X' })).rejects.toThrow();
     });
 
-    it('rechaza editar si quien edita no es el creador', async () => {
+    it('rechaza editar si quien edita no es el creador ni VALIDADOR_AMBIENTAL/ADMIN', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
-      await expect(service.update(punto.id, 'otro-user', { barrio: 'X' })).rejects.toThrow();
+      await expect(service.update(punto.id, 'otro-user', Role.GESTOR_AMBIENTAL, { barrio: 'X' })).rejects.toThrow();
+    });
+
+    it('permite a VALIDADOR_AMBIENTAL editar un punto que no creo', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      const actualizado = await service.update(punto.id, 'validador-1', Role.VALIDADOR_AMBIENTAL, { barrio: 'Editado por validador' });
+      expect(actualizado.barrio).toBe('Editado por validador');
+    });
+
+    it('permite a ADMIN editar un punto que no creo', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      const actualizado = await service.update(punto.id, 'admin-1', Role.ADMIN, { barrio: 'Editado por admin' });
+      expect(actualizado.barrio).toBe('Editado por admin');
     });
 
     it('reemplaza el array de residuos cuando se pasa uno nuevo', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
-      const actualizado = await service.update(punto.id, 'user-1', {
+      const actualizado = await service.update(punto.id, 'user-1', Role.GESTOR_AMBIENTAL, {
         residuos: [{ tipoResiduo: 'PLANTAS', quienDispuso: 'COMUNIDAD', areaLinealMetros: 2, percibeOlores: false, percibeVectores: false, photos: [] }],
       });
       expect(actualizado.residuos).toHaveLength(1);

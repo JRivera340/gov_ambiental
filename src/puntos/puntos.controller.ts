@@ -67,9 +67,9 @@ export class PuntosController {
   }
 
   @Patch(':id')
-  @Roles(Role.GESTOR_AMBIENTAL)
+  @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
   update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdatePuntoDto) {
-    return this.puntosService.update(id, req.user.userId, dto);
+    return this.puntosService.update(id, req.user.userId, req.user.role, dto);
   }
 
   @Post(':id/send')

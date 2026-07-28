@@ -8,6 +8,7 @@ import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
+import { Role } from '../common/enums/role.enum';
 
 export type PublicResiduo = Pick<
   ResiduoEntry,
@@ -97,10 +98,15 @@ export class PuntosService {
   // Solo el creador puede editar, y solo mientras el punto no esté publicado
   // (BORRADOR o RECHAZADA — para corregir y reenviar). Una vez ENVIADA o
   // PUBLICADA, los cambios pasan por seguimiento/aprobar-residuo, no por acá.
-  async update(id: string, userId: string, dto: UpdatePuntoDto): Promise<PuntoResiduo> {
+  async update(id: string, userId: string, role: Role, dto: UpdatePuntoDto): Promise<PuntoResiduo> {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
-    if (punto.createdByUserId !== userId) throw new ForbiddenException('Solo el creador puede editar el punto');
+    // GESTOR_AMBIENTAL solo puede editar lo suyo. VALIDADOR_AMBIENTAL/ADMIN
+    // pueden editar cualquier punto, igual que en el hub.
+    const puedeEditarCualquiera = role === Role.VALIDADOR_AMBIENTAL || role === Role.ADMIN;
+    if (!puedeEditarCualquiera && punto.createdByUserId !== userId) {
+      throw new ForbiddenException('Solo el creador puede editar el punto');
+    }
     if (punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
       throw new BadRequestException('Solo se puede editar un punto en borrador o rechazado');
     }
