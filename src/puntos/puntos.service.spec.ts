@@ -196,6 +196,33 @@ describe('PuntosService — ciclo de vida', () => {
     expect(aprobado.publishedAt).toBeInstanceOf(Date);
   });
 
+  it('approve recalcula el estado del proceso cuando el punto esta ligado a uno', async () => {
+    const repo = new InMemoryPuntosRepository();
+    const recalculado: string[] = [];
+    const procesosStubLocal = { recalculateStatus: async (processId: string) => { recalculado.push(processId); } };
+    const service = new PuntosService(repo, asignacionesStub as any, procesosStubLocal as any);
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await service.send(punto.id, 'user-1');
+    await repo.save({ ...(await repo.findById(punto.id))!, processId: 'proceso-1' } as any);
+
+    await service.approve(punto.id, 'validador-1');
+
+    expect(recalculado).toEqual(['proceso-1']);
+  });
+
+  it('approve no llama a recalculateStatus si el punto no esta ligado a un proceso', async () => {
+    const recalculado: string[] = [];
+    const procesosStubLocal = { recalculateStatus: async (processId: string) => { recalculado.push(processId); } };
+    const repo = new InMemoryPuntosRepository();
+    const service = new PuntosService(repo, asignacionesStub as any, procesosStubLocal as any);
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await service.send(punto.id, 'user-1');
+
+    await service.approve(punto.id, 'validador-1');
+
+    expect(recalculado).toEqual([]);
+  });
+
   it('reject marca RECHAZADA con las notas', async () => {
     const { service } = makeService();
     const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
