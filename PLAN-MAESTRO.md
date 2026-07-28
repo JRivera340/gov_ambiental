@@ -675,20 +675,17 @@ los hitos anteriores ya estén cerradas.
 - Los 11 roles no ambientales del hub (`IVC`, `ESPACIO_PUBLICO`, `PYBA`,
   `DEPORTES`, `TUTOR`, `ESTUDIANTE` y sus variantes de gestor/validador).
 - Endpoints ya rotos en el hub: `editar-residuo`, `import-ambiental-excel` —
-  no se replican, son deuda del origen, no de la extracción.
+  no se replican, son deuda del origen, no de la extracción. Detalle completo
+  (archivo/línea, impacto, esfuerzo) movido a `DEUDA-TECNICA.md` en el repo
+  del hub, ítem 2 — no se repite aquí.
 - Cualquier feature nueva no presente hoy en el hub — este plan es paridad +
   independencia, no expansión de alcance funcional.
 - Migración de HS256 (secreto compartido) a firma asimétrica (RS256) para la
   emisión de tokens del hub — es trabajo de plataforma (afecta a todos los
   módulos presentes y futuros, no solo a ambiental), no de esta extracción.
   Queda registrado como deuda en Decisiones abiertas, se resuelve aparte.
-- **`tsc --noEmit` del frontend del hub (`packages/frontend`) tiene 61
-  errores preexistentes**, confirmado el 2026-07-28 antes de tocar nada de
-  la rama `feature/ambiental-handoff-sidebar` (mismo conteo con y sin los
-  cambios de esa rama — no los introdujo ni los agrava). Incluye tipos de
-  encuestas (`Survey`, `submitSurveyResults` faltantes en
-  `survey.service.ts`), comparaciones de enums sin overlap
-  (`ResiduoEntry.status`, roles `VALIDADOR` vs. el enum real),
-  `pointNumber`/props posiblemente `undefined` sin narrowing, y una prop CSS
-  inválida en `LineChart.tsx`. Es deuda del hub, no de la extracción de
-  ambiental — fuera de alcance de este proyecto, no se toca aquí.
+- `tsc --noEmit` del frontend del hub tiene 61 errores preexistentes,
+  confirmado el 2026-07-28, sin relación con esta extracción (mismo conteo
+  con y sin los cambios de la rama del sidebar). Es deuda del hub, no de
+  ambiental — movida a `DEUDA-TECNICA.md` en el repo del hub, ítem 4, con el
+  detalle completo. No se repite aquí.
