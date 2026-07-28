@@ -1,4 +1,4 @@
-import path from 'path';
+import * as path from 'path';
 import { TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
 import { getEnv } from './env';
 

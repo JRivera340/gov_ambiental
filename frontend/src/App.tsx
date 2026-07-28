@@ -6,11 +6,12 @@ import { CreateActivity } from './pages/CreateActivity';
 import { EditActivity } from './pages/EditActivity';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
+import { HandoffPage } from './pages/HandoffPage';
 
 // No hay página de login en este repo — la sesión llega desde bogotaneidapp
-// (fase 5: cookie compartida entre subdominios). Mientras tanto, para probar
-// en local, generá un token con `npm run token:test` en el backend y
-// guardalo manualmente: sessionStorage.setItem('gov_auth_token', '<token>').
+// vía /handoff (PLAN-MAESTRO.md HITO 0). Para probar sin pasar por el hub,
+// generá un token con `npm run token:test` en el backend y guardalo
+// manualmente: sessionStorage.setItem('gov_auth_token', '<token>').
 function RutaProtegida({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   if (!isAuthenticated) {
@@ -54,6 +55,8 @@ function App() {
         path="/validador/residuos"
         element={<RutaProtegida><ValidadorMapaDashboard /></RutaProtegida>}
       />
+
+      <Route path="/handoff" element={<HandoffPage />} />
 
       <Route path="/public/actividad/:id" element={<PublicPuntoPage />} />
     </Routes>

@@ -10,6 +10,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5174,
+    // Permite probar el flujo de handoff local con hostnames que imitan
+    // subdominios reales (PLAN-MAESTRO.md HITO 0) en vez de localhost.
+    allowedHosts: ['ambiental.bogotaneidapp.local'],
     proxy: {
       '/api': {
         target: process.env.BACKEND_URL || 'http://localhost:3001',
