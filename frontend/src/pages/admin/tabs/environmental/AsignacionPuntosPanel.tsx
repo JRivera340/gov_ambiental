@@ -55,8 +55,7 @@ export const AsignacionPuntosPanel: React.FC<AsignacionPuntosPanelProps> = ({ ac
     }
 
     try {
-      const todosLosUsuarios = await usersService.getGestores();
-      setGestores(todosLosUsuarios.filter(u => u.role === 'GESTOR_AMBIENTAL'));
+      setGestores(await usersService.getGestores());
     } catch (e) {
       setGestores([]);
     }

@@ -133,6 +133,7 @@ enum Role { GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN }
 - **Rutas semanales** (`src/rutas-semanales/`) tienen lógica propia en `lib/` (separada de la entidad) — seguir el mismo patrón de extraer lógica pura para tests.
 - **Sectores** se derivan de parseo KMZ (`kmz-parser.service.ts`), igual que en el legacy (`RecoleccionUrbana.kmz`).
 - **`ResiduoEntry`/`ResiduoNota`** son tipos embebidos dentro del punto (JSON), no entidades TypeORM separadas — mismo patrón que `dynamicAnswers.residuos[]` del legacy.
+- **Usuarios** no tienen tabla propia aquí (excepto en `version1`, ver sección 0) — se resuelven vía proxy contra el hub (`src/users/`). El endpoint del hub `GET /users/gestores/list` filtra por el ROL DE QUIEN LLAMA, no por dominio: un `GESTOR_AMBIENTAL` recibe solo gestores ambientales, pero `VALIDADOR_AMBIENTAL`/`ADMIN` reciben los gestores de TODOS los dominios (IVC, espacio público, PYBA, deportes). **El filtrado por dominio se hace SIEMPRE en el proxy del backend (`UsersService.findGestores`), nunca en componentes de frontend.** El módulo ambiental no debe recibir usuarios de otros dominios ni por un instante, así el consumidor los descarte después.
 
 ---
 

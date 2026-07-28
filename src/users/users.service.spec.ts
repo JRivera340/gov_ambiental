@@ -95,7 +95,7 @@ describe('UsersService', () => {
     jest.useRealTimers();
   });
 
-  it('findGestores cachea por rol del que llama', async () => {
+  it('findGestores cachea entre llamadas dentro del TTL', async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => [mockUser],
@@ -103,10 +103,49 @@ describe('UsersService', () => {
     global.fetch = fetchMock as any;
 
     const service = new UsersService();
-    await service.findGestores('GESTOR_AMBIENTAL', 'token-a');
-    await service.findGestores('GESTOR_AMBIENTAL', 'token-b');
-    await service.findGestores('ADMIN', 'token-c');
+    await service.findGestores('token-a');
+    await service.findGestores('token-b');
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('findGestores filtra a solo GESTOR_AMBIENTAL sin importar el rol de quien llama (VALIDADOR_AMBIENTAL)', async () => {
+    const mixedDomainUsers = [
+      { ...mockUser, id: 'amb-1', role: 'GESTOR_AMBIENTAL' },
+      { ...mockUser, id: 'ivc-1', role: 'GESTOR_IVC' },
+      { ...mockUser, id: 'ep-1', role: 'GESTOR_ESPACIO_PUBLICO' },
+      { ...mockUser, id: 'pyba-1', role: 'GESTOR_PYBA' },
+    ];
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mixedDomainUsers,
+    });
+    global.fetch = fetchMock as any;
+
+    const service = new UsersService();
+    const result = await service.findGestores('token-validador');
+
+    expect(result).toEqual([mixedDomainUsers[0]]);
+  });
+
+  it('findGestores filtra a solo GESTOR_AMBIENTAL sin importar el rol de quien llama (ADMIN)', async () => {
+    const mixedDomainUsers = [
+      { ...mockUser, id: 'amb-1', role: 'GESTOR_AMBIENTAL' },
+      { ...mockUser, id: 'ivc-1', role: 'GESTOR_IVC' },
+      { ...mockUser, id: 'ep-1', role: 'GESTOR_ESPACIO_PUBLICO' },
+      { ...mockUser, id: 'pyba-1', role: 'GESTOR_PYBA' },
+      { ...mockUser, id: 'amb-2', role: 'GESTOR_AMBIENTAL' },
+    ];
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mixedDomainUsers,
+    });
+    global.fetch = fetchMock as any;
+
+    const service = new UsersService();
+    const result = await service.findGestores('token-admin');
+
+    expect(result).toEqual([mixedDomainUsers[0], mixedDomainUsers[4]]);
+    expect(result.every((u) => u.role === 'GESTOR_AMBIENTAL')).toBe(true);
   });
 });

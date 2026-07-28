@@ -12,7 +12,7 @@ export class UsersController {
 
   @Get('gestores/list')
   findGestores(@Req() req: any) {
-    return this.usersService.findGestores(req.user.role, extractBearerToken(req));
+    return this.usersService.findGestores(extractBearerToken(req));
   }
 
   @Get(':id')

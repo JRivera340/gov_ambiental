@@ -38,7 +38,7 @@ describe('AMBIENTAL_NAV_ITEMS', () => {
     expect(AMBIENTAL_NAV_ITEMS).toHaveLength(4);
     const keys = AMBIENTAL_NAV_ITEMS.map((i) => i.key);
     expect(new Set(keys).size).toBe(4);
-    expect(keys).toEqual(['mapa', 'ruta', 'puntos', 'perfil']);
+    expect(keys).toEqual(['mapa', 'ruta', 'puntos', 'crear-punto']);
   });
 });
 
@@ -46,6 +46,6 @@ describe('AMBIENTAL_SECONDARY_ACTIONS', () => {
   it('tiene las 3 acciones secundarias con keys únicas', () => {
     const keys = AMBIENTAL_SECONDARY_ACTIONS.map((a) => a.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(['crear-punto', 'volver-panel', 'logout']);
+    expect(keys).toEqual(['perfil', 'volver-panel', 'logout']);
   });
 });

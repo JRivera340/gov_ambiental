@@ -1,6 +1,7 @@
 import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { getEnv } from '../config/env';
 import { HubUser } from './dto/hub-user.dto';
+import { Role } from '../common/enums/role.enum';
 
 interface CacheEntry<T> {
   data: T;
@@ -18,7 +19,7 @@ const HUB_TIMEOUT_MS = 4_000;
 @Injectable()
 export class UsersService {
   private readonly userCache = new Map<string, CacheEntry<HubUser>>();
-  private readonly gestoresCache = new Map<string, CacheEntry<HubUser[]>>();
+  private gestoresCache: CacheEntry<HubUser[]> | null = null;
 
   async findById(id: string, bearerToken: string): Promise<HubUser> {
     const cached = this.userCache.get(id);
@@ -31,15 +32,21 @@ export class UsersService {
     return data;
   }
 
-  async findGestores(callerRole: string, bearerToken: string): Promise<HubUser[]> {
-    const cached = this.gestoresCache.get(callerRole);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.data;
+  // El hub filtra esta lista segun el ROL DE QUIEN LLAMA (a un
+  // GESTOR_AMBIENTAL le devuelve solo ambientales, pero a VALIDADOR_AMBIENTAL
+  // o ADMIN les devuelve los gestores de TODOS los dominios: IVC, espacio
+  // publico, PYBA, deportes). El modulo ambiental no debe recibir esos datos
+  // ni por un instante - el filtrado por dominio se hace SIEMPRE aca, nunca
+  // en el frontend (ver CLAUDE.md).
+  async findGestores(bearerToken: string): Promise<HubUser[]> {
+    if (this.gestoresCache && this.gestoresCache.expiresAt > Date.now()) {
+      return this.gestoresCache.data;
     }
 
     const data = await this.fetchFromHub<HubUser[]>('/api/users/gestores/list', bearerToken);
-    this.gestoresCache.set(callerRole, { data, expiresAt: Date.now() + CACHE_TTL_MS });
-    return data;
+    const soloAmbiental = data.filter((u) => u.role === Role.GESTOR_AMBIENTAL);
+    this.gestoresCache = { data: soloAmbiental, expiresAt: Date.now() + CACHE_TTL_MS };
+    return soloAmbiental;
   }
 
   private async fetchFromHub<T>(path: string, bearerToken: string): Promise<T> {

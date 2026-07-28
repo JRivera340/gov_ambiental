@@ -70,11 +70,7 @@ export const EditActivity: React.FC = () => {
     loadData();
     loadSantaFeBoundaries().then(setBoundaries);
     catalogService.getAll().then(setCatalogs).catch(() => setCatalogs(null));
-    // Ver nota equivalente en CreateActivity.tsx: el hub no acota la lista a
-    // gestores ambientales cuando quien llama es VALIDADOR_AMBIENTAL/ADMIN.
-    usersService.getGestores()
-      .then((users) => setGestores(users.filter((u) => u.role === 'GESTOR_AMBIENTAL')))
-      .catch(() => setGestores([]));
+    usersService.getGestores().then(setGestores).catch(() => setGestores([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
