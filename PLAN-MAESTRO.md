@@ -49,16 +49,75 @@ ESCRIBE en la base de ambiental. En ningún momento modifica el origen.
 **Objetivo:** validar la cadena completa de auth cross-dominio con el módulo
 casi vacío, cuando cambiar de rumbo todavía es barato.
 
-**Estado: LOCAL y Railway verificados 2026-07-28. Falta solo el merge del
-sidebar del hub y el dominio custom.** Tareas 1-3, 5, 6, 7 hechas. Tarea 8
-(subdominio custom `ambiental.bogotaneidapp.com`) pendiente — requiere acceso
-a DNS de `bogotaneidapp.com`, no se hizo todavía.
+**Estado: CERRADO 2026-07-28, salvo el merge del sidebar del hub** (pendiente
+de revisión de Josh — la rama `feature/ambiental-handoff-sidebar` sigue sin
+mergear a `main`, a propósito). Todas las tareas verificables sin ese merge
+están hechas y comprobadas en producción real, no solo en local.
+
+**Asignación final de dominios (HITO 0):**
+
+| Dominio | Apunta a |
+|---|---|
+| `bogotaneidapp.com` | Hub (`gov-espacio-publico`, frontend) |
+| `ambiental.bogotaneidapp.com` | Frontend del módulo ambiental (`ambiental-frontend`) |
+| `api.ambiental.bogotaneidapp.com` | Backend del módulo ambiental (`ambiental-backend`) |
+
+**Verificación de dominios/certificados, 2026-07-28:**
+- `ambiental.bogotaneidapp.com`: dominio custom en Railway con
+  `syncStatus: ACTIVE`, certificado emitido y válido (verificado con `curl`
+  sin `-k` — un cert inválido o auto-firmado habría fallado), la SPA carga
+  (200, HTML real). CORS del backend acepta ese origen (`OPTIONS` preflight
+  devuelve `access-control-allow-origin` correcto).
+- `api.ambiental.bogotaneidapp.com`: dominio custom agregado en Railway al
+  servicio `ambiental-backend` (antes solo tenía el dominio Railway propio).
+  **Pendiente de DNS** — registros abajo, a crear en modo DNS only:
+
+  | Tipo | Nombre | Valor |
+  |---|---|---|
+  | CNAME | `api.ambiental` | `m2wt4vvl.up.railway.app` |
+  | TXT | `_railway-verify.api.ambiental` | `railway-verify=0a2074bd111b86725012294ec9c3dcaf3d78ef2ca11882421ad0fdf579c8f3bc` |
+
+  Igual que con el subdominio del frontend, Railway puede tardar hasta 72h en
+  propagar y emitir el certificado, aunque en la práctica el del frontend
+  quedó listo en minutos — no hay por qué preocuparse antes de ese margen.
+  Cuando Josh confirme que estos registros están creados y el dominio
+  aparece verificado en Railway, falta un último paso: actualizar
+  `VITE_AMBIENTAL_API_URL` (hub y `ambiental-frontend`) de la URL Railway
+  actual a `https://api.ambiental.bogotaneidapp.com`.
+
+**Bug real encontrado y corregido en la verificación end-to-end:** el flujo
+de handoff hacía `POST ${VITE_AMBIENTAL_URL}/api/handoff`, pero la variable
+apuntaba al FRONTEND (`ambiental.bogotaneidapp.com`), no al backend —
+`/api/handoff` solo existe en el backend. Probado en vivo: contra el
+frontend, 405 (ruta inexistente); contra el backend
+(`ambiental-backend-production.up.railway.app`), 302 correcto con
+`#token=...`. Corregido:
+1. Variable renombrada `VITE_AMBIENTAL_URL` → `VITE_AMBIENTAL_API_URL` (el
+   nombre anterior era ambiguo entre la URL del frontend y la de la API) en
+   Railway (hub) y en el código de la rama del sidebar
+   (`AdminDashboard.tsx`, commit `5c2cc73c`).
+2. Valor corregido para apuntar al backend (temporalmente la URL Railway,
+   `https://ambiental-backend-production.up.railway.app`; pasa al subdominio
+   `api.ambiental.bogotaneidapp.com` en cuanto ese DNS verifique, ver arriba).
+3. Flujo completo re-verificado contra el backend real con un JWT real
+   (firmado con el `JWT_SECRET` de producción, nunca impreso en ningún log):
+   `POST /api/handoff` → 302 → `https://ambiental.bogotaneidapp.com/handoff#token=...`.
+
+**Regla para el futuro, para no repetir este bug:** el filtrado/enrutamiento
+entre frontend y backend de un módulo nunca debe asumirse implícito por
+compartir dominio — cada variable de URL debe nombrarse explícitamente por a
+qué servicio apunta (`_API_URL` vs. el dominio del sitio), y verificarse con
+una petición real antes de darla por buena.
 
 Servicios Railway creados en el proyecto `gov-espacio-publico` (mismo
 proyecto que el hub, decisión del usuario — ya aloja también los servicios de
 encuestas):
 - `ambiental-backend` — https://ambiental-backend-production.up.railway.app
+  (dominio Railway; dominio definitivo `api.ambiental.bogotaneidapp.com`,
+  DNS pendiente, ver tabla de asignación de dominios abajo)
 - `ambiental-frontend` — https://ambiental-frontend-production.up.railway.app
+  (dominio Railway; dominio definitivo `ambiental.bogotaneidapp.com`, ya
+  verificado y en uso)
 - `Postgres-_hTA` — base de datos propia de ambiental (nombre autogenerado,
   sin impacto funcional)
 
@@ -179,12 +238,15 @@ es parte del diseño del handoff en sí, pero bloqueaban probarlo):
    igual al real de producción del hub (leído de `backend-api`, no
    inventado). `CORS_ORIGIN`/`FRONTEND_URL` de ambiental-backend apuntan al
    dominio Railway del frontend.
-8. Subdominio `ambiental.bogotaneidapp.com` apuntando al servicio Railway del
-   frontend. **PENDIENTE** — requiere acceso a DNS de `bogotaneidapp.com`,
-   no se hizo todavía.
-9. ~~CORS del backend ambiental~~ HECHO 2026-07-28 con el dominio Railway del
-   frontend (`ambiental-frontend-production.up.railway.app`). Falta agregar
-   `ambiental.bogotaneidapp.com` cuando se resuelva la tarea 8.
+8. ~~Subdominio `ambiental.bogotaneidapp.com` apuntando al servicio Railway del
+   frontend~~ HECHO 2026-07-28: DNS creado por Josh, dominio custom
+   verificado en Railway (`syncStatus: ACTIVE`), certificado emitido, SPA
+   carga en producción. Subdominio del backend
+   (`api.ambiental.bogotaneidapp.com`) agregado el mismo día, DNS pendiente
+   de que Josh lo cree (ver registros arriba).
+9. ~~CORS del backend ambiental~~ HECHO 2026-07-28, verificado con el
+   dominio real (`ambiental.bogotaneidapp.com`) además del dominio Railway
+   del frontend.
 10. ~~Entorno local: hosts con entradas que imiten subdominios~~ HECHO
     2026-07-27: `bogotaneidapp.local` / `ambiental.bogotaneidapp.local`,
     flujo de handoff verificado ahí antes de tocar Railway.
@@ -196,9 +258,11 @@ pantalla que muestra su nombre y su rol.
 
 **Se despliega y se comprueba:** ambos servicios (frontend/backend de
 ambiental) visibles y healthy en el dashboard de Railway; healthcheck
-`/api/health` en verde; flujo de handoff repetido en producción, no solo
-local. HECHO 2026-07-28 salvo la prueba con login real de un ADMIN (bloqueada
-hasta que el sidebar del hub esté mergeado — ver arriba).
+`/api/health` en verde; flujo de handoff repetido en producción contra el
+subdominio real (no solo local, no solo `.up.railway.app`). HECHO
+2026-07-28 salvo la prueba con login real de un ADMIN (bloqueada hasta que
+el sidebar del hub esté mergeado — ver arriba) y salvo el certificado de
+`api.ambiental.bogotaneidapp.com` (pendiente de DNS, ver arriba).
 
 **Riesgos:**
 - El mecanismo interino (POST + fragmento) reduce la exposición del JWT en
