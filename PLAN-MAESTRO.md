@@ -69,21 +69,15 @@ están hechas y comprobadas en producción real, no solo en local.
   (200, HTML real). CORS del backend acepta ese origen (`OPTIONS` preflight
   devuelve `access-control-allow-origin` correcto).
 - `api.ambiental.bogotaneidapp.com`: dominio custom agregado en Railway al
-  servicio `ambiental-backend` (antes solo tenía el dominio Railway propio).
-  **Pendiente de DNS** — registros abajo, a crear en modo DNS only:
-
-  | Tipo | Nombre | Valor |
-  |---|---|---|
-  | CNAME | `api.ambiental` | `m2wt4vvl.up.railway.app` |
-  | TXT | `_railway-verify.api.ambiental` | `railway-verify=0a2074bd111b86725012294ec9c3dcaf3d78ef2ca11882421ad0fdf579c8f3bc` |
-
-  Igual que con el subdominio del frontend, Railway puede tardar hasta 72h en
-  propagar y emitir el certificado, aunque en la práctica el del frontend
-  quedó listo en minutos — no hay por qué preocuparse antes de ese margen.
-  Cuando Josh confirme que estos registros están creados y el dominio
-  aparece verificado en Railway, falta un último paso: actualizar
-  `VITE_AMBIENTAL_API_URL` (hub y `ambiental-frontend`) de la URL Railway
-  actual a `https://api.ambiental.bogotaneidapp.com`.
+  servicio `ambiental-backend`. **VERIFICADO 2026-07-28**: DNS propagado
+  (`DNS_RECORD_STATUS_PROPAGATED`), ownership verificado, certificado
+  `CERTIFICATE_STATUS_TYPE_VALID` — emitido en minutos, no hizo falta
+  esperar las 72h de margen. `GET /api/health` contra el subdominio
+  responde 200. `VITE_AMBIENTAL_API_URL` actualizado a
+  `https://api.ambiental.bogotaneidapp.com` en Railway (hub y
+  `ambiental-frontend`, ambos redeploy en `SUCCESS`) — ya no queda ninguna
+  URL `.up.railway.app` en el bundle de producción del frontend de
+  ambiental (verificado grepeando el JS servido).
 
 **Bug real encontrado y corregido en la verificación end-to-end:** el flujo
 de handoff hacía `POST ${VITE_AMBIENTAL_URL}/api/handoff`, pero la variable
@@ -96,12 +90,16 @@ frontend, 405 (ruta inexistente); contra el backend
    nombre anterior era ambiguo entre la URL del frontend y la de la API) en
    Railway (hub) y en el código de la rama del sidebar
    (`AdminDashboard.tsx`, commit `5c2cc73c`).
-2. Valor corregido para apuntar al backend (temporalmente la URL Railway,
-   `https://ambiental-backend-production.up.railway.app`; pasa al subdominio
-   `api.ambiental.bogotaneidapp.com` en cuanto ese DNS verifique, ver arriba).
-3. Flujo completo re-verificado contra el backend real con un JWT real
-   (firmado con el `JWT_SECRET` de producción, nunca impreso en ningún log):
-   `POST /api/handoff` → 302 → `https://ambiental.bogotaneidapp.com/handoff#token=...`.
+2. Valor final: `https://api.ambiental.bogotaneidapp.com` (ya no la URL
+   Railway intermedia).
+3. Flujo completo re-verificado de punta a punta con un JWT real (firmado
+   con el `JWT_SECRET` de producción, nunca impreso en ningún log) contra
+   los subdominios definitivos, sin pasar por ninguna URL `.up.railway.app`
+   en ningún paso visible del recorrido:
+   `POST https://api.ambiental.bogotaneidapp.com/api/handoff` → 302 →
+   `https://ambiental.bogotaneidapp.com/handoff#token=...` → 200. CORS
+   verificado también contra el subdominio de la API directamente (no solo
+   contra la URL Railway).
 
 **Regla para el futuro, para no repetir este bug:** el filtrado/enrutamiento
 entre frontend y backend de un módulo nunca debe asumirse implícito por
@@ -112,12 +110,12 @@ una petición real antes de darla por buena.
 Servicios Railway creados en el proyecto `gov-espacio-publico` (mismo
 proyecto que el hub, decisión del usuario — ya aloja también los servicios de
 encuestas):
-- `ambiental-backend` — https://ambiental-backend-production.up.railway.app
-  (dominio Railway; dominio definitivo `api.ambiental.bogotaneidapp.com`,
-  DNS pendiente, ver tabla de asignación de dominios abajo)
-- `ambiental-frontend` — https://ambiental-frontend-production.up.railway.app
-  (dominio Railway; dominio definitivo `ambiental.bogotaneidapp.com`, ya
-  verificado y en uso)
+- `ambiental-backend` — dominio definitivo `api.ambiental.bogotaneidapp.com`
+  (verificado, en uso; la URL Railway `ambiental-backend-production.up.railway.app`
+  sigue existiendo como dominio de respaldo del servicio, pero ya no aparece
+  en ningún flujo de usuario)
+- `ambiental-frontend` — dominio definitivo `ambiental.bogotaneidapp.com`
+  (verificado, en uso; misma nota sobre la URL Railway de respaldo)
 - `Postgres-_hTA` — base de datos propia de ambiental (nombre autogenerado,
   sin impacto funcional)
 
@@ -258,11 +256,12 @@ pantalla que muestra su nombre y su rol.
 
 **Se despliega y se comprueba:** ambos servicios (frontend/backend de
 ambiental) visibles y healthy en el dashboard de Railway; healthcheck
-`/api/health` en verde; flujo de handoff repetido en producción contra el
-subdominio real (no solo local, no solo `.up.railway.app`). HECHO
-2026-07-28 salvo la prueba con login real de un ADMIN (bloqueada hasta que
-el sidebar del hub esté mergeado — ver arriba) y salvo el certificado de
-`api.ambiental.bogotaneidapp.com` (pendiente de DNS, ver arriba).
+`/api/health` en verde; flujo de handoff repetido en producción de punta a
+punta contra los subdominios definitivos (`ambiental.bogotaneidapp.com` /
+`api.ambiental.bogotaneidapp.com`), sin que aparezca ninguna URL
+`.up.railway.app` en ningún paso del recorrido. HECHO 2026-07-28 salvo la
+prueba con login real de un ADMIN, que solo tiene sentido una vez el
+sidebar esté mergeado (ver arriba).
 
 **Riesgos:**
 - El mecanismo interino (POST + fragmento) reduce la exposición del JWT en
