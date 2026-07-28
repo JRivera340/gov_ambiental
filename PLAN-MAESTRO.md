@@ -317,15 +317,23 @@ sesión nocturna:
   migraciones TypeORM versionadas (no `synchronize`). Ver detalle completo y
   el checkbox de salida cumplido en `ESTADO-EXTRACCION.md`, sección "Fase 2 —
   Independencia de código".
+- `getUserById` — **REPLICADO 2026-07-28**: módulo `src/users/` propio
+  (`users.controller.ts`, `users.service.ts`) que hace de proxy hacia
+  `GET /api/users/:id` y `GET /api/users/gestores/list` del hub
+  (`HUB_API_URL`, nueva var de entorno, default apunta al servicio
+  `backend-api` de Railway). Reenvía el mismo JWT de la sesión (no se acuñó
+  secreto nuevo — el hub no tiene mecanismo de service-to-service, solo
+  valida cualquier JWT firmado con el `JWT_SECRET` compartido). Cache en
+  memoria con TTL de 60s (por `id` para usuario individual, por rol del que
+  llama para la lista de gestores, ya que el hub filtra esa lista según el
+  rol del caller). Tests en `users.service.spec.ts` (4 nuevos, cache hit/miss
+  y propagación de error). `jest`/`tsc` verdes (72 tests, 17 suites).
 
 **Tareas, en este orden (ROTO → AUSENTE → PARCIAL):**
 1. **ROTO primero:**
-   - `getUserById` (`users.service.ts:39-42`) llama `GET /users/:id`, que no
-     existe en el backend — usado en producción por
-     `ValidadorActividadPanel.tsx:60`. Decisión de arquitectura ya tomada:
-     usuarios se resuelven por ID contra el hub, no contra una tabla local.
-     Implementar un endpoint propio que haga de proxy/cache hacia el hub (o
-     consumir el hub directo desde el frontend, ver Decisiones abiertas).
+   - ~~`getUserById` llama `GET /users/:id`, que no existe en el backend~~ —
+     CERRADO 2026-07-28: endpoint propio de proxy/cache implementado en
+     `src/users/`, ver detalle en el bloque de estado arriba.
 2. **AUSENTE:**
    - Recalculo automático de estado de `Proceso` al aprobar un punto ligado
      (hub: `sorver.controller.ts:486-488`).
@@ -357,9 +365,9 @@ de esa resolución.
 **Plan de vuelta atrás:** cada tarea es un commit/PR independiente, revert
 individual sin afectar las demás.
 
-**Decisiones abiertas de este hito:** mecanismo exacto de resolución de
-usuario por ID (endpoint propio que llama al hub vs. llamada directa del
-frontend al hub) — ver tabla general.
+**Decisiones abiertas de este hito:** ninguna — la única (mecanismo de
+resolución de usuario por ID) se cerró el 2026-07-28, ver bloque de estado
+arriba.
 
 ## HITO 3 — Migración de datos (NO trabajar hasta terminar HITO 0-2)
 
@@ -549,7 +557,6 @@ los hitos anteriores ya estén cerradas.
 |---|---|---|
 | Mecanismo de handoff de sesión — interino (dentro del permiso actual) vs. objetivo (código de un solo uso, requiere tocar auth del hub) | Interino para HITO 0: POST con formulario auto-submit (token en el body, no en la URL) + fragmento `#token=` en la redirección de vuelta — no toca auth del hub, solo el sidebar. Migrar a código de un solo uso canjeado servidor-servidor apenas se autorice tocar auth del hub (ver HITO 0 tarea 4 para el detalle de qué hace falta). | Josh |
 | Firma del token: HS256 compartido vs. asimétrica (RS256, hub firma con privada, módulos verifican con pública) | HS256 compartido para HITO 0 — ya funciona, no bloquea. Deuda explícita: migrar a firma asimétrica ANTES de sumar un segundo módulo al esquema de identidad centralizada, porque con secreto compartido cualquier módulo puede fabricar tokens válidos para toda la plataforma, no solo verificarlos. | Josh |
-| Resolución de usuario por ID (`getUserById`) — endpoint propio que hace proxy al hub, vs. el frontend de ambiental llama directo al hub | Endpoint propio en el backend de ambiental que hace de proxy con caché simple — evita exponer el `JWT_SECRET`/credenciales de servicio en el frontend. | Josh |
 | Inventario de `ui/` a replicar en HITO 1 (completo vs. solo lo usado hoy) | Solo lo que ambiental usa hoy (Button, Badge, Card, Input, Select) — no construir primitivas sin consumidor. | Josh |
 | Adjuntos (fotos/actas) en la migración: mover a storage propio o referenciar el del hub | Referenciar el storage del hub (no mover archivos) hasta que el módulo `files` propio (ver `ESTADO-EXTRACCION.md`) esté resuelto. | Josh |
 | Momento exacto de corte de escritura (HITO 4) | Ventana de mantenimiento anunciada, mínimo 24h antes, con el hub en solo-lectura durante la migración final de HITO 3. | Josh |

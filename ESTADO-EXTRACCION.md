@@ -49,8 +49,8 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 
 Prioridad alta:
 1. ~~AdminDashboard shell + ruta `/admin`~~ RESUELTO 2026-07-27: `pages/admin/AdminDashboard.tsx` + `pages/admin/hooks/useAdminDashboard.ts` (hook propio, reducido — no el de 1400 líneas multi-dominio del hub) + ruta `/admin` en `App.tsx`, redirect de `LoginPage` para rol ADMIN. Verificado con backend real levantado (login, `GET /puntos` con token ADMIN) y `tsc`/`vitest` limpios.
-2. **CRUD de usuarios en backend** — solo existe `GET /users/gestores/list`. Frontend (`users.service.ts`) ya invoca `create/update/delete/import` sin backend. Necesario para que ADMIN gestione gestores/validadores desde este repo. Origen: módulo de usuarios del hub (verificar ubicación exacta, es compartido entre dominios).
-3. **Permitir edición de punto a VALIDADOR_AMBIENTAL/ADMIN** — hoy solo GESTOR_AMBIENTAL puede (`PATCH /puntos/:id`). Decidido: replicar el hub, la paridad manda (ver Decisiones abiertas).
+2. **CRUD de usuarios en backend** — parcialmente resuelto 2026-07-28: `GET /users/:id` y `GET /users/gestores/list` ahora existen como proxy propio hacia el hub (`src/users/`, ver PLAN-MAESTRO.md HITO 2). Sigue pendiente `create/update/delete/import` — el frontend (`users.service.ts`) los invocaba sin backend, pero esos métodos ya se limpiaron como código muerto (commit `20114e1`, sin consumidores reales) antes de este fix. Si ADMIN necesita gestionar gestores/validadores desde este repo en el futuro, es trabajo nuevo, no una regresión a arreglar.
+3. ~~Permitir edición de punto a VALIDADOR_AMBIENTAL/ADMIN~~ RESUELTO — ver fila "Editar punto" en la matriz de arriba, REPLICADA 2026-07-28.
 
 Prioridad media:
 4. ~~Recalculo automático de estado de `Proceso`~~ RESUELTO — ya estaba implementado en `puntos.service.ts:154` (equivalente a `sorver.controller.ts:486-488` del hub), esta fila del documento estaba desactualizada. Verificado 2026-07-28 con 2 tests nuevos (`puntos.service.spec.ts`) que confirman que `approve()` llama a `recalculateStatus` cuando el punto tiene `processId`, y que NO lo llama cuando no lo tiene.

@@ -10,6 +10,10 @@ export const envSchema = z.object({
 
   JWT_SECRET: z.string(),
 
+  // Backend del hub (gov-espacio-publico), para el proxy de resolucion de
+  // usuarios por ID (ver PLAN-MAESTRO.md HITO 2, tarea 1 - getUserById).
+  HUB_API_URL: z.string().default('https://backend-api-production-0ce4.up.railway.app'),
+
   DB_HOST: z.string(),
   DB_PORT: z.coerce.number().default(5432),
   DB_USERNAME: z.string(),
