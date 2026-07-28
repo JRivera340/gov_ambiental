@@ -10,6 +10,14 @@ Criterio final: se puede eliminar
 `gov-espacio-publico/packages/frontend/src/pages/gestor-ambiental/` sin romper
 el hub, y el ambiental opera de forma autónoma desde su propio subdominio.
 
+## Base de datos de gov-espacio-publico — SOLO LECTURA, SIEMPRE
+Regla permanente, sin excepción, no ligada a ningún hito ni sesión. La base
+de datos del hub contiene los datos de producción en uso. Este repo NUNCA
+escribe en ella: ni INSERT, ni UPDATE, ni DELETE, ni ALTER, ni migraciones.
+Solo lectura, y únicamente cuando se necesite consultar o migrar hacia el
+ambiental. Esto aplica también durante el HITO 3: la migración LEE del hub y
+ESCRIBE en la base de ambiental. En ningún momento modifica el origen.
+
 ## Decisiones de arquitectura
 
 - **Identidad centralizada** — gov-espacio-publico es el único proveedor de

@@ -19,12 +19,25 @@ La referencia de comportamiento es SIEMPRE la implementación del hub. Ante una
 duda sobre cómo debe funcionar algo, consulta el original en
 gov-espacio-publico antes de improvisar.
 
-**gov-espacio-publico ya NO es solo-lectura sin excepción** — desde
-PLAN-MAESTRO.md HITO 0 se permite tocar, en rama aparte (nunca `main`): el
-sidebar de admin (entrada nueva), la ruta/enlace que esa entrada necesita, y
-variables de entorno con la URL del módulo ambiental. Todo lo demás del hub
-(auth, roles, entidades, el gestor-ambiental legacy) sigue prohibido sin
-autorización explícita del usuario.
+**gov-espacio-publico ya NO es solo-lectura sin excepción a nivel de CÓDIGO**
+— desde PLAN-MAESTRO.md HITO 0 se permite tocar, en rama aparte (nunca
+`main`): el sidebar de admin (entrada nueva), la ruta/enlace que esa entrada
+necesita, y variables de entorno con la URL del módulo ambiental. Todo lo
+demás del código del hub (auth, roles, entidades, el gestor-ambiental legacy)
+sigue prohibido sin autorización explícita del usuario.
+
+## Base de datos de gov-espacio-publico — SOLO LECTURA, SIEMPRE
+Regla permanente, sin excepción, no ligada a ningún hito. La base de datos
+del hub contiene los datos de producción en uso. Este repo NUNCA escribe en
+ella: ni INSERT, ni UPDATE, ni DELETE, ni ALTER, ni migraciones. Solo lectura,
+y únicamente cuando se necesite consultar o migrar hacia el ambiental.
+
+Esto aplica también durante el HITO 3: la migración LEE del hub y ESCRIBE en
+la base de ambiental. En ningún momento modifica el origen.
+
+El permiso de tocar código del hub (párrafo anterior) es exclusivamente eso
+— código del hub, en rama aparte. No se extiende ni remotamente a su base de
+datos.
 
 Actualiza ESTADO-EXTRACCION.md cuando una tarea:
 - cambie el estado de una fila de la matriz de paridad
