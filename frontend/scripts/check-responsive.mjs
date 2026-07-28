@@ -7,6 +7,10 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5174';
+// Opcional: para probar rutas protegidas por RutaProtegida sin pasar por
+// /handoff. Mismas claves que auth.service.ts (gov_auth_token/gov_auth_user).
+const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const AUTH_USER_JSON = process.env.AUTH_USER_JSON;
 const SCREENSHOTS_DIR = path.resolve(process.cwd(), '.screenshots');
 
 const VIEWPORTS = [
@@ -23,10 +27,21 @@ async function checkRoute(browser, route) {
   for (const vp of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
     const page = await context.newPage();
+    if (AUTH_TOKEN && AUTH_USER_JSON) {
+      await page.addInitScript(
+        ([token, userJson]) => {
+          sessionStorage.setItem('gov_auth_token', token);
+          sessionStorage.setItem('gov_auth_user', userJson);
+        },
+        [AUTH_TOKEN, AUTH_USER_JSON],
+      );
+    }
     const url = `${BASE_URL}${route}`;
     try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-      await page.waitForTimeout(500); // deja asentar animaciones/mapas
+      // 'networkidle' no dispara en vistas con mapas (tiles/polling
+      // continuo) — 'load' + espera fija es mas confiable para esta app.
+      await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForTimeout(1500);
 
       const { scrollWidth, clientWidth } = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
