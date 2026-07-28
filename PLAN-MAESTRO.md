@@ -399,29 +399,72 @@ por constraint de esquema. Vale un chequeo puntual cuando haya datos reales.
 join referencia un string (`operativoSubtipo`), no una FK real — parece
 vestigial, no se incluye en el alcance de migración salvo que se confirme uso.
 
-**Conteo de filas — PENDIENTE, no obtenido en esta auditoría.** La única base
-con datos accesible sin credenciales de producción fue el contenedor Docker
-local de desarrollo (vacío, no sirve). El acceso de lectura a la Postgres de
-producción del hub vía Railway CLI fue bloqueado por la capa de permisos del
-entorno (no llegó a pedir aprobación). Cuando se autorice, correr contra la
-producción del hub (SOLO LECTURA, nunca escribir):
-```sql
-SELECT status, COUNT(*) FROM activities
-WHERE "operativoCategoria" = 'AMBIENTAL' GROUP BY status;
+**Conteo de filas — línea base de reconciliación, obtenida 2026-07-28.**
+Consultas de solo lectura (`SELECT`/`COUNT` únicamente, sin exportar filas)
+contra la producción del hub, vía el TCP proxy ya existente del servicio
+Postgres del hub (`hopper.proxy.rlwy.net:55251`).
 
-SELECT COUNT(*) FROM activities
-WHERE "operativoCategoria" = 'AMBIENTAL' AND results = 'Importado desde Excel';
+Desglose por estado, `operativoCategoria = 'AMBIENTAL'` (criterio amplio):
 
-SELECT COUNT(*) FROM ruta_semanal;
-SELECT COUNT(*) FROM processes;
-SELECT COUNT(*) FROM punto_asignacion pa
-  JOIN activities a ON a.id = pa."activityId" WHERE a."operativoCategoria" = 'AMBIENTAL';
-SELECT COUNT(*) FROM activity_gestores ag
-  JOIN activities a ON a.id = ag."activityId" WHERE a."operativoCategoria" = 'AMBIENTAL';
-```
-El conteo de `results = 'Importado desde Excel'` es el que decide qué se
-descarta (tarea 2 abajo) — la decisión de descarte la toma Josh al ver el
-número, no se asume aquí.
+| Estado | Filas |
+|---|---|
+| BORRADOR | 0 |
+| ENVIADA | 11 |
+| APROBADA | 0 |
+| RECHAZADA | 2 |
+| PUBLICADA | 333 |
+| **Total** | **346** |
+
+Desglose por estado, `operativoSubtipo = 'AMBIENTAL_PUNTOS_ACUMULACION'` (criterio estrecho):
+
+| Estado | Filas |
+|---|---|
+| ENVIADA | 11 |
+| RECHAZADA | 2 |
+| PUBLICADA | 332 |
+| **Total** | **345** |
+
+**Diferencia entre criterios: 1 fila.** Es una sola actividad en estado
+`PUBLICADA` con `operativoCategoria = 'AMBIENTAL'` pero
+`operativoSubtipo = 'AMBIENTAL'` (subtipo genérico, no
+`AMBIENTAL_PUNTOS_ACUMULACION`). Es decir, el criterio estrecho excluiría
+exactamente 1 punto publicado que sí es ambiental por categoría. Dado que la
+diferencia es mínima (1 de 346) y el criterio amplio no deja nada relevante
+fuera, **se recomienda migrar con `operativoCategoria = 'AMBIENTAL'`** (el
+más amplio) para no perder esa fila — decisión pendiente de confirmación de
+Josh.
+
+Registros corruptos de import Excel: `results = 'Importado desde Excel'` →
+**0 filas** dentro de `operativoCategoria = 'AMBIENTAL'`. No hay nada que
+descartar por este motivo en el dominio ambiental — el problema de import
+roto, si existe, no afecta a estas 346 filas.
+
+Otras tablas/entidades relacionadas:
+
+| Tabla / dato | Conteo |
+|---|---|
+| `ruta_semanal` (total) | 12 |
+| `processes` (total) | 0 |
+| `punto_asignacion` (join contra ambiental) | 345 |
+| `activity_gestores` (join contra ambiental, operativos grupales) | 1 |
+| Puntos ambientales con al menos 1 entrada de residuo embebida | 346 |
+| Total de entradas de residuo embebidas (`dynamicAnswers.residuos[]`) | 1082 |
+| Fotos "antes" (`photos[]`) | 12 |
+| Fotos "después" (`photosFase2[]`) | 0 |
+| Puntos con acta PDF (`actaPdfUrl`) | 1 |
+| Puntos con acta de texto legacy (`actaOperativo`) | 106 |
+
+Notas sobre estos números:
+- `processes = 0`: ningún punto ambiental está agrupado en un proceso todavía
+  en el hub — la tabla `ProcessEntity` existe pero no tiene uso real ahí. No
+  bloquea la migración, solo significa que no hay procesos que migrar.
+- `punto_asignacion` (345) es casi 1:1 con el total (346) — solo 1 punto
+  ambiental no tiene asignación de gestor registrada.
+- Fotos "después" en 0 y actas PDF en solo 1 de 346 — la mayoría de la
+  evidencia de cierre vive en el campo de texto legacy `actaOperativo` (106),
+  no en URL de storage. Relevante para la decisión abierta sobre adjuntos:
+  mover a storage propio va a mover principalmente fotos "antes" (12) y 1 PDF,
+  no un volumen grande.
 
 **Tareas:**
 1. Correr `migrate-from-legacy.ts` (ya existe como embrión) contra un dump de
