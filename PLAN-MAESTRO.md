@@ -366,6 +366,63 @@ frontend al hub) — ver tabla general.
 **Objetivo:** mover los datos históricos de la base del hub a la base propia
 de ambiental, con transformación de esquema (no copia).
 
+**Alcance exhaustivo — sin recortes.** Debe migrarse TODO lo ambiental: todos
+los puntos/actividades en TODOS los estados (no solo activos), rutas
+semanales completas incluido histórico, asignaciones de puntos, entradas de
+residuos y sus notas, adjuntos (fotos/actas). Auditoría de origen (hub,
+SOLO LECTURA, 2026-07-28):
+
+| Entidad hub | Tabla | Rol | ¿Tabla propia o campo embebido? |
+|---|---|---|---|
+| `ActivityEntity` (`packages/backend/src/sorver/entities/activity.entity.ts`) | `activities` | Entidad central, compartida entre IVC/Espacio Público/Ambiental/PYBA | — |
+| `PuntoAsignacion` (`punto-asignacion.entity.ts`) | `punto_asignacion` | Punto → gestor, PK en `activityId` | Tabla propia |
+| `RutaSemanal` (`ruta-semanal.entity.ts`) | `ruta_semanal` | Ruta semanal por gestor | Tabla propia |
+| `ProcessEntity` (`process.entity.ts`) | `processes` | Agrupa actividades en un proceso | Tabla propia |
+| join `activity_gestores` | `activity_gestores` | Gestores involucrados en operativo grupal (M2M) | Tabla propia |
+| Residuos + notas | — | Entradas de residuo y su `observaciones` | **Embebido**: `activities.dynamicAnswers.residuos[]` (jsonb) — no hay tabla `notas` separada en el hub |
+| Fotos | — | Antes/después | **Embebido**: `activities.photos: text[]`, `activities.photosFase2: text[]` |
+| Actas | — | Documento PDF del operativo | **Embebido**: `activities.actaOperativo` (texto legacy), `activities.actaPdfUrl` (URL en R2) |
+
+Filtro para aislar filas ambientales: `activities."operativoCategoria" =
+'AMBIENTAL'` (enum `OperativoCategoria`, `enums/operativo.enum.ts`). Hay un
+discriminador más estrecho, `operativoSubtipo = 'AMBIENTAL_PUNTOS_ACUMULACION'`
+— es el que `residuos.service.ts` exige para permitir seguimiento de residuos.
+**Decisión abierta:** confirmar antes de migrar si el alcance es
+`operativoCategoria = 'AMBIENTAL'` (todo lo ambiental, más amplio) o solo el
+subtipo de puntos de acumulación (más estrecho, 1:1 con `PuntoResiduo` de este
+repo) — ver tabla de decisiones abiertas.
+
+`ruta_semanal` y `processes` no tienen columna de categoría propia: son
+ambientales por convención de código (ningún otro dominio escribe ahí), no
+por constraint de esquema. Vale un chequeo puntual cuando haya datos reales.
+`operativo_tipo` (`operativo-tipo.entity.ts`) existe en el schema pero su
+join referencia un string (`operativoSubtipo`), no una FK real — parece
+vestigial, no se incluye en el alcance de migración salvo que se confirme uso.
+
+**Conteo de filas — PENDIENTE, no obtenido en esta auditoría.** La única base
+con datos accesible sin credenciales de producción fue el contenedor Docker
+local de desarrollo (vacío, no sirve). El acceso de lectura a la Postgres de
+producción del hub vía Railway CLI fue bloqueado por la capa de permisos del
+entorno (no llegó a pedir aprobación). Cuando se autorice, correr contra la
+producción del hub (SOLO LECTURA, nunca escribir):
+```sql
+SELECT status, COUNT(*) FROM activities
+WHERE "operativoCategoria" = 'AMBIENTAL' GROUP BY status;
+
+SELECT COUNT(*) FROM activities
+WHERE "operativoCategoria" = 'AMBIENTAL' AND results = 'Importado desde Excel';
+
+SELECT COUNT(*) FROM ruta_semanal;
+SELECT COUNT(*) FROM processes;
+SELECT COUNT(*) FROM punto_asignacion pa
+  JOIN activities a ON a.id = pa."activityId" WHERE a."operativoCategoria" = 'AMBIENTAL';
+SELECT COUNT(*) FROM activity_gestores ag
+  JOIN activities a ON a.id = ag."activityId" WHERE a."operativoCategoria" = 'AMBIENTAL';
+```
+El conteo de `results = 'Importado desde Excel'` es el que decide qué se
+descarta (tarea 2 abajo) — la decisión de descarte la toma Josh al ver el
+número, no se asume aquí.
+
 **Tareas:**
 1. Correr `migrate-from-legacy.ts` (ya existe como embrión) contra un dump de
    staging, nunca contra producción directamente en el primer intento.
