@@ -86,6 +86,32 @@ export class PuntosService {
       isGroupOperativo: dto.isGroupOperativo || (dto.gestoresInvolucradosIds?.length ?? 0) > 0,
       gestoresInvolucradosIds: dto.gestoresInvolucradosIds || [],
       residuos,
+      frecuenciaAcumulacion: dto.frecuenciaAcumulacion,
+      observaciones: dto.observaciones,
+      entornoEscolar: dto.entornoEscolar,
+      nombreEntornoEscolar: dto.nombreEntornoEscolar,
+      especificarEntorno: dto.especificarEntorno,
+      tipoZona: dto.tipoZona,
+      tipoSuelo: dto.tipoSuelo,
+      condicionesZona: dto.condicionesZona || [],
+      poblacionHabitanteCalle: dto.poblacionHabitanteCalle,
+      factoresAcumulacion: dto.factoresAcumulacion || [],
+      camarasPunto: dto.camarasPunto,
+      operadorAseo: dto.operadorAseo,
+      recoleccionPuertaAPuerta: dto.recoleccionPuertaAPuerta,
+      m2Invasion: dto.m2Invasion,
+      actoresIndisciplina: dto.actoresIndisciplina,
+      intervencionesPropuestas: dto.intervencionesPropuestas,
+      identificacionGenerador: dto.identificacionGenerador,
+      tipoGenerador: dto.tipoGenerador,
+      nombreResponsable: dto.nombreResponsable,
+      direccionResponsable: dto.direccionResponsable,
+      observoDisposicion: dto.observoDisposicion,
+      fechaObservacion: dto.fechaObservacion ? new Date(dto.fechaObservacion) : undefined,
+      metodoIdentificacion: dto.metodoIdentificacion,
+      actoresEstrategicos: dto.actoresEstrategicos || [],
+      telefonoActor: dto.telefonoActor,
+      intervencionesRecomendadas: dto.intervencionesRecomendadas || [],
     } as Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>);
     await this.asignacionesService.asignarACreador(punto.id, userId);
     return punto;
@@ -124,6 +150,36 @@ export class PuntosService {
       punto.gestoresInvolucradosIds = dto.gestoresInvolucradosIds;
       punto.isGroupOperativo = dto.gestoresInvolucradosIds.length > 0;
     }
+    if (dto.frecuenciaAcumulacion !== undefined) punto.frecuenciaAcumulacion = dto.frecuenciaAcumulacion;
+    if (dto.observaciones !== undefined) punto.observaciones = dto.observaciones;
+    if (dto.entornoEscolar !== undefined) punto.entornoEscolar = dto.entornoEscolar;
+    if (dto.nombreEntornoEscolar !== undefined) punto.nombreEntornoEscolar = dto.nombreEntornoEscolar;
+    if (dto.especificarEntorno !== undefined) punto.especificarEntorno = dto.especificarEntorno;
+    if (dto.tipoZona !== undefined) punto.tipoZona = dto.tipoZona;
+    if (dto.tipoSuelo !== undefined) punto.tipoSuelo = dto.tipoSuelo;
+    if (dto.condicionesZona !== undefined) punto.condicionesZona = dto.condicionesZona;
+    if (dto.poblacionHabitanteCalle !== undefined) punto.poblacionHabitanteCalle = dto.poblacionHabitanteCalle;
+    if (dto.factoresAcumulacion !== undefined) punto.factoresAcumulacion = dto.factoresAcumulacion;
+    if (dto.camarasPunto !== undefined) punto.camarasPunto = dto.camarasPunto;
+    if (dto.operadorAseo !== undefined) punto.operadorAseo = dto.operadorAseo;
+    if (dto.recoleccionPuertaAPuerta !== undefined) punto.recoleccionPuertaAPuerta = dto.recoleccionPuertaAPuerta;
+    if (dto.m2Invasion !== undefined) punto.m2Invasion = dto.m2Invasion;
+    if (dto.actoresIndisciplina !== undefined) punto.actoresIndisciplina = dto.actoresIndisciplina;
+    if (dto.intervencionesPropuestas !== undefined) punto.intervencionesPropuestas = dto.intervencionesPropuestas;
+    if (dto.identificacionGenerador !== undefined) punto.identificacionGenerador = dto.identificacionGenerador;
+    if (dto.tipoGenerador !== undefined) punto.tipoGenerador = dto.tipoGenerador;
+    if (dto.nombreResponsable !== undefined) punto.nombreResponsable = dto.nombreResponsable;
+    if (dto.direccionResponsable !== undefined) punto.direccionResponsable = dto.direccionResponsable;
+    if (dto.observoDisposicion !== undefined) punto.observoDisposicion = dto.observoDisposicion;
+    // Fechas del DTO llegan como string ISO (@IsISO8601); la entidad las
+    // guarda como Date, mismo patrón que dateTime más arriba — castear
+    // explícitamente ANTES de asignar, nunca repo.update() directo (bug
+    // documentado en CLAUDE.md sección 6, toISOString).
+    if (dto.fechaObservacion !== undefined) punto.fechaObservacion = new Date(dto.fechaObservacion);
+    if (dto.metodoIdentificacion !== undefined) punto.metodoIdentificacion = dto.metodoIdentificacion;
+    if (dto.actoresEstrategicos !== undefined) punto.actoresEstrategicos = dto.actoresEstrategicos;
+    if (dto.telefonoActor !== undefined) punto.telefonoActor = dto.telefonoActor;
+    if (dto.intervencionesRecomendadas !== undefined) punto.intervencionesRecomendadas = dto.intervencionesRecomendadas;
     if (dto.residuos !== undefined) {
       punto.residuos = dto.residuos.map((r: any) => ({
         id: r.id || randomUUID(),

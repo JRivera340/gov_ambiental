@@ -15,6 +15,81 @@ export enum EstadoPunto {
   PUBLICADA = 'PUBLICADA',
 }
 
+// Campos del formulario fijo de "Identificación de Puntos de Acumulación de
+// Residuos" (antes formulario dinámico traído de gov_encuestas_publico, ver
+// ESTADO-EXTRACCION.md — regresión detectada y corregida 2026-07-29). Los
+// enums replican EXACTAMENTE los values de la encuesta original, no se
+// renombró ni se recortó ninguna opción.
+
+export enum FrecuenciaAcumulacion {
+  PRIMERA_VEZ = 'PRIMERA_VEZ',
+  OCASIONAL = 'OCASIONAL',
+  FRECUENTE = 'FRECUENTE',
+  PERMANENTE = 'PERMANENTE',
+}
+
+export enum TipoZona {
+  RESIDENCIAL = 'RESIDENCIAL',
+  COMERCIAL = 'COMERCIAL',
+  INDUSTRIAL = 'INDUSTRIAL',
+  MIXTA = 'MIXTA',
+  OTRA = 'OTRA',
+}
+
+export enum TipoSuelo {
+  ANDEN = 'ANDEN',
+  CALLE = 'CALLE',
+  SEPARADOR = 'SEPARADOR',
+  PARQUE = 'PARQUE',
+  OTRO = 'OTRO',
+}
+
+export enum CamarasPunto {
+  NO_HAY = 'NO_HAY',
+  FUNCIONAMIENTO = 'FUNCIONAMIENTO',
+  MANTENIMIENTO = 'MANTENIMIENTO',
+  FUERA_DE_SERVICIO = 'FUERA_DE_SERVICIO',
+}
+
+// Cadena de evidencia para comparendos (ESTADO-EXTRACCION.md): estos 7 campos
+// (identificacionGenerador -> metodoIdentificacion) se sostienen entre sí. Si
+// se identifica al generador, tipoGenerador/nombreResponsable/
+// direccionResponsable lo describen; observoDisposicion/fechaObservacion/
+// metodoIdentificacion documentan CÓMO se llegó a esa conclusión. Quitar uno
+// deja a los otros seis sin sentido — no eliminar por separado.
+export enum IdentificacionGenerador {
+  SI = 'SI',
+  NO = 'NO',
+  PARCIALMENTE = 'PARCIALMENTE',
+}
+
+export enum TipoGenerador {
+  COMUNIDAD = 'COMUNIDAD',
+  VIVIENDA = 'VIVIENDA',
+  RESTAURANTE = 'RESTAURANTE',
+  BAR = 'BAR',
+  TIENDA = 'TIENDA',
+  SUPERMERCADO = 'SUPERMERCADO',
+  PLAZA_MERCADO = 'PLAZA_MERCADO',
+  OBRA_CONSTRUCCION = 'OBRA_CONSTRUCCION',
+  EMPRESA = 'EMPRESA',
+  TALLER = 'TALLER',
+  HABITANTE_CALLE = 'HABITANTE_CALLE',
+  RECICLADOR = 'RECICLADOR',
+  VOLQUETA = 'VOLQUETA',
+  OTRO = 'OTRO',
+}
+
+export enum MetodoIdentificacion {
+  OBSERVACION_DIRECTA = 'OBSERVACION_DIRECTA',
+  INFO_COMUNIDAD = 'INFO_COMUNIDAD',
+  CAMARAS = 'CAMARAS',
+  FOTOGRAFIAS = 'FOTOGRAFIAS',
+  DOCUMENTACION_RESIDUOS = 'DOCUMENTACION_RESIDUOS',
+  INFO_OPERADOR_ASEO = 'INFO_OPERADOR_ASEO',
+  OTRO = 'OTRO',
+}
+
 export type ResiduoNota = {
   id: string;
   fecha: string;
@@ -140,6 +215,97 @@ export class PuntoResiduo {
 
   @Column({ type: 'timestamptz', nullable: true })
   ultimoSeguimientoAt?: Date;
+
+  // ── Formulario fijo "Identificación de Puntos de Acumulación" ──────────
+  // Ver ESTADO-EXTRACCION.md: 26 columnas agregadas 2026-07-29 para corregir
+  // la regresión donde estas respuestas se capturaban en pantalla y se
+  // descartaban al guardar. nombreResponsable/direccionResponsable/
+  // telefonoActor contienen DATOS PERSONALES de ciudadanos (ver esa misma
+  // sección) — no van en el seed de desarrollo con valores reales.
+
+  @Column({ type: 'enum', enum: FrecuenciaAcumulacion, nullable: true })
+  frecuenciaAcumulacion?: FrecuenciaAcumulacion;
+
+  @Column({ type: 'text', nullable: true })
+  observaciones?: string;
+
+  @Column({ type: 'boolean', nullable: true })
+  entornoEscolar?: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  nombreEntornoEscolar?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  especificarEntorno?: string;
+
+  @Column({ type: 'enum', enum: TipoZona, nullable: true })
+  tipoZona?: TipoZona;
+
+  @Column({ type: 'enum', enum: TipoSuelo, nullable: true })
+  tipoSuelo?: TipoSuelo;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  condicionesZona?: string[];
+
+  @Column({ type: 'boolean', nullable: true })
+  poblacionHabitanteCalle?: boolean;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  factoresAcumulacion?: string[];
+
+  @Column({ type: 'enum', enum: CamarasPunto, nullable: true })
+  camarasPunto?: CamarasPunto;
+
+  @Column({ type: 'varchar', nullable: true })
+  operadorAseo?: string;
+
+  @Column({ type: 'boolean', nullable: true })
+  recoleccionPuertaAPuerta?: boolean;
+
+  @Column({ type: 'double precision', nullable: true })
+  m2Invasion?: number;
+
+  @Column({ type: 'text', nullable: true })
+  actoresIndisciplina?: string;
+
+  @Column({ type: 'text', nullable: true })
+  intervencionesPropuestas?: string;
+
+  // Cadena de evidencia para comparendos — ver comentario en el enum
+  // IdentificacionGenerador más arriba. No eliminar uno de estos 7 sin
+  // revisar los demás.
+  @Column({ type: 'enum', enum: IdentificacionGenerador, nullable: true })
+  identificacionGenerador?: IdentificacionGenerador;
+
+  @Column({ type: 'enum', enum: TipoGenerador, nullable: true })
+  tipoGenerador?: TipoGenerador;
+
+  /** DATO PERSONAL — ver ESTADO-EXTRACCION.md, sección de datos sensibles. */
+  @Column({ type: 'varchar', nullable: true })
+  nombreResponsable?: string;
+
+  /** DATO PERSONAL — ver ESTADO-EXTRACCION.md, sección de datos sensibles. */
+  @Column({ type: 'varchar', nullable: true })
+  direccionResponsable?: string;
+
+  @Column({ type: 'boolean', nullable: true })
+  observoDisposicion?: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  fechaObservacion?: Date;
+
+  @Column({ type: 'enum', enum: MetodoIdentificacion, nullable: true })
+  metodoIdentificacion?: MetodoIdentificacion;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  actoresEstrategicos?: string[];
+
+  /** DATO PERSONAL — ver ESTADO-EXTRACCION.md, sección de datos sensibles. */
+  @Column({ type: 'varchar', nullable: true })
+  telefonoActor?: string;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  intervencionesRecomendadas?: string[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

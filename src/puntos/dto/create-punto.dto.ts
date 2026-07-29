@@ -1,6 +1,7 @@
 import { IsArray, IsISO8601, IsNumber, IsOptional, IsString } from 'class-validator';
+import { FormularioFijoPuntoDto } from './formulario-fijo-punto.dto';
 
-export class CreatePuntoDto {
+export class CreatePuntoDto extends FormularioFijoPuntoDto {
   @IsNumber()
   lat!: number;
 

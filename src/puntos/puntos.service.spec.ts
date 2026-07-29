@@ -1,6 +1,15 @@
 import { PuntosService, toPublicPunto } from './puntos.service';
 import { InMemoryPuntosRepository } from './puntos.repository.memory';
-import { EstadoPunto } from './entities/punto-residuo.entity';
+import {
+  CamarasPunto,
+  EstadoPunto,
+  FrecuenciaAcumulacion,
+  IdentificacionGenerador,
+  MetodoIdentificacion,
+  TipoGenerador,
+  TipoSuelo,
+  TipoZona,
+} from './entities/punto-residuo.entity';
 import { Role } from '../common/enums/role.enum';
 
 const asignacionesStub = { asignarACreador: async () => {} };
@@ -26,6 +35,57 @@ describe('PuntosService', () => {
     expect(punto.entidadesAcompanantes).toEqual(['POLICIA', 'BOMBEROS']);
     expect(punto.gestoresInvolucradosIds).toEqual(['gestor-2', 'gestor-3']);
     expect(punto.isGroupOperativo).toBe(true);
+  });
+
+  it('persiste los 26 campos del formulario fijo y los recupera igual al reabrir el punto (ver ESTADO-EXTRACCION.md, regresion de operativoData)', async () => {
+    const { service, repo } = makeService();
+    const formularioLlenado = {
+      lat: 4.6, lng: -74.08, barrio: 'La Candelaria',
+      entidadResponsable: 'UAESP',
+      frecuenciaAcumulacion: FrecuenciaAcumulacion.FRECUENTE,
+      observaciones: 'Punto reincidente hace 3 semanas',
+      entornoEscolar: true,
+      nombreEntornoEscolar: 'Colegio Distrital X',
+      especificarEntorno: 'Cerca de la entrada principal',
+      tipoZona: TipoZona.RESIDENCIAL,
+      tipoSuelo: TipoSuelo.ANDEN,
+      condicionesZona: ['MAL_ESTADO_VIA', 'FALTA_ILUMINACION'],
+      poblacionHabitanteCalle: true,
+      factoresAcumulacion: ['CONTENEDOR_MAL_UBICADO', 'AUSENCIA_CONTENEDOR'],
+      camarasPunto: CamarasPunto.FUNCIONAMIENTO,
+      operadorAseo: 'Promoambiental',
+      recoleccionPuertaAPuerta: false,
+      m2Invasion: 12.5,
+      actoresIndisciplina: 'Vendedores ambulantes de la zona',
+      intervencionesPropuestas: 'Instalar contenedor y sensibilizar',
+      identificacionGenerador: IdentificacionGenerador.PARCIALMENTE,
+      tipoGenerador: TipoGenerador.COMUNIDAD,
+      nombreResponsable: 'Juan Pérez (ficticio, dato de prueba)',
+      direccionResponsable: 'Calle 10 # 5-20 (ficticio, dato de prueba)',
+      observoDisposicion: true,
+      fechaObservacion: '2026-07-20T08:30:00.000Z',
+      metodoIdentificacion: MetodoIdentificacion.OBSERVACION_DIRECTA,
+      actoresEstrategicos: ['JAC', 'ADMINISTRADOR_SECTOR'],
+      telefonoActor: '3000000000 (ficticio, dato de prueba)',
+      intervencionesRecomendadas: ['LIMPIEZA_INMEDIATA', 'INSTALACION_CONTENEDOR'],
+    };
+
+    const creado = await service.create('user-1', formularioLlenado as any);
+
+    // "Reabrir el punto": no confiar en el objeto devuelto por create(), volver
+    // a leerlo desde el repositorio como haria la app al abrir el detalle.
+    const reabierto = await repo.findById(creado.id);
+    expect(reabierto).not.toBeNull();
+
+    for (const [campo, valorEsperado] of Object.entries(formularioLlenado)) {
+      if (campo === 'lat' || campo === 'lng' || campo === 'barrio' || campo === 'entidadResponsable') continue;
+      const valorReabierto = (reabierto as any)[campo];
+      if (campo === 'fechaObservacion') {
+        expect(new Date(valorReabierto).toISOString()).toBe(valorEsperado);
+      } else {
+        expect(valorReabierto).toEqual(valorEsperado);
+      }
+    }
   });
 
   describe('update', () => {
