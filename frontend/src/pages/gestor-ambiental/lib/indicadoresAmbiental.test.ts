@@ -5,7 +5,7 @@ import {
 
 const punto = (id: string, barrio: string, residuos: any[], lat = 4.6, lng = -74.07, operativoSubtipo = 'AMBIENTAL'): any => ({
   id, barrio, lat, lng, dateTime: '2026-07-01T00:00:00Z',
-  operativoData: { residuos },
+  residuos,
   operativoSubtipo,
 });
 const r = (tipo: string, recogido: boolean, dateTime?: string, fechaRecogida?: string) =>

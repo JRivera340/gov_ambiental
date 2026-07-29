@@ -44,26 +44,19 @@ describe('findTechnicalResidueKey', () => {
 });
 
 describe('getResiduos', () => {
-  it('devuelve el array de residuos cuando existe', () => {
-    const a: any = { operativoData: { residuos: [{ id: '1', recogido: true }] } };
+  it('devuelve el array de residuos desde activity.residuos', () => {
+    const a: any = { residuos: [{ id: '1', recogido: true }] };
     expect(getResiduos(a)).toHaveLength(1);
   });
-  it('reconstruye el formato legacy plano', () => {
-    const a: any = { operativoData: { tipoResiduo: 'RESIDUOS_ORDINARIOS' }, dateTime: daysAgo(1), createdAt: daysAgo(2) };
-    const r = getResiduos(a);
-    expect(r).toHaveLength(1);
-    expect(r[0].id).toBe('legacy-0');
-    expect(r[0].recogido).toBe(false);
-  });
   it('devuelve [] cuando no hay residuos', () => {
-    expect(getResiduos({ operativoData: {} } as any)).toEqual([]);
+    expect(getResiduos({} as any)).toEqual([]);
   });
 });
 
 describe('criticidad de puntos', () => {
   const punto = (residuos: any[]): any => ({
     operativoSubtipo: 'AMBIENTAL_PUNTOS_ACUMULACION',
-    operativoData: { residuos },
+    residuos,
   });
 
   it('tier 2 (crítico) con pendiente de 5 días', () => {

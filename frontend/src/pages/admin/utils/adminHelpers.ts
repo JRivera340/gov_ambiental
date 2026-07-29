@@ -11,6 +11,12 @@ import {
   tipoResiduoColors,
   markerColors,
 } from './adminConstants';
+// Fuente única de getResiduos()/isPuntoRecogido() — antes había una copia
+// separada acá que leía activity.operativoData (campo que nunca existió en
+// el backend de este repo, ver ESTADO-EXTRACCION.md). Unificado 2026-07-29.
+import { getResiduos, isPuntoRecogido } from '../../gestor-ambiental/lib/residuos';
+
+export { getResiduos, isPuntoRecogido };
 
 // ── Helpers de residuos ────────────────────────────────────
 
@@ -54,28 +60,6 @@ export const findTechnicalResidueKey = (value: string): string => {
   return technicalResidueKeys[0];
 };
 
-/** Retorna el array de residuos de una actividad, normalizando el formato legado */
-export function getResiduos(activity: Activity): any[] {
-  const opData = activity.operativoData as any;
-  if (opData?.residuos && Array.isArray(opData.residuos) && opData.residuos.length > 0) {
-    return opData.residuos.map((r: any) => ({
-      ...r,
-      dateTime: r.dateTime || activity.dateTime || activity.createdAt,
-    }));
-  }
-  if (opData?.tipoResiduo) {
-    return [
-      {
-        id: 'legacy-0',
-        tipoResiduo: opData.tipoResiduo,
-        dateTime: activity.dateTime || activity.createdAt,
-        recogido: false,
-      },
-    ];
-  }
-  return [];
-}
-
 // ── Lógica de puntos críticos ──────────────────────────────
 
 /** Retorna el tier de criticidad de un punto (0 = normal, 1 = vencido, 2 = crítico) */
@@ -86,7 +70,7 @@ export function getPuntoCriticoTier(activity: Activity): 0 | 1 | 2 {
   let hasPending = false;
 
   residuos.forEach(r => {
-    if (!r.recogido && r.status !== 'Recogido') {
+    if (!r.recogido) {
       hasPending = true;
       const days = differenceInDays(new Date(), new Date(r.dateTime));
       if (days > maxDays) maxDays = days;
@@ -101,14 +85,6 @@ export function getPuntoCriticoTier(activity: Activity): 0 | 1 | 2 {
 
 export function isPuntoEmergencia(activity: Activity): boolean {
   return getPuntoCriticoTier(activity) > 0;
-}
-
-export function isPuntoRecogido(activity: Activity): boolean {
-  if ((activity.status as any) === 'Recogido') return true;
-  if (activity.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
-  const residuos = getResiduos(activity);
-  if (residuos.length === 0) return false;
-  return residuos.every(r => r.recogido || r.status === 'Recogido');
 }
 
 // ── Geometría ─────────────────────────────────────────────

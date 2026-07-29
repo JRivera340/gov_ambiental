@@ -4,45 +4,33 @@ import { getResiduos, isPuntoEmergencia, isPuntoRecogido } from './residuos';
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
 
 describe('getResiduos', () => {
-  it('devuelve el array de residuos cuando existe', () => {
-    const a: any = { operativoData: { residuos: [{ id: 'r1', recogido: false }] }, dateTime: daysAgo(1) };
+  it('devuelve el array de residuos desde activity.residuos', () => {
+    const a: any = { residuos: [{ id: 'r1', recogido: false }], dateTime: daysAgo(1) };
     const res = getResiduos(a);
     expect(res).toHaveLength(1);
     expect(res[0].id).toBe('r1');
   });
 
-  it('reconstruye el formato legacy plano con id legacy-0', () => {
-    const a: any = { operativoData: { tipoResiduo: 'ESCOMBROS', areaLinealMetros: 8 }, dateTime: daysAgo(1), createdAt: daysAgo(2), photos: [] };
-    const res = getResiduos(a);
-    expect(res).toHaveLength(1);
-    expect(res[0].id).toBe('legacy-0');
-    expect(res[0].tipoResiduo).toBe('ESCOMBROS');
-    expect(res[0].recogido).toBe(false);
+  it('devuelve [] si activity.residuos no es un array', () => {
+    expect(getResiduos({} as any)).toEqual([]);
+    expect(getResiduos({ residuos: null } as any)).toEqual([]);
   });
 
-  it('detecta el formato de encuesta (claves UUID) con id legacy-survey', () => {
-    const a: any = {
-      operativoData: { q1: 'RESIDUOS_ORDINARIOS', q2: 'COMUNIDAD', q3: 15 },
-      dateTime: daysAgo(1),
-      photos: [],
-    };
-    const res = getResiduos(a);
-    expect(res).toHaveLength(1);
-    expect(res[0].id).toBe('legacy-survey');
-    expect(res[0].tipoResiduo).toBe('RESIDUOS_ORDINARIOS');
-    expect(res[0].quienDispuso).toBe('COMUNIDAD');
-    expect(res[0].areaLinealMetros).toBe(15);
+  it('devuelve [] si activity.residuos está vacío', () => {
+    expect(getResiduos({ residuos: [] } as any)).toEqual([]);
   });
 
-  it('devuelve [] sin datos de residuo', () => {
-    expect(getResiduos({ operativoData: {} } as any)).toEqual([]);
+  it('rellena dateTime del residuo con el de la actividad si falta', () => {
+    const a: any = { residuos: [{ id: 'r1', recogido: false }], dateTime: daysAgo(2), createdAt: daysAgo(3) };
+    const res = getResiduos(a);
+    expect(res[0].dateTime).toBe(a.dateTime);
   });
 });
 
 describe('isPuntoEmergencia', () => {
   const punto = (residuos: any[]): any => ({
     operativoSubtipo: 'AMBIENTAL_PUNTOS_ACUMULACION',
-    operativoData: { residuos },
+    residuos,
   });
 
   it('es emergencia con un pendiente de 4+ días', () => {
@@ -62,7 +50,7 @@ describe('isPuntoEmergencia', () => {
 describe('isPuntoRecogido', () => {
   const punto = (residuos: any[]): any => ({
     operativoSubtipo: 'AMBIENTAL_PUNTOS_ACUMULACION',
-    operativoData: { residuos },
+    residuos,
   });
 
   it('es recogido si todos los residuos lo están', () => {
