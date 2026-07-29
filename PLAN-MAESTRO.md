@@ -502,6 +502,21 @@ registros parciales se borraron (autorizado explícitamente, solo en la base
 de ambiental, nunca en el hub) y se corrió de nuevo con la versión
 reanudable, esta vez en segundo plano desde el inicio.
 
+**Resultado final de la corrida completa 2026-07-29:**
+
+| Tabla | Origen (hub) | Destino (ambiental) |
+|---|---|---|
+| `puntos_residuo` | 346 | 346 |
+| `ruta_semanal` | 12 | 12 |
+| `punto_asignacion` | 345 | 345 |
+
+Muestreo de 10 puntos elegidos al azar, comparando `status`, `lat`, `lng`,
+`barrio`, `entidadResponsable` y conteo de residuos embebidos, campo por
+campo contra el hub (solo lectura): **10/10 idénticos, sin diferencias.**
+1 punto sin residuos detectables (`43bef652-eb03-4345-bd0b-2757955c5bf2`) —
+mismo caso ya anotado en el ensayo, pendiente de revisión manual (no bloquea,
+es 1 de 346).
+
 **Alcance exhaustivo — sin recortes.** Debe migrarse TODO lo ambiental: todos
 los puntos/actividades en TODOS los estados (no solo activos), rutas
 semanales completas incluido histórico, asignaciones de puntos, entradas de
