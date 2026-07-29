@@ -38,12 +38,44 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 |---|---|---|---|---|---|
 | Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` | igual | REPLICADA | — |
 | Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | REPLICADA | — |
-| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL | DIVERGENTE deliberada | ninguna — simplificación válida, ver sección Divergencias |
+| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL | **REGRESIÓN detectada 2026-07-29** (ver detalle abajo) | Faltan columnas propias para 26 de los 32 campos del formulario general — en curso |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | REPLICADA (2026-07-28, con tests) | — |
 | Dashboard validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) | dedicado, ya portado (commit 83f72bb: tabs/filtros/paginación) | REPLICADA | — |
 | Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/residuos` | igual | REPLICADA | — |
 | Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | REPLICADA | — |
 | Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin`, montado 2026-07-27 | REPLICADA | — (interfaz de `EnvironmentalTab` simplificada de 17 a 12 props; ver Divergencias deliberadas) |
+
+## REGRESIÓN detectada 2026-07-29: 26 de 38 respuestas del formulario de creación se descartan silenciosamente
+
+Al convertir el formulario dinámico de "Crear punto" a formulario fijo (ver
+PLAN-MAESTRO.md, tarea de eliminación de `gov_encuestas_publico`) se encontró
+que el `onSubmit` de `CreateActivity.tsx` solo envía al backend `dateTime`,
+`lat/lng/barrio`, `entidadResponsable`, `residuos[]` y `gestoresInvolucradosIds`
+(casi siempre vacío). Las otras 26 respuestas de las 38 preguntas del
+formulario general (frecuencia de acumulación, tipo de zona, tipo de suelo,
+condiciones de la zona, identificación del generador, actores estratégicos,
+intervenciones recomendadas, etc. — ver lista completa más abajo) se capturan
+en pantalla y se pierden al guardar. `PuntoResiduo` (la entidad de este repo)
+no tiene columnas para ninguna de ellas.
+
+**Confirmado que es regresión, no deuda de origen**: en `gov-espacio-publico`
+(hub, verificado SOLO LECTURA) `ActivityEntity` sí tiene una columna
+`dynamicAnswers` (jsonb, `activity.entity.ts:179`), y
+`sorver.repository.typeorm.ts` mapea `dto.operativoData` → `entity.dynamicAnswers`
+al crear/editar (líneas 591-609 y 300-309) y de vuelta a `operativoData` al
+leer (líneas 349, 402) — el hub sí persiste y devuelve las 38 respuestas
+completas. La fila "Crear punto" de la matriz de arriba estaba marcada
+DIVERGENTE deliberada (simplificación de UI válida) pero no se había medido
+que además se perdía dato real — eso no es divergencia, es una regresión no
+detectada hasta ahora porque la base de este repo estaba vacía (ver también
+el hallazgo de `operativoData`/`getResiduos()` más abajo, mismo origen: nunca
+hubo datos reales en pantalla para notar que faltaban).
+
+**En curso 2026-07-29**: se están agregando columnas propias (no un campo
+JSON opaco, para poder reportar y para el diccionario de datos de la entrega
+a UAESP) para las respuestas que Josh confirme que se quedan, con migración
+versionada, DTO y persistencia real. Ver PLAN-MAESTRO.md para el detalle de
+implementación y el estado de avance.
 
 ## Pendiente de replicar
 
@@ -148,6 +180,72 @@ por HTTP, microfrontend, u otra). No resolverla ahora, dejarla planteada.
 Criterio de terminado del proyecto: se puede borrar
 `gov-espacio-publico/packages/frontend/src/pages/gestor-ambiental/` sin romper
 el hub.
+
+## Definición de terminado del HITO 2
+
+Lista finita, verificable en pantalla, con datos reales (seed de desarrollo,
+no base vacía — ver "Pendiente de verificar" abajo). Cuando todas las
+casillas estén marcadas, el hito se cierra, aunque queden detalles menores
+sin resolver.
+
+**GESTOR_AMBIENTAL:**
+- [ ] Crea un punto llenando el formulario fijo completo (todos los campos con
+  columna propia, no solo entidad/fecha/ubicación), lo envía, y al reabrirlo
+  (vista de detalle o editar) ve exactamente lo que escribió, campo por campo
+  — sin ningún valor perdido ni distinto.
+- [ ] Agrega uno o más residuos al punto (tipo, quién dispuso, olores,
+  vectores, área, foto), y al reabrirlo cada residuo aparece completo con su
+  foto visible.
+- [ ] Tiene una ruta semanal activa con paradas, la cierra o cancela, y el
+  historial la refleja correctamente — no vuelve a aparecer como activa
+  (bug de "ruta cancelada" ya cubierto por test, pero verificar en pantalla
+  con datos reales, no solo en el test).
+
+**VALIDADOR_AMBIENTAL:**
+- [ ] Ve un punto enviado por un gestor con el nombre real del creador
+  resuelto (proxy de usuarios, no un ID crudo ni "Información no disponible").
+- [ ] Aprueba un punto y el cambio de estado se refleja de inmediato en el
+  mapa/dashboard del gestor que lo creó.
+- [ ] Rechaza un punto con notas de validación, y esas notas son visibles
+  para el gestor.
+- [ ] Marca un sector como recogido y el estado se refleja en el panel de
+  sector de recolección.
+
+**ADMIN:**
+- [ ] Ve la lista de puntos con indicadores agregados que sí reflejan datos
+  reales de los campos con columna propia (ej. cuántos puntos con cámaras,
+  distribución por tipo de zona) — no ceros ni vacíos por falta de dato.
+- [ ] Asigna un punto sin gestor a un gestor específico, y la asignación se
+  refleja tanto en el panel de asignación como en el dashboard de ese gestor.
+- [ ] La lista de gestores para asignar muestra solo gestores ambientales
+  (ver fix de filtrado por dominio ya aplicado) — confirmar en pantalla con
+  datos reales, no solo con el test.
+
+**Transversal (los 3 roles):**
+- [ ] En toda vista donde aparece un usuario (creador de punto, gestor
+  asignado, validador), se ve el nombre real, no un ID ni un placeholder de
+  error — con el seed cargado, no con la base vacía.
+
+## Pendiente de verificar (base estuvo vacía hasta ahora)
+
+Todo lo marcado como REPLICADA en la matriz de paridad de arriba se verificó
+leyendo código y, cuando mucho, con una o dos filas de prueba manual — nunca
+con un conjunto de datos realista. El bug de `operativoData`/`getResiduos()`
+(ver PLAN-MAESTRO.md) sobrevivió sin detectarse exactamente por esta razón:
+nunca hubo residuos reales en pantalla para notar que la lista siempre
+aparecía vacía. Hasta que se cargue el seed de desarrollo (ver
+PLAN-MAESTRO.md) y se recorran las vistas de los 3 roles con datos reales,
+las siguientes filas quedan **PENDIENTE DE VERIFICAR**, no confirmadas:
+
+- Mapa general gestor, planificador de ruta / ruta activa / segmento /
+  historial, dashboard validador, mapa de residuos validador, admin —
+  asignación de puntos + indicadores.
+
+Confirmadas independientemente del seed (verificación reciente con
+datos/flujo real, no solo código): edición de punto (con tests dedicados),
+esquema de base de datos (migraciones corridas contra producción), proxy de
+usuarios (probado contra el hub real con tokens reales), handoff (probado
+de punta a punta contra los subdominios reales).
 
 ## Decisiones abiertas
 
