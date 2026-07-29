@@ -77,10 +77,12 @@ export function useRutaAmbiental(
     // asignados primero (antes de ordenar), para no perder puntos por un corte
     // global; y se incluyen los ya recogidos (resto) para que el gestor pueda
     // recorrer todos sus puntos, no solo los vencidos/pendientes.
+    // Mono-subtipo: toda actividad de este repo ya es punto de acumulación
+    // (ver CLAUDE.md) — operativoSubtipo no existe en este backend. Bug real
+    // corregido 2026-07-29: la lista de candidatos para la ruta siempre daba
+    // vacía.
     const asignados = new Set(puntosAsignados);
-    const acumulacion = activities.filter(
-      a => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && asignados.has(a.id)
-    );
+    const acumulacion = activities.filter(a => asignados.has(a.id));
     const tienePendiente = (a: Activity) => getResiduos(a).some(r => !r.recogido);
     const vencidos = acumulacion.filter(a => isPuntoEmergencia(a));
     const pendientes = acumulacion.filter(a => !isPuntoEmergencia(a) && tienePendiente(a));

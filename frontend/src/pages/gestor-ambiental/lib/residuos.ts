@@ -16,8 +16,12 @@ export function getResiduos(activity: Activity): ResiduoEntry[] {
 }
 
 // Un punto está en emergencia si tiene residuos pendientes con 4+ días.
+// Este repo es mono-subtipo (todo PuntoResiduo ya es "punto de acumulación",
+// ver CLAUDE.md invariantes) — el chequeo de operativoSubtipo comparaba
+// contra un campo que no existe en este backend y siempre daba false. Bug
+// real corregido 2026-07-29 (ver ESTADO-EXTRACCION.md): ningún punto se
+// mostraba nunca como emergencia ni como recogido en mapas/listas.
 export function isPuntoEmergencia(activity: Activity): boolean {
-  if (activity.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
   const residuos = getResiduos(activity);
   return residuos.some((r) => {
     if (r.recogido) return false;
@@ -29,7 +33,6 @@ export function isPuntoEmergencia(activity: Activity): boolean {
 // Un punto está recogido si todos sus residuos lo están.
 export function isPuntoRecogido(activity: Activity): boolean {
   if ((activity.status as string) === 'Recogido') return true;
-  if (activity.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
   const residuos = getResiduos(activity);
   if (residuos.length === 0) return false;
   return residuos.every((r) => r.recogido || (r as any).status === 'Recogido');

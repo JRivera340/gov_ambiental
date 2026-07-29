@@ -170,13 +170,17 @@ export function useGestorAmbiental() {
   };
 
   // ── Filtered activities ──
-  const puntoCriticoActivities = useMemo(() => {
-    return activities.filter((a: Activity) => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION');
-  }, [activities]);
+  // Este repo es mono-subtipo: toda actividad YA es "punto de acumulación"
+  // (ver CLAUDE.md invariantes) — operativoSubtipo/operativoCategoria no
+  // existen en este backend, así que filtrar por esos campos siempre daba
+  // listas vacías. Bug real corregido 2026-07-29 (afectaba mapa, sidebar,
+  // indicadores y planificador de ruta), ver ESTADO-EXTRACCION.md.
+  // El subtipo genérico "AMBIENTAL" (no puntos-de-acumulación) es
+  // inalcanzable desde la UI de este repo — ambientalActivities queda
+  // vacío a propósito, no es un bug.
+  const puntoCriticoActivities = activities;
 
-  const ambientalActivities = useMemo(() => {
-    return activities.filter((a: Activity) => a.operativoSubtipo === 'AMBIENTAL');
-  }, [activities]);
+  const ambientalActivities = useMemo(() => [] as Activity[], []);
 
   const filteredActivities = useMemo(() => {
     let base = genFilterSubtipo === 'AMBIENTAL' ? ambientalActivities
@@ -192,14 +196,13 @@ export function useGestorAmbiental() {
     }
     if (mapaEstadoRecoleccionFilter !== 'ALL') {
       base = base.filter((a: Activity) => {
-        if (a.operativoCategoria !== 'AMBIENTAL' && a.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return true;
         const recog = isPuntoRecogido(a);
         return mapaEstadoRecoleccionFilter === 'RECOGIDOS' ? recog : !recog;
       });
     }
 
     return base.filter((a: Activity) => {
-      if (genFilterTipo && a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION') {
+      if (genFilterTipo) {
         const residuos = getResiduos(a);
         const hasType = residuos.some(r => String(r.tipoResiduo).toUpperCase() === genFilterTipo);
         if (!hasType) return false;
@@ -220,7 +223,7 @@ export function useGestorAmbiental() {
 
   const mapActivitiesFinal = useMemo(() => {
     return filteredActivitiesWithIndex.filter(item => {
-      if (soloMios && item.activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && !puntosAsignadosSet.has(item.activity.id)) {
+      if (soloMios && !puntosAsignadosSet.has(item.activity.id)) {
         return false;
       }
       if (listSearchNumber) {
@@ -237,11 +240,13 @@ export function useGestorAmbiental() {
       if (sidebarTab === 'rechazadas') {
         return a.status === 'RECHAZADA' && a.createdByUserId === user?.id;
       }
-      return sidebarTab === 'ambiental'
-        ? a.operativoSubtipo === 'AMBIENTAL'
-        : a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION';
+      // La pestaña "ambiental" (operativo generico, no puntos de
+      // acumulación) es inalcanzable desde la UI de este repo — queda
+      // vacía a propósito, no es un bug (ver nota en puntoCriticoActivities
+      // más arriba).
+      return sidebarTab !== 'ambiental';
     }).filter(({ activity: a }) => {
-      if (soloMios && a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && !puntosAsignadosSet.has(a.id)) {
+      if (soloMios && !puntosAsignadosSet.has(a.id)) {
         return false;
       }
       return true;

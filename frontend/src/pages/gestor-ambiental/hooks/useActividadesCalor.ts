@@ -34,8 +34,10 @@ export function useActividadesCalor({
   // Actividades en calor: todos los residuos pendientes, ordenados de más antiguo a más nuevo
   const actividadesEnCalor = useMemo(() => {
     const result: Array<{ activity: Activity; residuo: ResiduoEntry; daysPending: number }> = [];
+    // Mono-subtipo: toda actividad de este repo ya es punto de acumulación
+    // (ver CLAUDE.md) — operativoSubtipo no existe en este backend. Bug real
+    // corregido 2026-07-29: esta lista siempre daba vacía.
     activities.forEach(a => {
-      if (a.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return;
       const residuos = getResiduos(a);
       residuos.forEach(r => {
         if (!r.recogido) {
@@ -72,7 +74,6 @@ export function useActividadesCalor({
     setIsMarkingOrdinarios(true);
     try {
       const targetActivities = activities.filter(a => {
-        if (a.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
         const matchingSectors = activitySectorMap.get(a.id);
         if (!matchingSectors || !matchingSectors.some(id => targetSectorIds.has(id))) return false;
 

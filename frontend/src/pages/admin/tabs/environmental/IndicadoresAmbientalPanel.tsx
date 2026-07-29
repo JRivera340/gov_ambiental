@@ -5,10 +5,10 @@ import {
 } from '../../../gestor-ambiental/lib/indicadoresAmbiental.lib';
 
 export const IndicadoresAmbientalPanel: React.FC<{ actividades: Activity[] }> = ({ actividades }) => {
-  const puntos = useMemo(
-    () => actividades.filter(a => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION'),
-    [actividades],
-  );
+  // Mono-subtipo: toda actividad de este repo ya es punto de acumulación
+  // (ver CLAUDE.md) — operativoSubtipo no existe en este backend. Bug real
+  // corregido 2026-07-29: los indicadores siempre daban cero.
+  const puntos = actividades;
   const tiempo = tiempoMedioRecoleccionDias(puntos);
   const cobertura = coberturaPct(puntos);
   const vencidos = puntosVencidos(puntos).length;

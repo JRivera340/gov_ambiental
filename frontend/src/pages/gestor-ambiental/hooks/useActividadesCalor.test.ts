@@ -31,18 +31,18 @@ const baseParams = (over: any = {}) => ({
 describe('useActividadesCalor', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('actividadesEnCalor lista residuos pendientes, oldest first, e ignora recogidos/no-acumulación', () => {
+  it('actividadesEnCalor lista todos los residuos pendientes de todas las actividades, oldest first, e ignora recogidos', () => {
     const activities = [
       acumul('a1', [
         { id: 'r1', recogido: false, dateTime: '2026-02-01T00:00:00Z', tipoResiduo: 'X' },
         { id: 'r2', recogido: true, dateTime: '2026-01-01T00:00:00Z', tipoResiduo: 'X' },
       ]),
       acumul('a2', [{ id: 'r3', recogido: false, dateTime: '2026-01-10T00:00:00Z', tipoResiduo: 'X' }]),
-      { id: 'other', operativoSubtipo: 'IVC_PARQUEADEROS', __residuos: [{ id: 'z', recogido: false, dateTime: '2020-01-01T00:00:00Z' }] },
+      { id: 'other', createdAt: '2026-01-01T00:00:00Z', __residuos: [{ id: 'z', recogido: false, dateTime: '2020-01-01T00:00:00Z' }] },
     ];
     const { result } = renderHook(() => useActividadesCalor(baseParams({ activities }) as any));
     const calor = result.current.actividadesEnCalor;
-    expect(calor.map(c => c.residuo.id)).toEqual(['r3', 'r1']);
+    expect(calor.map(c => c.residuo.id)).toEqual(['z', 'r3', 'r1']);
   });
 
   it('handleAutoMarkOrdinarios sin sectores hoy avisa y no marca', async () => {

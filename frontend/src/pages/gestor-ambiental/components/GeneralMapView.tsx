@@ -490,7 +490,11 @@ export const GeneralMapView: React.FC = () => {
                       {mapActivitiesFinal
                         .filter(({ activity: a }) => a.lat && a.lng)
                         .map(({ activity: a, displayIdx }) => {
-                          const isPuntoCritico = a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION';
+                          // Mono-subtipo: toda actividad de este repo ya es
+                          // punto de acumulación (ver CLAUDE.md). Bug real
+                          // corregido 2026-07-29 (los marcadores nunca se
+                          // veían con emergencia ni con foco correcto).
+                          const isPuntoCritico = true;
                           const hasEmergency = isPuntoCritico && isPuntoEmergencia(a);
                           const faded = focusIds !== null && isPuntoCritico && !focusIds.has(a.id);
 

@@ -11,10 +11,10 @@ import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 export const PerfilGestorView: React.FC = () => {
   const { user, activities, setViewMode, openActivity } = useGestorAmbientalCtx();
 
-  const acumulacion = useMemo(
-    () => activities.filter(a => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION'),
-    [activities]
-  );
+  // Mono-subtipo: toda actividad de este repo ya es punto de acumulación
+  // (ver CLAUDE.md) — operativoSubtipo no existe en este backend. Bug real
+  // corregido 2026-07-29: las estadísticas del perfil siempre daban cero.
+  const acumulacion = activities;
 
   // "Visitado por mí" = hice seguimiento real en el punto: marqué un residuo
   // recogido o identifiqué uno nuevo (revisadoPorUserId es de la revisión

@@ -28,10 +28,7 @@ describe('getResiduos', () => {
 });
 
 describe('isPuntoEmergencia', () => {
-  const punto = (residuos: any[]): any => ({
-    operativoSubtipo: 'AMBIENTAL_PUNTOS_ACUMULACION',
-    residuos,
-  });
+  const punto = (residuos: any[]): any => ({ residuos });
 
   it('es emergencia con un pendiente de 4+ días', () => {
     expect(isPuntoEmergencia(punto([{ id: 'r1', recogido: false, dateTime: daysAgo(5) }]))).toBe(true);
@@ -42,16 +39,13 @@ describe('isPuntoEmergencia', () => {
   it('no es emergencia si el residuo viejo ya está recogido', () => {
     expect(isPuntoEmergencia(punto([{ id: 'r1', recogido: true, dateTime: daysAgo(9) }]))).toBe(false);
   });
-  it('no es emergencia si no es punto de acumulación', () => {
-    expect(isPuntoEmergencia({ operativoSubtipo: 'AMBIENTAL' } as any)).toBe(false);
+  it('no es emergencia sin residuos', () => {
+    expect(isPuntoEmergencia(punto([]))).toBe(false);
   });
 });
 
 describe('isPuntoRecogido', () => {
-  const punto = (residuos: any[]): any => ({
-    operativoSubtipo: 'AMBIENTAL_PUNTOS_ACUMULACION',
-    residuos,
-  });
+  const punto = (residuos: any[]): any => ({ residuos });
 
   it('es recogido si todos los residuos lo están', () => {
     expect(isPuntoRecogido(punto([{ id: 'r1', recogido: true }, { id: 'r2', recogido: true }]))).toBe(true);
