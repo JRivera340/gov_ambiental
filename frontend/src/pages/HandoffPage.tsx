@@ -3,14 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
 
-// Ruta de aterrizaje por rol tras el handoff (PLAN-MAESTRO.md HITO 2). ADMIN
-// no tiene todavía una pantalla propia armada (EnvironmentalTab.tsx existe
-// pero sin ningún contenedor que la use) -- se agrega acá el día que exista,
-// no antes: apuntar a una ruta que no existe rompería el flujo en vez de
-// arreglarlo.
+// Ruta de aterrizaje por rol tras el handoff (PLAN-MAESTRO.md HITO 2).
 const RUTA_POR_ROL: Partial<Record<string, string>> = {
   GESTOR_AMBIENTAL: '/gestor-ambiental/dashboard',
   VALIDADOR_AMBIENTAL: '/validador/residuos',
+  ADMIN: '/admin',
 };
 
 // PLAN-MAESTRO.md HITO 0 — pantalla mínima de destino del handoff. Lee el
