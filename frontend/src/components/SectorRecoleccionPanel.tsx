@@ -112,7 +112,7 @@ export const SectorRecoleccionPanel: React.FC<Props> = ({
       if (sectorBarrio) params.append('sectorBarrio', sectorBarrio);
 
       const result = await fetchAuthJSON(
-        `/api/sorver/sectores/puntos?${params.toString()}`,
+        `/api/sectores/puntos?${params.toString()}`,
       );
       setData(result);
     } catch (e: any) {
@@ -130,7 +130,7 @@ export const SectorRecoleccionPanel: React.FC<Props> = ({
   const handleMarcarRecogido = async () => {
     setMarking(true);
     try {
-      const result = await fetchAuthJSON('/api/sorver/sectores/marcar-recogido-masivo', {
+      const result = await fetchAuthJSON('/api/sectores/marcar-recogido-masivo', {
         method: 'PATCH',
         body: JSON.stringify({
           sectorId: sector.id,
