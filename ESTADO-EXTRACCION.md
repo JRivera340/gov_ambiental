@@ -38,7 +38,7 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 |---|---|---|---|---|---|
 | Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` | igual | REPLICADA | — |
 | Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | REPLICADA | — |
-| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | REPLICADA 2026-07-29, PENDIENTE DE VERIFICAR en pantalla con seed real | Migración pendiente de correr contra producción; sin verificación visual con datos reales todavía |
+| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | REPLICADA 2026-07-29, PENDIENTE DE VERIFICAR en pantalla con seed real | Migración ya corrida contra producción (`Postgres-_hTA`); falta verificación visual con datos reales (seed) |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | REPLICADA (2026-07-28, con tests) | — |
 | Dashboard validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) | dedicado, ya portado (commit 83f72bb: tabs/filtros/paginación) | REPLICADA | — |
 | Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/residuos` | igual | REPLICADA | — |
@@ -78,7 +78,8 @@ propósito para poder reportar/consultar sobre estos datos y para que el
 diccionario de datos de la entrega a UAESP no dependa de un blob ilegible):
 migración versionada (`src/migrations/1785339722226-FormularioFijoPuntoAcumulacion.ts`,
 generada y validada contra Postgres vacía local antes de aplicar en ningún
-lado real — **pendiente de correr contra producción**, ver PLAN-MAESTRO.md),
+lado real, **corrida contra producción el 2026-07-29** (`Postgres-_hTA`,
+verificada con `/api/health` y `/api/puntos` en 200/401 según corresponde),
 entidad (`punto-residuo.entity.ts`), DTO compartido
 (`dto/formulario-fijo-punto.dto.ts`, usado por `CreatePuntoDto` y
 `UpdatePuntoDto`), persistencia real en `puntos.service.ts` (`create`/
