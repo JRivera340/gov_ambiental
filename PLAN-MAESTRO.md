@@ -481,6 +481,27 @@ arriba.
 **Objetivo:** mover los datos históricos de la base del hub a la base propia
 de ambiental, con transformación de esquema (no copia).
 
+**Ensayo realizado 2026-07-29 (esto NO es el corte — el hub sigue siendo la
+fuente de verdad, HITO 4 sin empezar):** `scripts/migrate-from-legacy.ts`
+corrido contra un ensayo primero (Postgres local vacía, mismos datos reales
+del hub en modo lectura) y luego contra la producción real de ambiental
+(`Postgres-_hTA`). Ver reconciliación completa más abajo (tarea 5). Sirve
+doble propósito: rehearsal de este hito, y datos de prueba reales para
+recorrer las vistas de los 3 roles (ver ESTADO-EXTRACCION.md, sección
+"Pendiente de verificar").
+
+**Incidente durante la primera corrida real, ya corregido:** el primer
+intento contra producción se cortó a mitad (timeout de la herramienta usada
+para invocarlo, 180s, no un bug del script) dejando 253 de 346 puntos
+escritos y 0 rutas/asignaciones. Con el guard de idempotencia viejo
+("abortar si la tabla ya tiene filas") esto habría exigido limpiar todo a
+mano cada vez que algo cortara el proceso — inaceptable para el corte real,
+que puede tardar y no puede depender de que nada lo interrumpa. Se
+rediseñó el script (ver tarea 6 abajo) ANTES de reintentar: los 253
+registros parciales se borraron (autorizado explícitamente, solo en la base
+de ambiental, nunca en el hub) y se corrió de nuevo con la versión
+reanudable, esta vez en segundo plano desde el inicio.
+
 **Alcance exhaustivo — sin recortes.** Debe migrarse TODO lo ambiental: todos
 los puntos/actividades en TODOS los estados (no solo activos), rutas
 semanales completas incluido histórico, asignaciones de puntos, entradas de
@@ -593,10 +614,15 @@ Notas sobre estos números:
 5. Reconciliación: conteo de filas origen vs. destino, más muestreo manual de
    al menos N registros por estado (`BORRADOR`/`ENVIADA`/`APROBADA`/
    `RECHAZADA`/`PUBLICADA`).
-6. El script debe poder correrse múltiples veces sin duplicar (guard de
-   idempotencia ya existe: aborta si el destino ya tiene datos — confirmar que
-   sigue siendo el comportamiento deseado o si se necesita un modo
-   "re-ejecutar sobre destino vacío" explícito).
+6. ~~El script debe poder correrse múltiples veces sin duplicar~~ RESUELTO
+   2026-07-29: el guard viejo (abortar si la tabla ya tiene filas) se
+   reemplazó por **idempotencia por registro** — `upsert` por `id` (o
+   `puntoResiduoId` en asignaciones) en las 3 tablas, en lotes de 25 con log
+   de progreso. Si el proceso se corta a mitad, correrlo de nuevo retoma sin
+   duplicar y sin necesidad de limpiar nada primero — requisito para el corte
+   real de HITO 4, donde no se puede depender de que nada interrumpa el
+   proceso. Probado explícitamente: se corrió dos veces seguidas contra la
+   misma base y el conteo final no cambió (346/12/345, sin duplicados).
 
 **Criterio de terminado (verificable):** conteo de puntos en la base de
 ambiental == conteo de actividades AMBIENTAL en el hub menos los descartados
@@ -609,8 +635,11 @@ producción de ambiental en Railway, no solo en local — con el hub en modo
 solo-lectura mientras dura el corte (ver HITO 4 para el momento exacto).
 
 **Riesgos:** correr dos veces sin darse cuenta y duplicar datos → mitigación:
-el guard de idempotencia ya existente (aborta si destino no está vacío) se
-mantiene como salvaguarda, no se desactiva para "forzar" una re-migración.
+`upsert` por `id` hace que correr de más no duplique nada, por diseño (no por
+un guard que haya que recordar no desactivar). El riesgo real observado en la
+práctica fue el opuesto — un corte a mitad (timeout de la herramienta que lo
+invocó) con el guard viejo, que exigía limpiar antes de reintentar. Ya
+corregido (ver arriba).
 
 **Plan de vuelta atrás:** la base de ambiental se puede vaciar y re-migrar
 mientras el hub siga siendo la fuente de verdad (antes del corte de HITO 4) —
