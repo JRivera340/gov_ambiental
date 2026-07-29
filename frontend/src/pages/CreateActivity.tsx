@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -8,33 +8,24 @@ import { activityService } from '../services/activity.service';
 import { BoundaryLayer } from '../components/BoundaryLayer';
 import { BarriosLayer } from '../components/BarriosLayer';
 import { MapLayerControl, type LayerVisibility } from '../components/MapLayerControl';
-import { SurveyFieldInput } from '../components/create-activity/SurveyFieldInput';
 import { catalogService } from '../services/catalog.service';
 import { Toast } from '../components/Toast';
 import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
-import { ActaUpload } from '../components/ActaUpload';
-import { useAuthStore } from '../store/authStore';
 import { usersService } from '../services/users.service';
-import { surveyService, type SurveySchema, type SurveyQuestion } from '../services/survey.service';
 import type { Catalogs, ResiduoEntry, User } from '../types';
-import { CATEGORIA_ENCUESTAS_NAME, SUBTYPE_MAPPING, resolveSubtipo } from '../config/areasCatalog';
+import { SECCIONES_PUNTO_ACUMULACION, type CampoDef } from '../config/camposPuntoAcumulacion';
 import { isFieldVisible } from '../lib/fieldVisibility';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
 import { ACTORES_INDISCIPLINA } from '../types/ambientalCampos';
 import { loadSantaFeBoundaries, isPointInBoundaries, isPointInCandelaria, findBarrioByPoint } from '../utils/boundaryValidation';
 import type { GeoJSON } from 'geojson';
 
-// Este componente es el único punto de registro de puntos de acumulación en
-// este repo (recortado del `CreateActivity` genérico del monolito, que
-// también manejaba IVC/Espacio Público/PYBA). Acá la categoría y el subtipo
-// siempre son AMBIENTAL / AMBIENTAL_PUNTOS_ACUMULACION — no hay selector.
-
-const ROLE_LABEL: Record<string, string> = {
-  GESTOR_AMBIENTAL: 'Ambiental',
-  VALIDADOR_AMBIENTAL: 'Validador Ambiental',
-  ADMIN: 'Admin',
-};
+// Único punto de registro de puntos de acumulación en este repo. El
+// formulario general es fijo (ver config/camposPuntoAcumulacion.ts) — ya no
+// depende de gov_encuestas_publico, se entrega solo como código fuente.
+// Ver ESTADO-EXTRACCION.md para la regresión de datos que este cambio corrige
+// (26 campos que antes se descartaban al guardar, ahora tienen columna propia).
 
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -57,118 +48,139 @@ function ChangeView({ center }: { center: [number, number] }) {
   return null;
 }
 
-// Campos del survey de Puntos de Acumulación que se capturan POR RESIDUO (no en el formulario general)
-const PUNTOS_RESIDUO_SURVEY_NAMES = ['quienDispuso', 'tipoResiduo', 'percibeOlores', 'percibeVectores', 'areaLinealMetros', 'fotos_evidencia'];
+interface CampoInputProps {
+  campo: CampoDef;
+  value: any;
+  onChange: (name: string, value: any) => void;
+}
 
-interface DynamicFieldsProps {
-  questions: SurveyQuestion[];
+const CampoInput: React.FC<CampoInputProps> = ({ campo, value, onChange }) => {
+  const val = value ?? '';
+
+  if (campo.type === 'NUMBER') {
+    return (
+      <input
+        type="number" min="0" step="any"
+        value={value ?? ''}
+        onChange={(e) => onChange(campo.name, e.target.value === '' ? undefined : Number(e.target.value))}
+        className="input-field" placeholder={campo.placeholder || '0'}
+      />
+    );
+  }
+  if (campo.type === 'TEXTAREA' || campo.type === 'TEXT') {
+    return (
+      <textarea
+        value={value ?? ''}
+        onChange={(e) => onChange(campo.name, e.target.value || undefined)}
+        rows={campo.type === 'TEXTAREA' ? 4 : 1}
+        className="input-field" placeholder={campo.placeholder || ''}
+      />
+    );
+  }
+  if (campo.type === 'DATE') {
+    return (
+      <input
+        type="datetime-local"
+        value={value ?? ''}
+        onChange={(e) => onChange(campo.name, e.target.value)}
+        className="input-field"
+      />
+    );
+  }
+  if (campo.type === 'RADIO' || campo.type === 'SELECT') {
+    if (campo.type === 'SELECT') {
+      return (
+        <select value={val} onChange={(e) => onChange(campo.name, e.target.value)} className="input-field">
+          <option value="">Seleccionar...</option>
+          {(campo.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {(campo.options || []).map((o) => (
+          <label key={o.value} className={`flex items-center gap-3 cursor-pointer p-3 rounded-xl border transition-all ${String(val) === o.value ? 'bg-primary/5 border-primary shadow-sm' : 'bg-white border-neutral-100 hover:border-neutral-200'}`}>
+            <input
+              type="radio" name={campo.name} value={o.value}
+              checked={String(val) === o.value}
+              onChange={() => onChange(campo.name, o.value)}
+              className="w-4 h-4 text-primary border-neutral-300 focus:ring-primary"
+            />
+            <span className={`text-sm ${String(val) === o.value ? 'text-primary font-bold' : 'text-neutral-600'}`}>{o.label}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (campo.type === 'MULTISELECT') {
+    const arr = Array.isArray(value) ? value : [];
+    return (
+      <div className="flex flex-wrap gap-2">
+        {(campo.options || []).map((o) => {
+          const on = arr.includes(o.value);
+          return (
+            <button
+              type="button" key={o.value}
+              onClick={() => onChange(campo.name, on ? arr.filter((x: string) => x !== o.value) : [...arr, o.value])}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${on ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-neutral-200 text-neutral-600'}`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  return <input type="text" value={val} onChange={(e) => onChange(campo.name, e.target.value)} className="input-field" />;
+};
+
+interface CamposGeneralesProps {
   values: Record<string, any>;
-  onChange: (key: string, value: any) => void;
-  catalogs: Catalogs | null;
-  gestores: User[];
-  currentUserId?: string;
+  onChange: (name: string, value: any) => void;
+  lat: number;
+  lng: number;
+  barrio: string;
   boundaries: GeoJSON | null;
   layerVisibility: LayerVisibility;
   onLayerVisibilityChange: (layer: keyof LayerVisibility, visible: boolean) => void;
   onToggleAllLayers: (visible: boolean) => void;
-  setLat: (lat: number) => void;
-  setLng: (lng: number) => void;
-  setBarrio: (barrio: string) => void;
-  getLocation: (qId: string) => void;
+  onMapClick: (lat: number, lng: number) => void;
+  getLocation: () => void;
   gettingLocation: boolean;
   locationAccuracy: number | null;
   locationError: string;
-  barrio: string;
 }
 
-const DynamicFields: React.FC<DynamicFieldsProps> = ({
-  questions, values, onChange, catalogs, gestores, currentUserId, boundaries, layerVisibility,
-  onLayerVisibilityChange, onToggleAllLayers, setLat, setLng, setBarrio,
-  getLocation, gettingLocation, locationAccuracy, locationError, barrio,
+const CamposGenerales: React.FC<CamposGeneralesProps> = ({
+  values, onChange, lat, lng, barrio, boundaries, layerVisibility,
+  onLayerVisibilityChange, onToggleAllLayers, onMapClick,
+  getLocation, gettingLocation, locationAccuracy, locationError,
 }) => {
-  const [openSelectors, setOpenSelectors] = useState<Record<string, boolean>>({});
-  const [searchTerm, setSearchTerm] = useState<Record<string, string>>({});
-  const isQuestionVisible = (q: SurveyQuestion) =>
-    isFieldVisible(q.config?.visibleIf, (name: string) => {
-      const targetQ = questions.find(prevQ => prevQ.name === name);
-      return targetQ ? values[targetQ.id] : undefined;
-    });
-
-  const handleMapClickInternal = async (qId: string, newLat: number, newLng: number) => {
-    const inCandelaria = await isPointInCandelaria(newLat, newLng);
-    if (inCandelaria) {
-      alert('Las actividades no pueden registrarse dentro de la localidad de Candelaria.');
-      return;
-    }
-    if (boundaries && !isPointInBoundaries(newLat, newLng, boundaries)) {
-      alert('La ubicación debe estar dentro de los límites de Santa Fe.');
-      return;
-    }
-    setLat(newLat);
-    setLng(newLng);
-    onChange(qId, { lat: newLat, lng: newLng });
-    try {
-      const barrioName = await findBarrioByPoint(newLat, newLng);
-      if (barrioName && catalogs?.barrios.includes(barrioName)) {
-        setBarrio(barrioName);
-        const barrioQuestion = questions.find(q => q.name === 'barrio_detectado');
-        if (barrioQuestion) onChange(barrioQuestion.id, barrioName);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  const groupedQuestions = useMemo(() => {
-    const groups: { header?: SurveyQuestion; questions: SurveyQuestion[] }[] = [];
-    let currentGroup: { header?: SurveyQuestion; questions: SurveyQuestion[] } = { questions: [] };
-    const sortedQuestions = [...questions].sort((a, b) => (a.order || 0) - (b.order || 0));
-    sortedQuestions.forEach(q => {
-      if (q.type.toUpperCase() === 'SECTION_HEADER') {
-        if (currentGroup.questions.length > 0 || currentGroup.header) groups.push(currentGroup);
-        currentGroup = { header: q, questions: [] };
-      } else {
-        currentGroup.questions.push(q);
-      }
-    });
-    if (currentGroup.questions.length > 0 || currentGroup.header) groups.push(currentGroup);
-    return groups;
-  }, [questions]);
+  const resolveValueByName = (name: string) => values[name];
 
   return (
     <div className="space-y-10">
-      {groupedQuestions.map((group, gIdx) => (
-        <div key={gIdx} className="section-box bg-neutral-50/30 rounded-3xl border border-neutral-100 p-6 md:p-8 space-y-6 shadow-sm">
-          {group.header && (
-            <div className="border-b border-neutral-200 pb-4 mb-2">
-              <h3 className="text-xl font-bold text-primary flex items-center gap-2">
-                <span className="w-1.5 h-6 bg-primary rounded-full"></span>
-                {group.header.label}
-              </h3>
-              {group.header.placeholder && <p className="text-sm text-neutral-500 mt-1 ml-3">{group.header.placeholder}</p>}
-            </div>
-          )}
+      {SECCIONES_PUNTO_ACUMULACION.map((seccion, sIdx) => (
+        <div key={sIdx} className="section-box bg-neutral-50/30 rounded-3xl border border-neutral-100 p-6 md:p-8 space-y-6 shadow-sm">
+          <div className="border-b border-neutral-200 pb-4 mb-2">
+            <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+              <span className="w-1.5 h-6 bg-primary rounded-full"></span>
+              {seccion.titulo}
+            </h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {group.questions.map((q) => {
-              if (!isQuestionVisible(q)) return null;
-              const type = q.type.toUpperCase();
-              const fullWidth = ['LOCATION', 'FILE', 'TEXTAREA', 'MULTISELECT'].includes(type);
+            {seccion.campos.map((campo) => {
+              if (!isFieldVisible(campo.visibleIf, resolveValueByName)) return null;
+              const fullWidth = ['LOCATION', 'TEXTAREA', 'MULTISELECT'].includes(campo.type);
               const colSpan = fullWidth ? 'col-span-full' : 'col-span-1';
               return (
-                <div key={q.id} className={`${colSpan} space-y-2`}>
+                <div key={campo.name} className={`${colSpan} space-y-2`}>
                   <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
-                    {q.label} {q.required && <span className="text-red-500">*</span>}
+                    {campo.label} {campo.required && <span className="text-red-500">*</span>}
                   </label>
-
-                  {['NUMBER', 'TEXT', 'TEXTAREA', 'DATE', 'RADIO', 'SELECT'].includes(type) ? (
-                    <SurveyFieldInput question={q} value={values[q.id]} onChange={onChange} />
-                  ) : type === 'FILE' ? (
-                    (q.name?.toLowerCase().includes('acta') || q.label?.toLowerCase().includes('acta') || (q.config?.accept && String(q.config.accept).includes('pdf'))) ? (
-                      <ActaUpload onUploadSuccess={(url) => onChange(q.id, url)} existingUrl={Array.isArray(values[q.id]) ? values[q.id][0] : values[q.id]} />
-                    ) : (
-                      <PhotosUpload onUploadSuccess={(urls) => onChange(q.id, urls)} existingUrls={values[q.id] || []} />
-                    )
-                  ) : type === 'LOCATION' ? (
+                  {campo.type === 'LOCATION' ? (
                     <div className="space-y-4 bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
-                      <button type="button" onClick={() => getLocation(q.id)} disabled={gettingLocation} className="btn-secondary w-full py-3 flex items-center justify-center gap-2">
+                      <button type="button" onClick={getLocation} disabled={gettingLocation} className="btn-secondary w-full py-3 flex items-center justify-center gap-2">
                         {gettingLocation
                           ? locationAccuracy !== null ? `Refinando GPS... (±${Math.round(locationAccuracy)}m)` : 'Buscando señal GPS...'
                           : 'Usar mi ubicación actual'}
@@ -177,22 +189,22 @@ const DynamicFields: React.FC<DynamicFieldsProps> = ({
                       <div className="grid grid-cols-2 gap-4 text-center">
                         <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-100">
                           <span className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Latitud</span>
-                          <span className="text-xs font-mono text-neutral-700">{values[q.id]?.lat?.toFixed(6) || '---'}</span>
+                          <span className="text-xs font-mono text-neutral-700">{lat?.toFixed(6) || '---'}</span>
                         </div>
                         <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-100">
                           <span className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Longitud</span>
-                          <span className="text-xs font-mono text-neutral-700">{values[q.id]?.lng?.toFixed(6) || '---'}</span>
+                          <span className="text-xs font-mono text-neutral-700">{lng?.toFixed(6) || '---'}</span>
                         </div>
                       </div>
                       <div className="h-80 rounded-2xl overflow-hidden border-2 border-neutral-100 shadow-inner relative">
-                        <MapContainer center={[values[q.id]?.lat || 4.6097, values[q.id]?.lng || -74.0817]} zoom={16} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+                        <MapContainer center={[lat || 4.6097, lng || -74.0817]} zoom={16} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <MapLayerControl layerVisibility={layerVisibility} onLayerVisibilityChange={onLayerVisibilityChange} onToggleAll={onToggleAllLayers} position="topright" />
                           <BoundaryLayer kmlPath="/boundaries/KMZ_Sectores_Catastrales_SF_2026.kmz" color="#DC2626" fillOpacity={0.1} />
                           <BarriosLayer color="#2563eb" fillColor="#2563eb" fillOpacity={0.05} weight={1} />
-                          <ChangeView center={[values[q.id]?.lat || 4.6097, values[q.id]?.lng || -74.0817]} />
-                          <Marker position={[values[q.id]?.lat || 4.6097, values[q.id]?.lng || -74.0817]} icon={defaultIcon} />
-                          <MapClickHandler onClick={(lat, lng) => handleMapClickInternal(q.id, lat, lng)} />
+                          <ChangeView center={[lat || 4.6097, lng || -74.0817]} />
+                          <Marker position={[lat || 4.6097, lng || -74.0817]} icon={defaultIcon} />
+                          <MapClickHandler onClick={onMapClick} />
                         </MapContainer>
                       </div>
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center">
@@ -200,121 +212,8 @@ const DynamicFields: React.FC<DynamicFieldsProps> = ({
                         <span className="text-sm font-bold text-emerald-800">{barrio || 'Toca el mapa para detectar el barrio'}</span>
                       </div>
                     </div>
-                  ) : (type === 'ENTITY_SELECT' || type === 'MULTISELECT') ? (
-                    <div className="space-y-3">
-                      {q.config?.multiple || type === 'MULTISELECT' ? (
-                        <div className="space-y-2">
-                          <div className="relative">
-                            <div
-                              className="input-field flex items-center justify-between cursor-pointer bg-white group hover:border-primary/30"
-                              onClick={() => setOpenSelectors(prev => ({ ...prev, [q.id]: !prev[q.id] }))}
-                            >
-                              <span className={Array.isArray(values[q.id]) && values[q.id].length > 0 ? "text-neutral-900 font-medium text-sm" : "text-neutral-400 text-sm"}>
-                                {Array.isArray(values[q.id]) && values[q.id].length > 0
-                                  ? `${values[q.id].length} seleccionados`
-                                  : `Seleccionar ${q.label}...`}
-                              </span>
-                              <svg className={`w-5 h-5 text-neutral-400 transition-transform ${openSelectors[q.id] ? 'rotate-180 text-primary' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-
-                            {openSelectors[q.id] && (
-                              <div className="absolute z-[100] left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden">
-                                <div className="p-3 border-b border-neutral-50 bg-neutral-50/30">
-                                  <input
-                                    type="text"
-                                    placeholder="Escribe para buscar..."
-                                    className="w-full px-4 py-2 text-sm bg-white border border-neutral-200 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all shadow-sm"
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => setSearchTerm(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                    value={searchTerm[q.id] || ''}
-                                    autoFocus
-                                  />
-                                </div>
-
-                                <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-                                  {(() => {
-                                    let rawList: any = [];
-                                    if (type === 'MULTISELECT') rawList = q.options || [];
-                                    else if (q.config?.entityType === 'GESTORES') {
-                                      rawList = (gestores || []).filter(g => g && g.id !== currentUserId).map(g => ({ value: `${g.name} ${g.lastname}`, label: `${g.name} ${g.lastname} [${ROLE_LABEL[g.role] ?? g.role}]` }));
-                                    } else {
-                                      rawList = (catalogs?.entidades || []).map(e => ({ value: e, label: e }));
-                                    }
-
-                                    let finalOptions = Array.isArray(rawList) ? rawList : [];
-                                    finalOptions = finalOptions.map((opt: any) => typeof opt === 'string' ? { value: opt, label: opt } : opt);
-                                    const term = (searchTerm[q.id] || '').toLowerCase().trim();
-                                    const words = term.split(/\s+/).filter(Boolean);
-                                    const filtered = finalOptions.filter((opt: any) => {
-                                      const label = opt.label.toLowerCase();
-                                      return words.length === 0 || words.every((w: string) => label.includes(w));
-                                    });
-
-                                    if (filtered.length === 0) return <div className="py-8 text-center"><p className="text-xs text-neutral-400">No se encontraron resultados</p></div>;
-
-                                    return filtered.map((opt: any) => (
-                                      <div
-                                        key={opt.value}
-                                        onClick={() => {
-                                          const current = Array.isArray(values[q.id]) ? values[q.id] : [];
-                                          if (current.includes(opt.value)) onChange(q.id, current.filter((i: string) => i !== opt.value));
-                                          else onChange(q.id, [...current, opt.value]);
-                                        }}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${Array.isArray(values[q.id]) && values[q.id].includes(opt.value) ? 'bg-primary/5 text-primary shadow-sm' : 'hover:bg-neutral-50 text-neutral-600'}`}
-                                      >
-                                        <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${Array.isArray(values[q.id]) && values[q.id].includes(opt.value) ? 'bg-primary border-primary shadow-inner' : 'border-neutral-300 bg-white'}`}>
-                                          {Array.isArray(values[q.id]) && values[q.id].includes(opt.value) && (
-                                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                          )}
-                                        </div>
-                                        <span className="text-sm font-semibold">{opt.label}</span>
-                                      </div>
-                                    ));
-                                  })()}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {Array.isArray(values[q.id]) && values[q.id].length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-3 p-2 bg-white rounded-xl border border-neutral-50 shadow-inner">
-                              {values[q.id].map((val: string) => (
-                                <span key={val} className="inline-flex items-center gap-2 px-3 py-1 bg-neutral-100 text-neutral-700 text-[10px] font-bold rounded-lg border border-neutral-200">
-                                  {val}
-                                  <button type="button" onClick={() => onChange(q.id, values[q.id].filter((v: string) => v !== val))} className="hover:text-red-500 transition-colors">
-                                    &times;
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <select value={values[q.id] ?? ''} onChange={(e) => onChange(q.id, e.target.value)} className="input-field">
-                          <option value="">Seleccionar {q.label}</option>
-                          {(() => {
-                            let opts: { value: string; label: string }[];
-                            if (q.config?.entityType === 'GESTORES') {
-                              opts = (gestores || []).filter(g => g && g.id !== currentUserId).map(g => ({ value: `${g.name} ${g.lastname}`, label: `${g.name} ${g.lastname} [${ROLE_LABEL[g.role] ?? g.role}]` }));
-                            } else if (q.options && q.options.length > 0) {
-                              opts = q.options.map((o: any) => ({ value: o.value, label: o.label }));
-                            } else {
-                              opts = (catalogs?.entidades || []).map((e: string) => ({ value: e, label: e }));
-                            }
-                            return opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>);
-                          })()}
-                        </select>
-                      )}
-                    </div>
                   ) : (
-                    <div className="flex items-center gap-3">
-                      <input type="checkbox" id={q.id} checked={values[q.id] ?? false} onChange={(e) => onChange(q.id, e.target.checked)} className="w-4 h-4 text-primary border-neutral-300 rounded focus:ring-primary" />
-                      <label htmlFor={q.id} className="text-sm text-neutral-700 cursor-pointer">Confirmar</label>
-                    </div>
+                    <CampoInput campo={campo} value={values[campo.name]} onChange={onChange} />
                   )}
                 </div>
               );
@@ -335,7 +234,6 @@ export const CreateActivity: React.FC = () => {
     propiedadHorizontal: false, upz: false, cambuches: false, bodegas: false,
   });
 
-  const user = useAuthStore((state) => state.user);
   const { handleSubmit } = useForm();
 
   const [loading, setLoading] = useState(false);
@@ -355,45 +253,13 @@ export const CreateActivity: React.FC = () => {
   const [editingResiduoId, setEditingResiduoId] = useState<string | null>(null);
 
   const [gestores, setGestores] = useState<User[]>([]);
-  const [operativoSubtipo, setOperativoSubtipo] = useState<string>('AMBIENTAL_PUNTOS_ACUMULACION');
-  const [surveySchema, setSurveySchema] = useState<SurveySchema | null>(null);
-  const [surveyLoading, setSurveyLoading] = useState(false);
-  const [surveyError, setSurveyError] = useState<{ type: 'not_found' | 'technical', message: string } | null>(null);
-  const [operativoDataValues, setOperativoDataValues] = useState<Record<string, any>>({});
+  const [camposValues, setCamposValues] = useState<Record<string, any>>({});
 
   useEffect(() => {
     loadCatalogs();
     loadBoundaries();
     usersService.getGestores().then(setGestores).catch(() => setGestores([]));
   }, []);
-
-  useEffect(() => {
-    loadSurveySchema();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operativoSubtipo]);
-
-  const loadSurveySchema = async () => {
-    setSurveyLoading(true);
-    setSurveyError(null);
-    setOperativoDataValues({});
-    setResiduos([]);
-    setShowResiduoForm(false);
-    setNuevoResiduoValues({});
-    try {
-      const schema = await surveyService.getSurvey(CATEGORIA_ENCUESTAS_NAME, operativoSubtipo);
-      if (!schema || (Array.isArray(schema) && schema.length === 0)) {
-        setSurveyError({ type: 'not_found', message: 'No hay un formulario activo para Ambiental en este momento. Por favor, contacta al administrador.' });
-        setSurveySchema(null);
-      } else {
-        setSurveySchema(Array.isArray(schema) ? schema[0] : schema);
-      }
-    } catch (error) {
-      setSurveyError({ type: 'technical', message: 'Estamos trabajando en ello. Por favor, intenta de nuevo en unos momentos.' });
-      setSurveySchema(null);
-    } finally {
-      setSurveyLoading(false);
-    }
-  };
 
   const loadCatalogs = async () => {
     try {
@@ -406,7 +272,31 @@ export const CreateActivity: React.FC = () => {
     setBoundaries(await loadSantaFeBoundaries());
   };
 
-  const getLocation = (qId: string) => {
+  const handleCampoChange = (name: string, value: any) => {
+    setCamposValues((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleMapClick = async (newLat: number, newLng: number) => {
+    const inCandelaria = await isPointInCandelaria(newLat, newLng);
+    if (inCandelaria) {
+      alert('Las actividades no pueden registrarse dentro de la localidad de Candelaria.');
+      return;
+    }
+    if (boundaries && !isPointInBoundaries(newLat, newLng, boundaries)) {
+      alert('La ubicación debe estar dentro de los límites de Santa Fe.');
+      return;
+    }
+    setLat(newLat);
+    setLng(newLng);
+    try {
+      const barrioName = await findBarrioByPoint(newLat, newLng);
+      if (barrioName && catalogs?.barrios.includes(barrioName)) {
+        setBarrio(barrioName);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const getLocation = () => {
     if (!navigator.geolocation) {
       setLocationError('Geolocalización no disponible en este navegador');
       return;
@@ -436,14 +326,8 @@ export const CreateActivity: React.FC = () => {
       }
       setLat(latitude);
       setLng(longitude);
-      const locationValue = { lat: latitude, lng: longitude };
-      setOperativoDataValues(prev => ({ ...prev, [qId]: locationValue, ubicacion_mapa: locationValue }));
       const bName = await findBarrioByPoint(latitude, longitude);
-      if (bName) {
-        setBarrio(bName);
-        const barrioQ = surveySchema?.questions.find(q => q.name === 'barrio_detectado');
-        setOperativoDataValues(prev => ({ ...prev, barrio_detectado: bName, ...(barrioQ ? { [barrioQ.id]: bName } : {}) }));
-      }
+      if (bName) setBarrio(bName);
       setGettingLocation(false);
       setLocationAccuracy(null);
     };
@@ -475,92 +359,69 @@ export const CreateActivity: React.FC = () => {
     );
   };
 
-  const handleOperativoDataChange = (key: string, value: any) => {
-    setOperativoDataValues(prev => ({ ...prev, [key]: value }));
-  };
+  const todosLosCampos = useMemo(() => SECCIONES_PUNTO_ACUMULACION.flatMap((s) => s.campos), []);
 
   const onSubmit = async () => {
-    if (!surveySchema) return;
-    const { esPuntosAcumulacion } = resolveSubtipo(operativoSubtipo);
-
-    if (esPuntosAcumulacion && residuos.length === 0) {
+    if (residuos.length === 0) {
       setToast({ message: 'Debe agregar al menos un residuo al punto', type: 'error' });
       return;
     }
 
-    const isQuestionVisibleAtSubmit = (q: SurveyQuestion): boolean =>
-      isFieldVisible(q.config?.visibleIf, (name: string) => {
-        const targetQ = surveySchema.questions.find(p => p.name === name);
-        return targetQ ? operativoDataValues[targetQ.id] : undefined;
-      });
+    const isCampoVisible = (campo: CampoDef): boolean =>
+      isFieldVisible(campo.visibleIf, (name: string) => camposValues[name]);
 
-    const isAnswered = (q: SurveyQuestion, val: any): boolean => {
+    const isAnswered = (val: any): boolean => {
       if (val === undefined || val === null) return false;
       if (typeof val === 'string') return val.trim() !== '';
       if (Array.isArray(val)) return val.length > 0;
-      if (q.type === 'LOCATION') return typeof val?.lat === 'number' && typeof val?.lng === 'number';
-      if (typeof val === 'object') return Object.keys(val).length > 0;
       return true;
     };
 
-    const missingRequired = surveySchema.questions.filter(q =>
-      q.required && q.type !== 'SECTION_HEADER' && isQuestionVisibleAtSubmit(q) &&
-      !(esPuntosAcumulacion && PUNTOS_RESIDUO_SURVEY_NAMES.includes(q.name ?? '')) &&
-      !isAnswered(q, operativoDataValues[q.id]),
-    );
+    const missingRequired = todosLosCampos.filter((c) => c.required && isCampoVisible(c) && !isAnswered(camposValues[c.name]));
+    if (!isAnswered(camposValues['ubicacion_mapa']) && !(lat && lng)) missingRequired.push({ name: 'ubicacion_mapa', label: 'Ubicación del punto de acumulación', type: 'LOCATION' });
 
     if (missingRequired.length > 0) {
-      setToast({ message: `Faltan campos obligatorios: ${missingRequired.map(q => q.label).join(', ')}`, type: 'error' });
+      setToast({ message: `Faltan campos obligatorios: ${missingRequired.map((c) => c.label).join(', ')}`, type: 'error' });
       return;
     }
 
     setLoading(true);
     try {
-      const findValue = (name: string) => {
-        const q = surveySchema.questions.find(q => q.name === name);
-        return q ? operativoDataValues[q.id] : undefined;
-      };
-
-      const dateTimeVal = findValue('fecha_operativo') || new Date().toISOString();
-      const locationVal = findValue('ubicacion_mapa') || { lat, lng };
-      const photosVal = findValue('fotos_evidencia') || [];
-      const barrioVal = findValue('barrio_detectado') || barrio;
-
-      const actaQuestion = surveySchema.questions.find(q =>
-        q.name?.toLowerCase().includes('acta') || q.label?.toLowerCase().includes('acta') ||
-        (q.config?.accept && String(q.config.accept).includes('pdf')),
-      );
-      const actaRaw = actaQuestion ? operativoDataValues[actaQuestion.id] : undefined;
-      const actaUrl = Array.isArray(actaRaw) ? actaRaw[0] : (actaRaw || undefined);
-      const resultsVal = findValue('descripcion_general');
-      const entidadResponsableVal = findValue('entidad_responsable');
-      const entidadesAcompanantesVal = findValue('entidades_acompanantes');
-
-      // Gestores acompañantes: la(s) pregunta(s) multiselect con entityType GESTORES
-      // guardan NOMBRES ("Nombre Apellido"). Hay que resolverlos a IDs.
-      const gestorNameQuestions = surveySchema.questions.filter((q: any) => q.config?.entityType === 'GESTORES');
-      const selectedGestorNames: string[] = gestorNameQuestions.flatMap((q: any) => {
-        const v = operativoDataValues[q.id];
-        return Array.isArray(v) ? v : (v ? [v] : []);
-      });
-      const gestoresInvolucradosIds = Array.from(new Set(
-        selectedGestorNames
-          .map((name) => gestores.find((g) => `${g.name} ${g.lastname}` === name)?.id)
-          .filter((id): id is string => !!id),
-      ));
+      const dateTimeVal = camposValues['fecha_operativo'] || new Date().toISOString();
 
       const dto: any = {
         dateTime: new Date(dateTimeVal).toISOString(),
-        lat: locationVal.lat,
-        lng: locationVal.lng,
-        barrio: barrioVal,
-        photos: photosVal,
-        actaPdfUrl: actaUrl,
-        results: resultsVal,
-        entidadResponsable: entidadResponsableVal,
-        entidadesAcompanantes: entidadesAcompanantesVal,
-        ...(gestoresInvolucradosIds.length > 0 ? { gestoresInvolucradosIds } : {}),
-        ...(esPuntosAcumulacion ? { residuos } : {}),
+        lat,
+        lng,
+        barrio,
+        entidadResponsable: camposValues['entidad_responsable'],
+        residuos,
+        frecuenciaAcumulacion: camposValues['frecuenciaAcumulacion'],
+        observaciones: camposValues['observaciones'],
+        entornoEscolar: camposValues['entornoEscolar'] !== undefined ? camposValues['entornoEscolar'] === 'true' || camposValues['entornoEscolar'] === true : undefined,
+        nombreEntornoEscolar: camposValues['nombreEntornoEscolar'],
+        especificarEntorno: camposValues['especificarEntorno'],
+        tipoZona: camposValues['tipoZona'],
+        tipoSuelo: camposValues['tipoSuelo'],
+        condicionesZona: camposValues['condicionesZona'],
+        poblacionHabitanteCalle: camposValues['poblacionHabitanteCalle'] !== undefined ? camposValues['poblacionHabitanteCalle'] === 'true' || camposValues['poblacionHabitanteCalle'] === true : undefined,
+        factoresAcumulacion: camposValues['factoresAcumulacion'],
+        camarasPunto: camposValues['camarasPunto'],
+        operadorAseo: camposValues['operadorAseo'],
+        recoleccionPuertaAPuerta: camposValues['recoleccionPuertaAPuerta'] !== undefined ? camposValues['recoleccionPuertaAPuerta'] === 'true' || camposValues['recoleccionPuertaAPuerta'] === true : undefined,
+        m2Invasion: camposValues['m2Invasion'],
+        actoresIndisciplina: camposValues['actoresIndisciplina'],
+        intervencionesPropuestas: camposValues['intervencionesPropuestas'],
+        identificacionGenerador: camposValues['identificacionGenerador'],
+        tipoGenerador: camposValues['tipoGenerador'],
+        nombreResponsable: camposValues['nombreResponsable'],
+        direccionResponsable: camposValues['direccionResponsable'],
+        observoDisposicion: camposValues['observoDisposicion'] !== undefined ? camposValues['observoDisposicion'] === 'true' || camposValues['observoDisposicion'] === true : undefined,
+        fechaObservacion: camposValues['fechaObservacion'] ? new Date(camposValues['fechaObservacion']).toISOString() : undefined,
+        metodoIdentificacion: camposValues['metodoIdentificacion'],
+        actoresEstrategicos: camposValues['actoresEstrategicos'],
+        telefonoActor: camposValues['telefonoActor'],
+        intervencionesRecomendadas: camposValues['intervencionesRecomendadas'],
       };
       if (processId) dto.processId = processId;
 
@@ -593,254 +454,218 @@ export const CreateActivity: React.FC = () => {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="card mb-8 p-6 bg-white rounded-2xl shadow-sm border border-neutral-100">
           <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Tipo de registro</h2>
-          <select
-            value={operativoSubtipo}
-            onChange={(e) => setOperativoSubtipo(e.target.value)}
-            className="input-field"
-          >
-            <option value="AMBIENTAL_PUNTOS_ACUMULACION">{SUBTYPE_MAPPING['AMBIENTAL_PUNTOS_ACUMULACION']}</option>
+          <select value="AMBIENTAL_PUNTOS_ACUMULACION" disabled className="input-field opacity-70">
+            <option value="AMBIENTAL_PUNTOS_ACUMULACION">Puntos de Acumulación de Residuos</option>
           </select>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          {surveyLoading ? (
-            <div className="py-12 flex flex-col items-center gap-4 bg-white rounded-3xl border border-neutral-100 shadow-sm">
-              <Loading />
-              <p className="text-sm text-neutral-400 font-medium animate-pulse">Cargando formulario dinámico...</p>
-            </div>
-          ) : surveyError ? (
-            <div className="py-12 px-6 text-center bg-white rounded-3xl border-2 border-dashed border-neutral-200 shadow-sm">
-              <h3 className="text-lg font-bold text-neutral-800 mb-2 uppercase tracking-wide">Formulario no disponible</h3>
-              <p className="text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">{surveyError.message}</p>
-            </div>
-          ) : surveySchema ? (
-            <>
-              <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
-                {(() => {
-                  const { esPuntosAcumulacion } = resolveSubtipo(operativoSubtipo);
-                  const visibleQuestions = esPuntosAcumulacion
-                    ? surveySchema.questions.filter(q => !PUNTOS_RESIDUO_SURVEY_NAMES.includes(q.name ?? ''))
-                    : surveySchema.questions;
-                  return (
-                    <DynamicFields
-                      questions={visibleQuestions}
-                      values={operativoDataValues}
-                      onChange={handleOperativoDataChange}
-                      catalogs={catalogs}
-                      gestores={gestores}
-                      currentUserId={user?.id}
-                      boundaries={boundaries}
-                      layerVisibility={layerVisibility}
-                      onLayerVisibilityChange={(l, v) => setLayerVisibility(p => ({ ...p, [l]: v }))}
-                      onToggleAllLayers={(v) => setLayerVisibility({ barrios: v, carrera7: v, colegios: v, cestas: v, falloSanVictorino: v, propiedadHorizontal: v, upz: v, cambuches: v, bodegas: v })}
-                      setLat={setLat}
-                      setLng={setLng}
-                      setBarrio={setBarrio}
-                      getLocation={getLocation}
-                      gettingLocation={gettingLocation}
-                      locationAccuracy={locationAccuracy}
-                      locationError={locationError}
-                      barrio={barrio}
-                    />
-                  );
-                })()}
+          <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
+            <CamposGenerales
+              values={camposValues}
+              onChange={handleCampoChange}
+              lat={lat}
+              lng={lng}
+              barrio={barrio}
+              boundaries={boundaries}
+              layerVisibility={layerVisibility}
+              onLayerVisibilityChange={(l, v) => setLayerVisibility((p) => ({ ...p, [l]: v }))}
+              onToggleAllLayers={(v) => setLayerVisibility({ barrios: v, carrera7: v, colegios: v, cestas: v, falloSanVictorino: v, propiedadHorizontal: v, upz: v, cambuches: v, bodegas: v })}
+              onMapClick={handleMapClick}
+              getLocation={getLocation}
+              gettingLocation={gettingLocation}
+              locationAccuracy={locationAccuracy}
+              locationError={locationError}
+            />
+          </div>
+
+          <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-black text-institutional-black tracking-tight">Residuos Identificados</h2>
+                <p className="text-xs text-neutral-400 mt-0.5">Agregue al menos un residuo detectado en el punto</p>
               </div>
-
-              {resolveSubtipo(operativoSubtipo).esPuntosAcumulacion && (
-                <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-xl font-black text-institutional-black tracking-tight">Residuos Identificados</h2>
-                      <p className="text-xs text-neutral-400 mt-0.5">Agregue al menos un residuo detectado en el punto</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                      {residuos.length} residuo{residuos.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-
-                  {residuos.length > 0 && (
-                    <div className="space-y-3 mb-6">
-                      {residuos.map((r, i) => (
-                        <div key={r.id || i} className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 shadow-sm">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-bold text-neutral-900">{i + 1}. {r.tipoResiduo?.replace(/_/g, ' ')}</p>
-                              <p className="text-xs text-neutral-500 mt-0.5">{r.quienDispuso?.replace(/_/g, ' ')} · {r.areaLinealMetros} m</p>
-                            </div>
-                            <div className="flex gap-2">
-                              <button type="button" onClick={() => {
-                                const id = r.id || `idx-${i}`;
-                                setEditingResiduoId(id);
-                                setNuevoResiduoValues({ ...r });
-                                setShowResiduoForm(true);
-                                setTimeout(() => document.getElementById('residuo-form-create')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-                              }} className="text-primary hover:text-primary-dark p-2 text-sm font-semibold">Editar</button>
-                              <button type="button" onClick={() => setResiduos(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700 p-2 text-xl font-bold leading-none">×</button>
-                            </div>
-                          </div>
-                          {r.photos?.length > 0 && (
-                            <div className="flex gap-2 mt-2 flex-wrap">
-                              {r.photos.map((url, pi) => (
-                                <img key={pi} src={url.startsWith('http') ? url : `https://pub-cabe26a560384a89a7e2a82367fb1813.r2.dev/${url}`} alt="" className="w-14 h-14 object-cover rounded-lg border border-neutral-200" />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {showResiduoForm ? (
-                    <div id="residuo-form-create" className="p-5 bg-primary/5 border border-primary/20 rounded-2xl space-y-5">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-black text-primary uppercase tracking-wider">{editingResiduoId ? 'Editar Residuo' : 'Nuevo Residuo'}</h3>
-                        <button type="button" onClick={() => { setShowResiduoForm(false); setNuevoResiduoValues({}); setEditingResiduoId(null); }} className="text-neutral-400 hover:text-neutral-600 text-sm">Cancelar</button>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">Tipo de Residuo *</label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {RESIDUO_TIPOS.map(opt => (
-                            <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.tipoResiduo === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
-                              <input type="radio" name="nr_tipoResiduo" value={opt.value} checked={nuevoResiduoValues.tipoResiduo === opt.value} onChange={() => setNuevoResiduoValues(prev => ({ ...prev, tipoResiduo: opt.value }))} className="accent-primary" />
-                              <span className="text-sm">{opt.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Quién dispuso los residuos? *</label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {[
-                            { value: 'COMUNIDAD', label: 'Comunidad' },
-                            { value: 'ESTABLECIMIENTOS_COMERCIALES', label: 'Establecimientos comerciales' },
-                            { value: 'VOLQUETAS', label: 'Volquetas' },
-                            { value: 'HABITANTES_DE_CALLE', label: 'Habitantes de calle' },
-                            { value: 'OTROS_NO_SE_CONOCE', label: 'Otros, no se conoce' },
-                          ].map(opt => (
-                            <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.quienDispuso === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
-                              <input type="radio" name="nr_quienDispuso" value={opt.value} checked={nuevoResiduoValues.quienDispuso === opt.value} onChange={() => setNuevoResiduoValues(prev => ({ ...prev, quienDispuso: opt.value }))} className="accent-primary" />
-                              <span className="text-sm">{opt.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">Actores que generan indisciplina</label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {ACTORES_INDISCIPLINA.map(opt => {
-                            const seleccionados: string[] = Array.isArray(nuevoResiduoValues.actoresIndisciplina) ? nuevoResiduoValues.actoresIndisciplina : [];
-                            const checked = seleccionados.includes(opt.value);
-                            return (
-                              <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${checked ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
-                                <input type="checkbox" checked={checked} onChange={() => setNuevoResiduoValues(prev => {
-                                  const prevSel: string[] = Array.isArray(prev.actoresIndisciplina) ? prev.actoresIndisciplina : [];
-                                  const next = checked ? prevSel.filter(v => v !== opt.value) : [...prevSel, opt.value];
-                                  return { ...prev, actoresIndisciplina: next };
-                                })} className="accent-primary" />
-                                <span className="text-sm">{opt.label}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">Fecha y Hora de Detección *</label>
-                        <input type="datetime-local" value={nuevoResiduoValues.dateTime ? nuevoResiduoValues.dateTime.slice(0, 16) : new Date().toISOString().slice(0, 16)} onChange={e => setNuevoResiduoValues(prev => ({ ...prev, dateTime: new Date(e.target.value).toISOString() }))} className="input-field" />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Se perciben olores? *</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map(opt => (
-                            <label key={String(opt.value)} className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.percibeOlores === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
-                              <input type="radio" name="nr_percibeOlores" checked={nuevoResiduoValues.percibeOlores === opt.value} onChange={() => setNuevoResiduoValues(prev => ({ ...prev, percibeOlores: opt.value }))} className="accent-primary" />
-                              <span className="text-sm">{opt.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Se perciben vectores? (Roedores, Palomas, Insectos, Perros, Gatos) *</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map(opt => (
-                            <label key={String(opt.value)} className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.percibeVectores === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
-                              <input type="radio" name="nr_percibeVectores" checked={nuevoResiduoValues.percibeVectores === opt.value} onChange={() => setNuevoResiduoValues(prev => ({ ...prev, percibeVectores: opt.value }))} className="accent-primary" />
-                              <span className="text-sm">{opt.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">Área lineal estimada (metros) *</label>
-                        <input type="number" min="0" step="0.01" placeholder="Ej: 10" value={nuevoResiduoValues.areaLinealMetros ?? ''} onChange={e => setNuevoResiduoValues(prev => ({ ...prev, areaLinealMetros: e.target.value ? parseFloat(e.target.value) : undefined }))} className="input-field" />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">Observaciones</label>
-                        <textarea rows={2} placeholder="Observaciones adicionales..." value={nuevoResiduoValues.observaciones ?? ''} onChange={e => setNuevoResiduoValues(prev => ({ ...prev, observaciones: e.target.value }))} className="input-field resize-none" />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-neutral-700 mb-2">Foto de Evidencia * (máx. 1)</label>
-                        <PhotosUpload onUploadSuccess={urls => setNuevoResiduoValues(prev => ({ ...prev, photos: urls.slice(0, 1) }))} existingUrls={nuevoResiduoValues.photos || []} maxPhotos={1} />
-                      </div>
-
-                      <div className="flex justify-end">
-                        <button type="button" onClick={() => {
-                          if (!nuevoResiduoValues.tipoResiduo) { setToast({ message: 'Seleccione el tipo de residuo', type: 'error' }); return; }
-                          if (!nuevoResiduoValues.quienDispuso) { setToast({ message: 'Seleccione quién dispuso los residuos', type: 'error' }); return; }
-                          if (nuevoResiduoValues.percibeOlores === undefined) { setToast({ message: 'Indique si se perciben olores', type: 'error' }); return; }
-                          if (nuevoResiduoValues.percibeVectores === undefined) { setToast({ message: 'Indique si se perciben vectores', type: 'error' }); return; }
-                          if (nuevoResiduoValues.areaLinealMetros === undefined || nuevoResiduoValues.areaLinealMetros === '') { setToast({ message: 'Ingrese el área estimada', type: 'error' }); return; }
-                          if (!nuevoResiduoValues.photos?.length) { setToast({ message: 'Suba la foto de evidencia del residuo', type: 'error' }); return; }
-
-                          if (editingResiduoId) {
-                            setResiduos(prev => prev.map((r, i) => {
-                              const currId = r.id || `idx-${i}`;
-                              return currId === editingResiduoId ? { ...nuevoResiduoValues, id: currId, recogido: r.recogido || false } as ResiduoEntry : r;
-                            }));
-                            setToast({ message: 'Residuo actualizado', type: 'success' });
-                          } else {
-                            setResiduos(prev => [...prev, {
-                              ...nuevoResiduoValues,
-                              id: crypto.randomUUID(),
-                              recogido: false,
-                              dateTime: nuevoResiduoValues.dateTime || new Date().toISOString(),
-                              photos: nuevoResiduoValues.photos || [],
-                            } as ResiduoEntry]);
-                            setToast({ message: 'Residuo agregado', type: 'success' });
-                          }
-                          setNuevoResiduoValues({});
-                          setEditingResiduoId(null);
-                          setShowResiduoForm(false);
-                        }} className="btn-primary">Guardar Residuo</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button type="button" onClick={() => {
-                      setShowResiduoForm(true);
-                      setTimeout(() => document.getElementById('residuo-form-create')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-                    }} className="w-full py-3 border-2 border-dashed border-primary/40 rounded-xl text-primary font-semibold hover:bg-primary/5 transition-colors">
-                      + Agregar Residuo
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="py-12 text-center bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-neutral-200 flex flex-col items-center gap-4">
-              <p className="text-neutral-500 font-medium italic">Cargando formulario...</p>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                {residuos.length} residuo{residuos.length !== 1 ? 's' : ''}
+              </span>
             </div>
-          )}
+
+            {residuos.length > 0 && (
+              <div className="space-y-3 mb-6">
+                {residuos.map((r, i) => (
+                  <div key={r.id || i} className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-neutral-900">{i + 1}. {r.tipoResiduo?.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">{r.quienDispuso?.replace(/_/g, ' ')} · {r.areaLinealMetros} m</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => {
+                          const id = r.id || `idx-${i}`;
+                          setEditingResiduoId(id);
+                          setNuevoResiduoValues({ ...r });
+                          setShowResiduoForm(true);
+                          setTimeout(() => document.getElementById('residuo-form-create')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                        }} className="text-primary hover:text-primary-dark p-2 text-sm font-semibold">Editar</button>
+                        <button type="button" onClick={() => setResiduos((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700 p-2 text-xl font-bold leading-none">×</button>
+                      </div>
+                    </div>
+                    {r.photos?.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {r.photos.map((url, pi) => (
+                          <img key={pi} src={url.startsWith('http') ? url : `https://pub-cabe26a560384a89a7e2a82367fb1813.r2.dev/${url}`} alt="" className="w-14 h-14 object-cover rounded-lg border border-neutral-200" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showResiduoForm ? (
+              <div id="residuo-form-create" className="p-5 bg-primary/5 border border-primary/20 rounded-2xl space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-primary uppercase tracking-wider">{editingResiduoId ? 'Editar Residuo' : 'Nuevo Residuo'}</h3>
+                  <button type="button" onClick={() => { setShowResiduoForm(false); setNuevoResiduoValues({}); setEditingResiduoId(null); }} className="text-neutral-400 hover:text-neutral-600 text-sm">Cancelar</button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Tipo de Residuo *</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {RESIDUO_TIPOS.map((opt) => (
+                      <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.tipoResiduo === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
+                        <input type="radio" name="nr_tipoResiduo" value={opt.value} checked={nuevoResiduoValues.tipoResiduo === opt.value} onChange={() => setNuevoResiduoValues((prev) => ({ ...prev, tipoResiduo: opt.value }))} className="accent-primary" />
+                        <span className="text-sm">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Quién dispuso los residuos? *</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { value: 'COMUNIDAD', label: 'Comunidad' },
+                      { value: 'ESTABLECIMIENTOS_COMERCIALES', label: 'Establecimientos comerciales' },
+                      { value: 'VOLQUETAS', label: 'Volquetas' },
+                      { value: 'HABITANTES_DE_CALLE', label: 'Habitantes de calle' },
+                      { value: 'OTROS_NO_SE_CONOCE', label: 'Otros, no se conoce' },
+                    ].map((opt) => (
+                      <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.quienDispuso === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
+                        <input type="radio" name="nr_quienDispuso" value={opt.value} checked={nuevoResiduoValues.quienDispuso === opt.value} onChange={() => setNuevoResiduoValues((prev) => ({ ...prev, quienDispuso: opt.value }))} className="accent-primary" />
+                        <span className="text-sm">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Actores que generan indisciplina</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {ACTORES_INDISCIPLINA.map((opt) => {
+                      const seleccionados: string[] = Array.isArray(nuevoResiduoValues.actoresIndisciplina) ? nuevoResiduoValues.actoresIndisciplina : [];
+                      const checked = seleccionados.includes(opt.value);
+                      return (
+                        <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${checked ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
+                          <input type="checkbox" checked={checked} onChange={() => setNuevoResiduoValues((prev) => {
+                            const prevSel: string[] = Array.isArray(prev.actoresIndisciplina) ? prev.actoresIndisciplina : [];
+                            const next = checked ? prevSel.filter((v) => v !== opt.value) : [...prevSel, opt.value];
+                            return { ...prev, actoresIndisciplina: next };
+                          })} className="accent-primary" />
+                          <span className="text-sm">{opt.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Fecha y Hora de Detección *</label>
+                  <input type="datetime-local" value={nuevoResiduoValues.dateTime ? nuevoResiduoValues.dateTime.slice(0, 16) : new Date().toISOString().slice(0, 16)} onChange={(e) => setNuevoResiduoValues((prev) => ({ ...prev, dateTime: new Date(e.target.value).toISOString() }))} className="input-field" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Se perciben olores? *</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map((opt) => (
+                      <label key={String(opt.value)} className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.percibeOlores === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
+                        <input type="radio" name="nr_percibeOlores" checked={nuevoResiduoValues.percibeOlores === opt.value} onChange={() => setNuevoResiduoValues((prev) => ({ ...prev, percibeOlores: opt.value }))} className="accent-primary" />
+                        <span className="text-sm">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Se perciben vectores? (Roedores, Palomas, Insectos, Perros, Gatos) *</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map((opt) => (
+                      <label key={String(opt.value)} className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${nuevoResiduoValues.percibeVectores === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200 hover:border-primary/30'}`}>
+                        <input type="radio" name="nr_percibeVectores" checked={nuevoResiduoValues.percibeVectores === opt.value} onChange={() => setNuevoResiduoValues((prev) => ({ ...prev, percibeVectores: opt.value }))} className="accent-primary" />
+                        <span className="text-sm">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Área lineal estimada (metros) *</label>
+                  <input type="number" min="0" step="0.01" placeholder="Ej: 10" value={nuevoResiduoValues.areaLinealMetros ?? ''} onChange={(e) => setNuevoResiduoValues((prev) => ({ ...prev, areaLinealMetros: e.target.value ? parseFloat(e.target.value) : undefined }))} className="input-field" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Observaciones</label>
+                  <textarea rows={2} placeholder="Observaciones adicionales..." value={nuevoResiduoValues.observaciones ?? ''} onChange={(e) => setNuevoResiduoValues((prev) => ({ ...prev, observaciones: e.target.value }))} className="input-field resize-none" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Foto de Evidencia * (máx. 1)</label>
+                  <PhotosUpload onUploadSuccess={(urls) => setNuevoResiduoValues((prev) => ({ ...prev, photos: urls.slice(0, 1) }))} existingUrls={nuevoResiduoValues.photos || []} maxPhotos={1} />
+                </div>
+
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => {
+                    if (!nuevoResiduoValues.tipoResiduo) { setToast({ message: 'Seleccione el tipo de residuo', type: 'error' }); return; }
+                    if (!nuevoResiduoValues.quienDispuso) { setToast({ message: 'Seleccione quién dispuso los residuos', type: 'error' }); return; }
+                    if (nuevoResiduoValues.percibeOlores === undefined) { setToast({ message: 'Indique si se perciben olores', type: 'error' }); return; }
+                    if (nuevoResiduoValues.percibeVectores === undefined) { setToast({ message: 'Indique si se perciben vectores', type: 'error' }); return; }
+                    if (nuevoResiduoValues.areaLinealMetros === undefined || nuevoResiduoValues.areaLinealMetros === '') { setToast({ message: 'Ingrese el área estimada', type: 'error' }); return; }
+                    if (!nuevoResiduoValues.photos?.length) { setToast({ message: 'Suba la foto de evidencia del residuo', type: 'error' }); return; }
+
+                    if (editingResiduoId) {
+                      setResiduos((prev) => prev.map((r, i) => {
+                        const currId = r.id || `idx-${i}`;
+                        return currId === editingResiduoId ? { ...nuevoResiduoValues, id: currId, recogido: r.recogido || false } as ResiduoEntry : r;
+                      }));
+                      setToast({ message: 'Residuo actualizado', type: 'success' });
+                    } else {
+                      setResiduos((prev) => [...prev, {
+                        ...nuevoResiduoValues,
+                        id: crypto.randomUUID(),
+                        recogido: false,
+                        dateTime: nuevoResiduoValues.dateTime || new Date().toISOString(),
+                        photos: nuevoResiduoValues.photos || [],
+                      } as ResiduoEntry]);
+                      setToast({ message: 'Residuo agregado', type: 'success' });
+                    }
+                    setNuevoResiduoValues({});
+                    setEditingResiduoId(null);
+                    setShowResiduoForm(false);
+                  }} className="btn-primary">Guardar Residuo</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => {
+                setShowResiduoForm(true);
+                setTimeout(() => document.getElementById('residuo-form-create')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+              }} className="w-full py-3 border-2 border-dashed border-primary/40 rounded-xl text-primary font-semibold hover:bg-primary/5 transition-colors">
+                + Agregar Residuo
+              </button>
+            )}
+          </div>
 
           <div className="pt-4">
-            <button type="submit" disabled={loading || !surveySchema} className="btn-primary w-full py-4 text-lg shadow-xl shadow-primary/20 disabled:opacity-50 disabled:shadow-none transition-all">
+            <button type="submit" disabled={loading} className="btn-primary w-full py-4 text-lg shadow-xl shadow-primary/20 disabled:opacity-50 disabled:shadow-none transition-all">
               {loading ? 'Guardando...' : 'Finalizar Registro'}
             </button>
           </div>
