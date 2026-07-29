@@ -195,31 +195,29 @@ export const getCategoryIcon = (
   isSectorAmbiental?: boolean,
   number?: number,
 ): DivIcon => {
-  const catUpper = (a.operativoCategoria || '').toUpperCase();
-  let color = markerColors[catUpper] || markerColors.DEFAULT;
+  // Este repo es mono-dominio (ver CLAUDE.md invariantes) — toda actividad ya
+  // es AMBIENTAL, no hace falta (ni existe) operativoCategoria para
+  // distinguirlo. Antes esto siempre caía en DEFAULT (gris) porque el campo
+  // no existe en este backend. Bug real corregido 2026-07-29.
+  let color = markerColors.AMBIENTAL;
   const tier = getPuntoCriticoTier(a);
 
   if (isSectorAmbiental && tier > 0) {
     color = tier === 2 ? '#DC2626' : '#EAB308';
-  } else if (isCobertura && catUpper === 'AMBIENTAL') {
+  } else if (isCobertura) {
     color = '#10B981';
   }
 
   if (a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && selectedTipoResiduo) {
-    const data = a.operativoData as any;
     const filterLabel = getResiduoLabel(selectedTipoResiduo);
-    const matchesLegacy =
-      data?.tipoResiduo && getResiduoLabel(data.tipoResiduo) === filterLabel;
-    const matchesArray =
-      Array.isArray(data?.residuos) &&
-      data.residuos.some((r: any) => getResiduoLabel(r.tipoResiduo) === filterLabel);
+    const matches = getResiduos(a).some((r) => getResiduoLabel(r.tipoResiduo) === filterLabel);
 
-    if (matchesLegacy || matchesArray) {
+    if (matches) {
       color = tipoResiduoColors[selectedTipoResiduo] || color;
     }
   }
 
-  return createMarkerIcon(color, a.operativoCategoria, a.operativoSubtipo, number);
+  return createMarkerIcon(color, 'AMBIENTAL', a.operativoSubtipo, number);
 };
 
 // ── Ubicaciones de actividad ──────────────────────────────
@@ -242,42 +240,10 @@ export const getAllLocations = (
     locations.push({ lat: activity.lat, lng: activity.lng, label: 'Ubicacion Principal', activity });
   }
 
-  if (
-    activity.operativoCategoria === 'ESPACIO_PUBLICO' &&
-    activity.operativoData &&
-    typeof activity.operativoData === 'object' &&
-    activity.operativoData !== null &&
-    'additionalLocations' in activity.operativoData &&
-    Array.isArray((activity.operativoData as any).additionalLocations)
-  ) {
-    try {
-      const additionalLocations = (activity.operativoData as any).additionalLocations;
-      if (additionalLocations && additionalLocations.length > 0) {
-        additionalLocations.forEach((loc: any, index: number) => {
-          if (
-            loc &&
-            typeof loc === 'object' &&
-            loc.lat != null &&
-            loc.lng != null &&
-            typeof loc.lat === 'number' &&
-            typeof loc.lng === 'number' &&
-            !isNaN(loc.lat) &&
-            !isNaN(loc.lng)
-          ) {
-            locations.push({
-              lat: loc.lat,
-              lng: loc.lng,
-              label: `Ubicacion ${index + 2}`,
-              activity,
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error procesando ubicaciones adicionales:', error);
-    }
-  }
-
+  // Antes había una rama acá para ubicaciones adicionales de ESPACIO_PUBLICO
+  // (leída de operativoData) — código muerto, ese dominio no existe en este
+  // repo (mono-dominio ambiental, ver CLAUDE.md) y el campo tampoco existe en
+  // el backend. Eliminada 2026-07-29, ver ESTADO-EXTRACCION.md.
   return locations;
 };
 

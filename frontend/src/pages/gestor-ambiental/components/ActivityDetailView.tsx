@@ -124,32 +124,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
           <p className="text-sm text-neutral-500 mt-1">{activity.results || 'Sin descripción adicional.'}</p>
         </div>
 
-        {/* Datos Específicos de Actividad AMBIENTAL */}
-        {activity.operativoSubtipo === 'AMBIENTAL' && activity.operativoData && (
-          <div className="mb-6">
-            <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wider mb-3">Datos de la Actividad Ambiental</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries({
-                'Puntos Atendidos': (activity.operativoData as any).puntosCriticosEmergentesAtendidos,
-                'Comp. Pedagógicos': (activity.operativoData as any).comparendosPedagogicos,
-                'Comparendos': (activity.operativoData as any).comparendos,
-                'Sensibilizados': (activity.operativoData as any).personasSensibilizadas,
-                'Huertas': (activity.operativoData as any).huertas,
-                'Vol. Recuperado (m³)': (activity.operativoData as any).m3RecuperadosAproximados,
-                'Recolectado (kg)': (activity.operativoData as any).kgMaterialResiduosRecolectados,
-                'Área Recup. (m²)': (activity.operativoData as any).m2RecuperadosEspacioPublico,
-              }).map(([label, value]) => (
-                value !== undefined && value !== null ? (
-                  <div key={label} className="bg-neutral-50 rounded-xl p-3 border border-neutral-200 shadow-sm">
-                    <p className="text-[11px] uppercase font-bold text-neutral-500 mb-1">{label}</p>
-                    <p className="font-black text-neutral-800 text-lg">{value as number}</p>
-                  </div>
-                ) : null
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Información del formulario del punto de acumulación */}
         {activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && (
           <div className="mb-6 bg-neutral-50 rounded-2xl p-5 border border-neutral-200">
@@ -191,7 +165,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                 </div>
               )}
               {(() => {
-                const ua = getUltimaActualizacion(activity.operativoData, activity.createdAt);
+                const ua = getUltimaActualizacion(activity.updatedAt, activity.createdAt);
                 if (!ua) return null;
                 return (
                   <div>
@@ -202,7 +176,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                   </div>
                 );
               })()}
-              {getPuntoSurveyAnswers(activity.operativoData).map((row) => (
+              {getPuntoSurveyAnswers(activity).map((row) => (
                 <div key={row.key}>
                   <p className="text-[11px] uppercase font-bold text-neutral-500 mb-1">{row.label}</p>
                   <p className="text-sm font-bold text-neutral-800">{row.value}</p>

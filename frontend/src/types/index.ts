@@ -261,6 +261,41 @@ export interface Activity {
   // Este backend guarda `residuos` como columna propia de nivel superior
   // (no anidada en `operativoData` como en el monolito).
   residuos?: ResiduoEntry[];
+  ultimoSeguimientoAt?: string | null;
+
+  // ── Formulario fijo "Identificación de Puntos de Acumulación" ──────────
+  // 26 columnas propias agregadas 2026-07-29 (ver ESTADO-EXTRACCION.md,
+  // regresión de operativoData). nombreResponsable/direccionResponsable/
+  // telefonoActor son DATOS PERSONALES — ver esa misma sección.
+  frecuenciaAcumulacion?: string | null;
+  observaciones?: string | null;
+  entornoEscolar?: boolean | null;
+  nombreEntornoEscolar?: string | null;
+  especificarEntorno?: string | null;
+  tipoZona?: string | null;
+  tipoSuelo?: string | null;
+  condicionesZona?: string[] | null;
+  poblacionHabitanteCalle?: boolean | null;
+  factoresAcumulacion?: string[] | null;
+  camarasPunto?: string | null;
+  operadorAseo?: string | null;
+  recoleccionPuertaAPuerta?: boolean | null;
+  m2Invasion?: number | null;
+  actoresIndisciplina?: string | null;
+  intervencionesPropuestas?: string | null;
+  identificacionGenerador?: string | null;
+  tipoGenerador?: string | null;
+  /** DATO PERSONAL — ver ESTADO-EXTRACCION.md. */
+  nombreResponsable?: string | null;
+  /** DATO PERSONAL — ver ESTADO-EXTRACCION.md. */
+  direccionResponsable?: string | null;
+  observoDisposicion?: boolean | null;
+  fechaObservacion?: string | null;
+  metodoIdentificacion?: string | null;
+  actoresEstrategicos?: string[] | null;
+  /** DATO PERSONAL — ver ESTADO-EXTRACCION.md. */
+  telefonoActor?: string | null;
+  intervencionesRecomendadas?: string[] | null;
 }
 
 export interface Process {

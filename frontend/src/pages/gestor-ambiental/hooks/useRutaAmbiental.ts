@@ -102,7 +102,7 @@ export function useRutaAmbiental(
       const maxDias = residuos.length > 0
         ? Math.max(...residuos.map(r => differenceInDays(new Date(), new Date(r.dateTime))))
         : 0;
-      const ultimoSeguimientoAt = (a as any).operativoData?.ultimoSeguimientoAt as string | undefined;
+      const ultimoSeguimientoAt = a.ultimoSeguimientoAt ?? undefined;
       const ahora = new Date();
       return {
         numeroGlobal: idx + 1,

@@ -1,49 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { activityService } from '../services/activity.service';
 import { useFileUrl } from '../hooks/useFileUrl';
-import type { Activity } from '../types';
+import type { Activity, ResiduoEntry } from '../types';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
-
-interface ResiduoEntry {
-  id?: string;
-  tipoResiduo: string;
-  quienDispuso?: string;
-  areaLinealMetros?: number;
-  observaciones?: string;
-  percibeOlores?: boolean;
-  percibeVectores?: boolean;
-  recogido?: boolean;
-  photos?: string[];
-  dateTime?: string;
-  [key: string]: any;
-}
+import { getResiduos as getResiduosFromActivity } from '../pages/gestor-ambiental/lib/residuos';
 
 interface Props {
   activity: Activity;
   onClose: () => void;
   onUpdated: (activity: Activity) => void;
-}
-
-function getResiduosFromActivity(activity: Activity): ResiduoEntry[] {
-  const opData = (activity.operativoData as any) || {};
-  if (Array.isArray(opData.residuos) && opData.residuos.length > 0) {
-    return opData.residuos;
-  }
-  if (opData.tipoResiduo) {
-    return [{
-      id: 'legacy-0',
-      tipoResiduo: opData.tipoResiduo,
-      quienDispuso: opData.quienDispuso || '',
-      percibeOlores: opData.percibeOlores ?? false,
-      percibeVectores: opData.percibeVectores ?? false,
-      areaLinealMetros: opData.areaLinealMetros || 0,
-      observaciones: opData.observaciones || '',
-      dateTime: activity.dateTime || activity.createdAt,
-      photos: activity.photos || [],
-      recogido: false,
-    }];
-  }
-  return [];
 }
 
 const TIPO_LABELS: Record<string, string> = Object.fromEntries(

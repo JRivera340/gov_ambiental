@@ -10,7 +10,7 @@ import { BarriosLayer } from '../../../components/BarriosLayer';
 import { ClickableMarker } from '../components/shared/ClickableMarker';
 import { PieChart } from '../components/shared/PieChart';
 import type { Activity } from '../../../types';
-import { getCategoryIcon } from '../utils/adminHelpers';
+import { getCategoryIcon, getResiduos } from '../utils/adminHelpers';
 import { INST_RED, AMB_GREEN, technicalResidueKeys, tipoResiduoColors, residuoLabels } from '../utils/adminConstants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,7 +93,12 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
       cambuches: visible, bodegas: visible,
     });
 
-  const ambientalActivities = filteredMapActivities.filter(a => a.operativoCategoria === 'AMBIENTAL');
+  // Todo lo que llega a este repo YA es ambiental (mono-dominio, ver
+  // CLAUDE.md invariantes) — filtrar por operativoCategoria es un filtro del
+  // hub que acá siempre da falso (el campo no existe en este backend) y
+  // dejaba esta lista vacía. Bug real corregido 2026-07-29, ver
+  // ESTADO-EXTRACCION.md.
+  const ambientalActivities = filteredMapActivities;
 
   const [showAsignacionPuntos, setShowAsignacionPuntos] = useState(false);
   const [showIndicadores, setShowIndicadores] = useState(false);
@@ -359,11 +364,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                     ).map(key => [
                       key,
                       filteredMapActivities
-                        .filter(a => a.operativoCategoria === 'AMBIENTAL')
-                        .filter(a => {
-                          const data = a.operativoData as any;
-                          return data?.tipoResiduo === key || (Array.isArray(data?.residuos) && data.residuos.some((r: any) => r.tipoResiduo === key));
-                        }).length
+                        .filter((a) => getResiduos(a).some((r) => r.tipoResiduo === key)).length
                     ]).filter(([, val]) => (val as number) > 0)
                   )}
                   size={110}

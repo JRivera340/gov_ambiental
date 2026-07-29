@@ -11,18 +11,12 @@ import type { Activity } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { startOfMonthStr as gSOM, endOfMonthStr as gEOM } from '../../utils/dateRanges';
+import { getResiduos } from '../gestor-ambiental/lib/residuos';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const gYearStart = () => `${new Date().getFullYear()}-01-01`;
 const gYearEnd = () => `${new Date().getFullYear()}-12-31`;
-
-function getResiduos(activity: Activity): any[] {
-  const opData = (activity.operativoData as any) || {};
-  if (Array.isArray(opData.residuos) && opData.residuos.length > 0) return opData.residuos;
-  if (opData.tipoResiduo) return [{ tipoResiduo: opData.tipoResiduo, recogido: false }];
-  return [];
-}
 
 function countPendientes(activity: Activity): number {
   return getResiduos(activity).filter(r => !(r as any).aprobado).length;

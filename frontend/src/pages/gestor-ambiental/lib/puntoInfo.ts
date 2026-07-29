@@ -1,14 +1,10 @@
-// Extrae las respuestas del formulario del punto de acumulación (nivel punto)
-// desde operativoData, para mostrarlas en el detalle. Usa el snapshot __fieldMeta
-// (label/tipo/opciones guardado al crear) para poner labels legibles, así las
-// preguntas nuevas de la encuesta aparecen sin tocar el componente.
+// Extrae las respuestas del formulario fijo de un punto de acumulación (nivel
+// punto, no residuo) para mostrarlas en el detalle. Antes leía
+// operativoData.__fieldMeta (formulario dinámico) — el formulario ya es fijo
+// (ver ESTADO-EXTRACCION.md, regresión de operativoData corregida 2026-07-29),
+// así que los labels/opciones vienen del catálogo fijo, no de un snapshot.
 
-// Claves internas o de nivel-residuo que NO son respuestas del punto.
-const CLAVES_EXCLUIDAS = new Set([
-  '__fieldMeta', 'residuos', 'tipo', 'barrio_detectado', 'ubicacion_mapa',
-  'quienDispuso', 'tipoResiduo', 'percibeOlores', 'percibeVectores',
-  'areaLinealMetros', 'fotos_evidencia', 'actoresIndisciplina', 'infoActualizadaAt',
-]);
+import { SECCIONES_PUNTO_ACUMULACION } from '../../../config/camposPuntoAcumulacion';
 
 export interface PuntoAnswer {
   key: string;
@@ -16,43 +12,37 @@ export interface PuntoAnswer {
   value: string;
 }
 
-// Claves de una versión previa del formulario quedaron como UUID sin snapshot en
-// __fieldMeta; sin etiqueta legible no se muestran (el dato sigue en operativoData).
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function optionLabel(meta: any, raw: any): string {
-  const opts = meta?.options;
-  if (Array.isArray(opts)) {
-    const found = opts.find((o: any) => String(o.value) === String(raw));
-    if (found) return String(found.label ?? found.value);
-  }
-  if (raw === true || raw === 'true') return 'Sí';
-  if (raw === false || raw === 'false') return 'No';
-  return String(raw);
-}
-
-function toDisplay(meta: any, raw: any): string {
-  if (Array.isArray(raw)) return raw.map((r) => optionLabel(meta, r)).join(', ');
-  return optionLabel(meta, raw);
-}
-
-function isEmpty(raw: any): boolean {
+function isEmpty(raw: unknown): boolean {
   return raw === undefined || raw === null || raw === '' ||
     (Array.isArray(raw) && raw.length === 0);
 }
 
-export function getPuntoSurveyAnswers(operativoData: any): PuntoAnswer[] {
-  if (!operativoData || typeof operativoData !== 'object') return [];
-  const meta = operativoData.__fieldMeta || {};
+function toDisplay(options: Array<{ value: string; label: string }> | undefined, raw: unknown): string {
+  const labelFor = (v: unknown): string => {
+    const found = options?.find((o) => String(o.value) === String(v));
+    if (found) return found.label;
+    if (v === true || v === 'true') return 'Sí';
+    if (v === false || v === 'false') return 'No';
+    return String(v);
+  };
+  if (Array.isArray(raw)) return raw.map(labelFor).join(', ');
+  return labelFor(raw);
+}
+
+// Campos del formulario general que se muestran en otra parte del detalle
+// (fecha, ubicación, entidad) — no se repiten acá como respuesta genérica.
+const CAMPOS_MOSTRADOS_APARTE = new Set(['fecha_operativo', 'ubicacion_mapa', 'entidad_responsable']);
+
+export function getPuntoSurveyAnswers(activity: Record<string, unknown> | null | undefined): PuntoAnswer[] {
+  if (!activity || typeof activity !== 'object') return [];
   const rows: PuntoAnswer[] = [];
-  for (const [key, raw] of Object.entries(operativoData)) {
-    if (CLAVES_EXCLUIDAS.has(key)) continue;
-    if (isEmpty(raw)) continue;
-    if (typeof raw === 'object' && !Array.isArray(raw)) continue; // ubicaciones u objetos complejos
-    const fieldMeta = meta[key];
-    const label = fieldMeta?.label;
-    if (!label && UUID_RE.test(key)) continue; // clave huérfana sin etiqueta
-    rows.push({ key, label: label || key, value: toDisplay(fieldMeta, raw) });
+  for (const seccion of SECCIONES_PUNTO_ACUMULACION) {
+    for (const campo of seccion.campos) {
+      if (CAMPOS_MOSTRADOS_APARTE.has(campo.name) || campo.type === 'LOCATION') continue;
+      const raw = activity[campo.name];
+      if (isEmpty(raw)) continue;
+      rows.push({ key: campo.name, label: campo.label, value: toDisplay(campo.options, raw) });
+    }
   }
   return rows;
 }

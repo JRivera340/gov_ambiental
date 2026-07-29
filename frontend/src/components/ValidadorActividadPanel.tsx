@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Activity, User } from '../types';
 import { StatusBadge } from './StatusBadge';
+import { getResiduos } from '../pages/gestor-ambiental/lib/residuos';
 
 interface Props {
   activity: Activity;
@@ -83,16 +84,7 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showActionsDropdown]);
 
-  const residuos = useMemo(() => {
-    const opData = (activity.operativoData as any) || {};
-    if (Array.isArray(opData.residuos)) return opData.residuos;
-    if (opData.tipoResiduo) return [{ 
-      tipoResiduo: opData.tipoResiduo, 
-      areaLinealMetros: opData.areaLinealMetros || 0,
-      photos: activity.photos || []
-    }];
-    return [];
-  }, [activity]);
+  const residuos = useMemo(() => getResiduos(activity), [activity]);
 
   // Fotos que no pertenecen a ningún residuo específico
   const generalPhotos = useMemo(() => {
@@ -272,11 +264,11 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
         )}
 
         {/* Observations */}
-        {(activity.operativoData as any)?.observaciones && (
+        {activity.observaciones && (
           <div className="px-6 py-5">
             <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Observaciones Técnicas</h3>
             <p className="text-sm text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-2xl border border-neutral-100 italic">
-              "{ (activity.operativoData as any).observaciones }"
+              "{activity.observaciones}"
             </p>
           </div>
         )}

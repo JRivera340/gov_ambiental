@@ -1,12 +1,16 @@
-// Determina la fecha de "última actualización" de un punto: prioriza
-// operativoData.infoActualizadaAt (marcada al editar la info del punto) y cae
-// a createdAt de la actividad si nunca fue editado.
+// Determina la fecha de "última actualización" de un punto. Antes leía
+// operativoData.infoActualizadaAt (campo que nunca existió en el backend, ver
+// ESTADO-EXTRACCION.md) — usa `updatedAt`, que ya es columna estándar de
+// TypeORM en PuntoResiduo (@UpdateDateColumn, se actualiza sola en cada save).
 export function getUltimaActualizacion(
-  operativoData: any,
+  updatedAt: string | Date | undefined,
   createdAt?: string | Date,
 ): { iso: string; esEdicion: boolean } | null {
-  const info = operativoData?.infoActualizadaAt;
-  if (info) return { iso: typeof info === 'string' ? info : new Date(info).toISOString(), esEdicion: true };
-  if (createdAt) return { iso: typeof createdAt === 'string' ? createdAt : new Date(createdAt).toISOString(), esEdicion: false };
+  const toIso = (v: string | Date) => (typeof v === 'string' ? v : new Date(v).toISOString());
+  if (updatedAt && createdAt && toIso(updatedAt) !== toIso(createdAt)) {
+    return { iso: toIso(updatedAt), esEdicion: true };
+  }
+  if (createdAt) return { iso: toIso(createdAt), esEdicion: false };
+  if (updatedAt) return { iso: toIso(updatedAt), esEdicion: false };
   return null;
 }

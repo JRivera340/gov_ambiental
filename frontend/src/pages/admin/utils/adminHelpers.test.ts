@@ -96,13 +96,9 @@ describe('isInside (ray casting)', () => {
 });
 
 describe('getAllLocations', () => {
-  it('incluye la ubicación principal y las adicionales de espacio público', () => {
-    const a: any = {
-      lat: 4.6, lng: -74.08,
-      operativoCategoria: 'ESPACIO_PUBLICO',
-      operativoData: { additionalLocations: [{ lat: 4.61, lng: -74.09 }] },
-    };
-    expect(getAllLocations(a)).toHaveLength(2);
+  it('incluye la ubicación principal de la actividad', () => {
+    const a: any = { lat: 4.6, lng: -74.08 };
+    expect(getAllLocations(a)).toHaveLength(1);
   });
   it('devuelve [] para actividad nula', () => {
     expect(getAllLocations(null)).toEqual([]);
