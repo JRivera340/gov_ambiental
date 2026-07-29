@@ -38,7 +38,7 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 |---|---|---|---|---|---|
 | Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` | igual | REPLICADA | — |
 | Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | REPLICADA | — |
-| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL | **REGRESIÓN detectada 2026-07-29** (ver detalle abajo) | Faltan columnas propias para 26 de los 32 campos del formulario general — en curso |
+| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | REPLICADA 2026-07-29, PENDIENTE DE VERIFICAR en pantalla con seed real | Migración pendiente de correr contra producción; sin verificación visual con datos reales todavía |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | REPLICADA (2026-07-28, con tests) | — |
 | Dashboard validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) | dedicado, ya portado (commit 83f72bb: tabs/filtros/paginación) | REPLICADA | — |
 | Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/residuos` | igual | REPLICADA | — |
@@ -71,11 +71,55 @@ detectada hasta ahora porque la base de este repo estaba vacía (ver también
 el hallazgo de `operativoData`/`getResiduos()` más abajo, mismo origen: nunca
 hubo datos reales en pantalla para notar que faltaban).
 
-**En curso 2026-07-29**: se están agregando columnas propias (no un campo
-JSON opaco, para poder reportar y para el diccionario de datos de la entrega
-a UAESP) para las respuestas que Josh confirme que se quedan, con migración
-versionada, DTO y persistencia real. Ver PLAN-MAESTRO.md para el detalle de
-implementación y el estado de avance.
+**RESUELTO 2026-07-29.** Los 26 campos se quedan (ninguno se eliminó del
+formulario — Josh confirmó "todos se quedan" tras revisar la lista). Columnas
+propias agregadas a `PuntoResiduo` (no un campo JSON opaco — se eligió así a
+propósito para poder reportar/consultar sobre estos datos y para que el
+diccionario de datos de la entrega a UAESP no dependa de un blob ilegible):
+migración versionada (`src/migrations/1785339722226-FormularioFijoPuntoAcumulacion.ts`,
+generada y validada contra Postgres vacía local antes de aplicar en ningún
+lado real — **pendiente de correr contra producción**, ver PLAN-MAESTRO.md),
+entidad (`punto-residuo.entity.ts`), DTO compartido
+(`dto/formulario-fijo-punto.dto.ts`, usado por `CreatePuntoDto` y
+`UpdatePuntoDto`), persistencia real en `puntos.service.ts` (`create`/
+`update`), y test de round-trip
+(`puntos.service.spec.ts`: llena los 26 campos, crea el punto, lo vuelve a
+leer del repositorio como haría la app al abrir el detalle, y confirma que
+cada campo llega igual — 30/30 tests verdes).
+
+### Datos personales (PII) — para el acta de entrega a la UAESP
+
+Tres de los 26 campos contienen datos personales de ciudadanos, no de
+funcionarios del distrito:
+
+| Campo | Contenido |
+|---|---|
+| `nombreResponsable` | Nombre del establecimiento o persona identificada como generadora de los residuos. |
+| `direccionResponsable` | Dirección de esa misma persona/establecimiento. |
+| `telefonoActor` | Teléfono de un actor estratégico comunitario (JAC, comerciante, etc.), no necesariamente el generador. |
+
+**Regla permanente:** el seed de desarrollo (ver más abajo) NUNCA debe llevar
+valores reales en estos tres campos — solo datos ficticios, marcados como
+tales. Cuando se escriba el diccionario de datos para el acta de entrega,
+estos tres campos deben señalarse explícitamente como datos personales — es
+la respuesta a la pregunta del acta sobre si lo entregado contiene datos
+personales. El endpoint público (`GET /puntos/public/:id`, `toPublicPunto()`
+en `puntos.service.ts`) no incluye ninguno de los 26 campos nuevos — quedan
+fuera por omisión, no hace falta excluirlos a mano, pero cualquier futura
+vista "pública" nueva debe revisar esta tabla antes de exponer campos del
+punto.
+
+### Cadena de evidencia para comparendos (campos #17 a #23)
+
+`identificacionGenerador` → `tipoGenerador` → `nombreResponsable` →
+`direccionResponsable` → `observoDisposicion` → `fechaObservacion` →
+`metodoIdentificacion` forman un bloque único, no siete campos sueltos: si se
+identificó al generador, los tres siguientes lo describen; los tres últimos
+documentan CÓMO se llegó a esa conclusión (evidencia). **Quitar cualquiera de
+los siete deja a los otros seis sin sentido** — si en el futuro alguien
+propone eliminar uno por parecer redundante, debe revisar los seis restantes
+primero. Mismo comentario dejado en el código (`punto-residuo.entity.ts`,
+junto al enum `IdentificacionGenerador`).
 
 ## Pendiente de replicar
 
