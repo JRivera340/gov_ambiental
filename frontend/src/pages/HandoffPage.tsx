@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
+
+// Ruta de aterrizaje por rol tras el handoff (PLAN-MAESTRO.md HITO 2). ADMIN
+// no tiene todavía una pantalla propia armada (EnvironmentalTab.tsx existe
+// pero sin ningún contenedor que la use) -- se agrega acá el día que exista,
+// no antes: apuntar a una ruta que no existe rompería el flujo en vez de
+// arreglarlo.
+const RUTA_POR_ROL: Partial<Record<string, string>> = {
+  GESTOR_AMBIENTAL: '/gestor-ambiental/dashboard',
+  VALIDADOR_AMBIENTAL: '/validador/residuos',
+};
 
 // PLAN-MAESTRO.md HITO 0 — pantalla mínima de destino del handoff. Lee el
 // JWT del fragmento de URL (nunca llega al servidor), lo decodifica (sin
@@ -19,7 +30,8 @@ function decodeJwtPayload(token: string): { sub: string; email: string; role: st
 
 export const HandoffPage: React.FC = () => {
   const login = useAuthStore((s) => s.login);
-  const [status, setStatus] = useState<'procesando' | 'error' | 'listo'>('procesando');
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<'procesando' | 'error' | 'sin-destino'>('procesando');
   const [identity, setIdentity] = useState<{ email: string; role: string } | null>(null);
   // React.StrictMode invoca los efectos dos veces en desarrollo. La primera
   // corrida procesa el token y limpia el hash con replaceState; sin este
@@ -66,12 +78,22 @@ export const HandoffPage: React.FC = () => {
     };
 
     login(token, user);
-    setIdentity({ email: payload.email, role: payload.role });
-    setStatus('listo');
 
     // Limpia el fragmento de la URL — no debe quedar en el historial del navegador.
     history.replaceState(null, '', window.location.pathname);
-  }, [login]);
+
+    const destino = RUTA_POR_ROL[payload.role];
+    if (destino) {
+      navigate(destino, { replace: true });
+      return;
+    }
+
+    // Rol sin pantalla propia todavía (ej. ADMIN, ver PLAN-MAESTRO.md) --
+    // se queda en esta pantalla mínima con un mensaje que lo explique, en vez
+    // de navegar a una ruta que no existe.
+    setIdentity({ email: payload.email, role: payload.role });
+    setStatus('sin-destino');
+  }, [login, navigate]);
 
   if (status === 'procesando') {
     return <div style={{ padding: 40, fontFamily: 'Inter, system-ui, sans-serif' }}>Procesando sesión...</div>;
@@ -91,6 +113,10 @@ export const HandoffPage: React.FC = () => {
       <h1 style={{ fontSize: 20, fontWeight: 700 }}>Sesión iniciada</h1>
       <p style={{ marginTop: 8 }}>Usuario: <strong>{identity?.email}</strong></p>
       <p>Rol: <strong>{identity?.role}</strong></p>
+      <p style={{ color: '#666', marginTop: 16 }}>
+        Este rol todavía no tiene un panel propio en el módulo ambiental — no
+        hay ninguna pantalla a la que redirigir.
+      </p>
     </div>
   );
 };

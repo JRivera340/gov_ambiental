@@ -4,6 +4,8 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { getEnv } from './config/env';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { name, version } = require('../package.json');
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
@@ -40,6 +42,12 @@ async function bootstrap() {
       return callback(null, false);
     },
     credentials: true,
+  });
+
+  // Respuesta simple en la raíz real (fuera del prefijo /api) para quien
+  // entre por error a la URL del backend sin saber que es una API.
+  app.getHttpAdapter().get('/', (_req, res) => {
+    res.json({ service: name, version, status: 'ok' });
   });
 
   app.setGlobalPrefix('api');
