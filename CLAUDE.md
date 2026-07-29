@@ -110,7 +110,6 @@ frontend/src/
     validador/
     admin/
     public/
-  components/create-activity/
   services/lib/
   store/
 ```

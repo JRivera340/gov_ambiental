@@ -1,5 +1,5 @@
 # Extracción del módulo ambiental — estado
-Última actualización: 2026-07-28 (sesión nocturna autónoma: paridad de edición de puntos, recalculo de proceso verificado, analisis de files/survey)
+Última actualización: 2026-07-29 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva)
 
 ## Contexto
 Este repo es la extracción del módulo ambiental de gov-espacio-publico
@@ -40,8 +40,7 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 | Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | REPLICADA | — |
 | Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | REPLICADA 2026-07-29, PENDIENTE DE VERIFICAR en pantalla con seed real | Migración ya corrida contra producción (`Postgres-_hTA`); falta verificación visual con datos reales (seed) |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | REPLICADA (2026-07-28, con tests) | — |
-| Dashboard validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) | dedicado, ya portado (commit 83f72bb: tabs/filtros/paginación) | REPLICADA | — |
-| Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/residuos` | igual | REPLICADA | — |
+| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) + `/validador/residuos` | una sola vista (`ValidadorMapaDashboard.tsx`, tabs/filtros/paginación); `/validador/dashboard` es un `Navigate` a `/validador/residuos` en `App.tsx` — dos rutas, mismo componente, no dos vistas distintas | REPLICADA | — |
 | Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | REPLICADA | — |
 | Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | REPLICADA 2026-07-29 (ver corrección de integridad abajo — el montaje anterior nunca había llegado a `test`) | — |
 
@@ -186,7 +185,7 @@ Prioridad alta:
 
 Prioridad media:
 4. ~~Recalculo automático de estado de `Proceso`~~ RESUELTO — ya estaba implementado en `puntos.service.ts:154` (equivalente a `sorver.controller.ts:486-488` del hub), esta fila del documento estaba desactualizada. Verificado 2026-07-28 con 2 tests nuevos (`puntos.service.spec.ts`) que confirman que `approve()` llama a `recalculateStatus` cuando el punto tiene `processId`, y que NO lo llama cuando no lo tiene.
-5. ~~Corregir `process.service.ts` (frontend) — llama `/sorver/processes*`, backend real es `/procesos`.~~ RESUELTO 2026-07-27: `process.service.ts` y `SectorRecoleccionPanel.tsx` apuntaban al prefijo `/sorver/` del hub (2 archivos, 8 llamadas). Repuntados a `/procesos*` y `/api/sectores/*`, verificado contra los controllers reales y probado en caliente contra backend levantado (rutas responden 401 con guard, no 404).
+5. **Corregir `process.service.ts` (frontend) — llama `/sorver/processes*`, backend real es `/procesos`.** Estaba marcado RESUELTO 2026-07-27 pero **el código en `test` sigue roto** (auditoría 2026-07-29, mismo patrón que la fila ADMIN — documento actualizado sin portar el fix): `frontend/src/services/process.service.ts` (6 llamadas) sigue apuntando a `/sorver/processes*` y `frontend/src/components/SectorRecoleccionPanel.tsx` (2 llamadas) sigue apuntando a `/api/sorver/sectores/*`. El backend real está en `/procesos` (`procesos.controller.ts`, prefijo global `/api`) y `/sectores` (`sectores.controller.ts`) — ninguna de las 8 llamadas coincide, todas dan 404. `process.service.ts` no tiene ningún consumidor (código muerto, no rompe pantalla). `SectorRecoleccionPanel.tsx` SÍ tiene consumidor real: `gestor-ambiental/components/GeneralMapView.tsx` — "marcar sector como recogido" está roto en pantalla para GESTOR_AMBIENTAL hoy en `test`. Pendiente de arreglar.
 
 Prioridad baja / depende de decisión abierta:
 6. Módulo `files` (subida de acta/fotos a R2) — ver Decisiones abiertas: no implementar hasta fase 2. **Análisis 2026-07-28** (solo investigación, sin implementar):
@@ -288,43 +287,84 @@ no base vacía — ver "Pendiente de verificar" abajo). Cuando todas las
 casillas estén marcadas, el hito se cierra, aunque queden detalles menores
 sin resolver.
 
+Auditoría 2026-07-29 (código, sin navegador): para cada casilla, qué está
+confirmado por código/tests y qué sigue requiriendo verificación visual.
+
 **GESTOR_AMBIENTAL:**
-- [ ] Crea un punto llenando el formulario fijo completo (todos los campos con
-  columna propia, no solo entidad/fecha/ubicación), lo envía, y al reabrirlo
-  (vista de detalle o editar) ve exactamente lo que escribió, campo por campo
-  — sin ningún valor perdido ni distinto.
-- [ ] Agrega uno o más residuos al punto (tipo, quién dispuso, olores,
-  vectores, área, foto), y al reabrirlo cada residuo aparece completo con su
-  foto visible.
-- [ ] Tiene una ruta semanal activa con paradas, la cierra o cancela, y el
-  historial la refleja correctamente — no vuelve a aparecer como activa
-  (bug de "ruta cancelada" ya cubierto por test, pero verificar en pantalla
-  con datos reales, no solo en el test).
+- [ ] Crea un punto llenando el formulario fijo completo, lo envía, y al
+  reabrirlo ve exactamente lo que escribió, campo por campo. **CONFIRMADO POR
+  CÓDIGO**: `puntos.service.spec.ts:40` llena los 26 campos, crea, relee del
+  repositorio y confirma igualdad campo a campo (30/30 tests verdes). Los 38
+  campos del formulario real (confirmado contra la encuesta viva en
+  `Postgres-Encuestas`, ver sección "Formulario" abajo) tienen paridad 1:1 con
+  `camposPuntoAcumulacion.ts` + el sub-formulario de residuo. **Falta
+  verificación visual en pantalla** con datos reales (no solo el test).
+- [ ] Agrega uno o más residuos (tipo, quién dispuso, olores, vectores, área,
+  foto), y al reabrirlo cada residuo aparece completo con su foto visible.
+  **CONFIRMADO POR CÓDIGO** para el dato (tests de creación con
+  residuos/fotos, `puntos.service.spec.ts:168`; reemplazo de residuos,
+  `:148`). **La foto visible en pantalla no está verificada** — ningún test
+  cubre que la URL de la foto renderice una imagen real.
+- [ ] Tiene una ruta semanal activa, la cierra o cancela, y el historial la
+  refleja correctamente. **CONFIRMADO POR CÓDIGO Y TEST**
+  (`rutas-semanales`: `cancelarRuta` funciona para el dueño, rechaza para
+  terceros, resultado queda en `estado: 'cancelada'`). **Falta verificación
+  visual.**
 
 **VALIDADOR_AMBIENTAL:**
 - [ ] Ve un punto enviado por un gestor con el nombre real del creador
-  resuelto (proxy de usuarios, no un ID crudo ni "Información no disponible").
-- [ ] Aprueba un punto y el cambio de estado se refleja de inmediato en el
-  mapa/dashboard del gestor que lo creó.
-- [ ] Rechaza un punto con notas de validación, y esas notas son visibles
-  para el gestor.
+  resuelto. **CONFIRMADO POR CÓDIGO**: `ValidadorActividadPanel.tsx` llama
+  `usersService.getUserById`, proxy con cache TTL 60s y timeout de 4s contra
+  el hub (`users.service.ts`). **Falta verificación visual.**
+- [ ] Aprueba un punto y el cambio se refleja en el mapa/dashboard del gestor.
+  **CONFIRMADO POR CÓDIGO** con una precisión: `GestorAmbientalDashboard`
+  carga `GET /puntos` (TODOS los puntos del sistema, sin filtrar por
+  creador/asignación — `useGestorAmbiental.ts:118`), así que cualquier cambio
+  de estado aparece en el próximo fetch/recarga de cualquier gestor, no solo
+  el creador — no hay push en tiempo real (ni falta, es fetch-on-load como el
+  resto de la app). **Falta verificación visual.**
+- [ ] Rechaza un punto con notas de validación, visibles para el gestor.
+  **CONFIRMADO POR CÓDIGO**: `reject()` guarda `validationNotes`
+  (`puntos.service.ts:214-220`), `ActivityDetailView.tsx:331` las renderiza
+  condicionalmente. **Falta verificación visual.**
 - [ ] Marca un sector como recogido y el estado se refleja en el panel de
-  sector de recolección.
+  sector de recolección. **ROTO, no NO-VERIFICADO** — ver hallazgo en
+  "Pendiente de replicar" ítem 5: `SectorRecoleccionPanel.tsx` llama
+  `/api/sorver/sectores/marcar-recogido-masivo`, el backend real está en
+  `/api/sectores/marcar-recogido-masivo` — 404 confirmado por comparación de
+  rutas. Consumidor real: `GeneralMapView.tsx` (vista de GESTOR_AMBIENTAL).
+  Pendiente de arreglar antes de poder marcar esta casilla.
 
 **ADMIN:**
-- [ ] Ve la lista de puntos con indicadores agregados que sí reflejan datos
-  reales de los campos con columna propia (ej. cuántos puntos con cámaras,
-  distribución por tipo de zona) — no ceros ni vacíos por falta de dato.
+- [ ] Ve indicadores agregados que reflejan datos reales. **CONFIRMADO POR
+  CÓDIGO**: `IndicadoresAmbientalPanel.tsx` lee `actividades` directo (bug de
+  `operativoCategoria`/`operativoSubtipo` siempre-falso ya corregido
+  2026-07-29, ver sección de regresión arriba). **Falta verificación visual**
+  de que las cifras concretas (cámaras, tipo de zona) coincidan con los 346
+  puntos reales.
 - [ ] Asigna un punto sin gestor a un gestor específico, y la asignación se
-  refleja tanto en el panel de asignación como en el dashboard de ese gestor.
-- [ ] La lista de gestores para asignar muestra solo gestores ambientales
-  (ver fix de filtrado por dominio ya aplicado) — confirmar en pantalla con
-  datos reales, no solo con el test.
+  refleja en el panel de asignación y en el dashboard del gestor.
+  **CONFIRMADO POR CÓDIGO**: `PATCH /asignaciones/punto` existe
+  (`asignaciones.controller.ts:31`); el dashboard del gestor ya muestra TODOS
+  los puntos del sistema (ver nota arriba), así que el punto recién asignado
+  es visible sin lógica adicional. **Falta verificación visual.**
+- [ ] La lista de gestores para asignar muestra solo gestores ambientales.
+  **CONFIRMADO POR CÓDIGO**: `AsignacionPuntosPanel.tsx` obtiene gestores en
+  fetch separado (desacoplado del resto del panel, corregido 2026-07-28) y el
+  backend (`GESTOR_AMBIENTAL` → hub ya filtra) mantiene el filtro por rol.
+  **Falta verificación visual con datos reales.**
 
 **Transversal (los 3 roles):**
-- [ ] En toda vista donde aparece un usuario (creador de punto, gestor
-  asignado, validador), se ve el nombre real, no un ID ni un placeholder de
-  error — con el seed cargado, no con la base vacía.
+- [ ] Nombre real de usuario en toda vista, no ID ni placeholder de error.
+  **CONFIRMADO POR CÓDIGO** vía el proxy de usuarios con cache (ver arriba) —
+  cubre creador, gestor asignado y validador (`revisadoPorNombre` es columna
+  propia, no requiere proxy). **Falta verificación visual con el seed
+  cargado.**
+
+**Resumen:** 10 de 11 casillas confirmadas por código/tests, pendientes solo
+de verificación visual (ninguna herramienta de navegador disponible en esta
+sesión). 1 de 11 (marcar sector recogido) está ROTA — no es cuestión de
+verificar, es cuestión de arreglar el endpoint primero.
 
 ## Segunda regresión detectada y corregida 2026-07-29: `operativoSubtipo`/`operativoCategoria` siempre falsos
 
@@ -375,6 +415,88 @@ Verificado tras el arreglo: `tsc --noEmit` limpio, 128/128 tests frontend y
 residuos, 71 con al menos un campo del formulario fijo poblado — el resto
 son puntos históricos migrados del hub sin esas respuestas en
 `dynamicAnswers`).
+
+## Integridad de datos migrados (verificado 2026-07-29 contra `Postgres-_hTA`, SOLO LECTURA)
+
+Consulta directa (`SELECT`/`COUNT`, sin exportar filas) contra la base de
+producción de ambiental, autorizada explícitamente por Josh para este
+chequeo puntual.
+
+- `puntos_residuo`: **346** filas (coincide con la migración).
+- **Ninguna de las 26 columnas nuevas del formulario fijo quedó en 0** — la
+  migración mapeó las 26. Conteo de registros con valor no nulo por columna:
+
+| Columna | Poblados / 346 | Columna | Poblados / 346 |
+|---|---|---|---|
+| `frecuenciaAcumulacion` | 63 | `identificacionGenerador` | 59 |
+| `observaciones` | 112 | `tipoGenerador` | 57 |
+| `entornoEscolar` | 69 | `nombreResponsable` | 16 |
+| `nombreEntornoEscolar` | 28 | `direccionResponsable` | 15 |
+| `especificarEntorno` | 22 | `observoDisposicion` | 55 |
+| `tipoZona` | 69 | `fechaObservacion` | **1** |
+| `tipoSuelo` | 66 | `metodoIdentificacion` | 40 |
+| `condicionesZona` | 43 | `actoresEstrategicos` | 21 |
+| `poblacionHabitanteCalle` | 64 | `telefonoActor` | 14 |
+| `factoresAcumulacion` | 50 | `intervencionesRecomendadas` | 51 |
+| `camarasPunto` | 67 | | |
+| `operadorAseo` | 65 | | |
+| `recoleccionPuertaAPuerta` | 51 | | |
+| `m2Invasion` | 57 | | |
+| `actoresIndisciplina` | 54 | | |
+| `intervencionesPropuestas` | 52 | | |
+
+**Anomalía real, a investigar:** `fechaObservacion` solo tiene **1** valor no
+nulo de 346, muy por debajo de sus campos hermanos del mismo bloque de
+evidencia (`identificacionGenerador` 59, `observoDisposicion` 55,
+`metodoIdentificacion` 40). Es sospechoso de un problema de mapeo/formato en
+`migrate-from-legacy.ts` (posible fallo silencioso de parseo de fecha para
+este campo específico), no necesariamente falta de dato de origen — pendiente
+de revisar contra el hub antes de asumir que el dato de origen simplemente no
+existía.
+
+**Residuos:** 345 de 346 puntos tienen al menos un residuo embebido (mismo
+1 punto sin residuos ya documentado como caso conocido); **1087** entradas de
+residuo en total (el conteo de línea base en el hub, previo a la migración,
+era 1082 — 5 entradas más en destino que en origen, sin explicación
+documentada todavía; no es alarmante por sí solo pero debe explicarse antes
+de dar la migración por cerrada del todo — posible causa: residuos agregados
+en ambiental después de la migración, vía `AGREGAR_RESIDUO` de seguimiento,
+sobre puntos ya migrados).
+
+**Rutas y asignaciones:** `ruta_semanal` = **12** (coincide). `punto_asignacion`
+= **345** (coincide, 1 punto sin asignar, ya documentado).
+
+## Formulario: 38 preguntas vs encuesta viva (verificado 2026-07-29, SOLO LECTURA)
+
+Consulta directa a `Postgres-Encuestas` (autorizada por Josh) contra la
+encuesta real en producción (`id=65045573-d85b-48fe-aae0-2d8692c1b1e9`,
+"AMBIENTAL - Identificación de Puntos de Acumulación de Residuos") — no
+contra el seed de código, que resultó estar desactualizado (ver hallazgo
+abajo). **38 preguntas confirmadas** (33 preguntas + 5 encabezados de
+sección).
+
+**Paridad: 29/29 preguntas a nivel de punto tienen match exacto** en
+`camposPuntoAcumulacion.ts` (tipo de campo, opciones, `required`,
+`visibleIf`) — mismo nombre técnico, mismas opciones en el mismo orden,
+misma obligatoriedad, misma condicionalidad. Las 4 preguntas restantes de las
+38 (`tipoResiduo`, `percibeOlores`, `percibeVectores`, `areaLinealMetros`)
+son a nivel de residuo individual, no de punto — viven correctamente en el
+sub-formulario de residuo de `CreateActivity.tsx`, tal como documenta el
+comentario del propio archivo. **Sin pérdida de campos, sin divergencia de
+tipo/opciones/obligatoriedad/condicionalidad en ninguna de las 38.**
+
+**Hallazgo cross-repo (no es de este repo, documentado en
+`gov-espacio-publico/DEUDA-TECNICA.md` ítem 10, rama
+`docs/deuda-encuestas-seed-drift`, commiteado sin pushear):** el seed de
+código de `gov_encuestas_publico`
+(`puntosAcumulacion.questions.ts`) no reproduce la encuesta real — le faltan
+6 preguntas que sí existen en producción (`especificarEntorno`,
+`operadorAseo`, `recoleccionPuertaAPuerta`, `m2Invasion`,
+`actoresIndisciplina` a nivel de punto, `intervencionesPropuestas`) y le
+sobran 2 que ya no existen en producción (`fotos_evidencia`,
+`entidades_acompanantes`). No afecta a este repo — el formulario fijo de
+ambiental se capturó de la encuesta viva real, no del seed — pero si alguien
+reseedea esa encuesta alguna vez, perdería estructura real sin darse cuenta.
 
 ## Pendiente de verificar (sin navegador esta sesión)
 

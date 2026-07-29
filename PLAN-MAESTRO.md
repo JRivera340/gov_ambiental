@@ -1,5 +1,5 @@
 # Plan maestro — Módulo ambiental independiente
-Última actualización: 2026-07-28 (sesión nocturna autónoma: HITO 1 replicado, HITO 2 avanzado)
+Última actualización: 2026-07-29 (auditoría HITO 2: bug real en sectores/procesos, pendientes concretos por hito, checklist de entregable UAESP)
 
 ## Objetivo y criterio de terminado
 Convertir el módulo ambiental en un servicio independiente, desplegado aparte
@@ -309,7 +309,7 @@ idéntico byte a byte al hub, `cva`/`clsx`/`tailwind-merge` instalados,
   corregidos (3 clases contradictorias genuinas, 2 catch vacíos, `no-undef`
   desactivado en TS por falsos positivos). 1592 warnings quedan sin tocar
   (instrucción explícita: solo errores).
-- `scripts/check-responsive.mjs` con Playwright: REPLICADO — corrido contra
+- `frontend/scripts/check-responsive.mjs` con Playwright: REPLICADO — corrido contra
   las 7 rutas existentes de `App.tsx` en 375/768/1440px, 0 desbordamientos,
   20 capturas en `.screenshots/` (gitignored). Nota: `waitUntil: 'networkidle'`
   no sirve en esta app (mapas Leaflet no dejan de hacer requests) — se usa
@@ -361,6 +361,17 @@ trivial sin afectar lógica.
 ## HITO 2 — Paridad funcional
 
 **Objetivo:** cerrar la matriz de paridad de `ESTADO-EXTRACCION.md`.
+
+**Auditoría 2026-07-29 (código, sin navegador):** 10 de las 11 casillas de la
+definición de terminado (ver `ESTADO-EXTRACCION.md`) están confirmadas por
+código/tests, pendientes solo de verificación visual. La 11ª está ROTA, no
+solo sin verificar: `SectorRecoleccionPanel.tsx` (consumido por
+`GeneralMapView.tsx`, vista de GESTOR_AMBIENTAL) llama
+`/api/sorver/sectores/*`, el backend real está en `/api/sectores/*` — 404 en
+producción hoy. Ver `ESTADO-EXTRACCION.md`, "Pendiente de replicar" ítem 5,
+para el detalle completo. Esto también reabre la fila 5 de esa lista, que
+estaba marcada RESUELTO sin código real que lo respalde — mismo patrón que ya
+se había encontrado y corregido con la fila ADMIN.
 
 **Estado: PARCIAL, avanzado 2026-07-28.** De las tareas priorizadas por la
 sesión nocturna:
@@ -701,6 +712,60 @@ segundo revert independiente.
 
 **Decisiones abiertas de este hito:** ninguna nueva — depende de que las de
 los hitos anteriores ya estén cerradas.
+
+## Pendiente por frente (auditoría 2026-07-29, sin porcentajes ni tiempos)
+
+### HITO 2
+- Arreglar `SectorRecoleccionPanel.tsx` y `process.service.ts`: repuntar de
+  `/api/sorver/*` a `/api/sectores/*` y `/api/procesos/*` (backend real).
+  `process.service.ts` no tiene consumidor — arreglarlo o confirmar que se
+  puede borrar en vez de arreglar.
+- Investigar por qué `fechaObservacion` solo tiene 1/346 valores no nulos
+  frente a sus campos hermanos (40-59) — posible bug de parseo de fecha en
+  `migrate-from-legacy.ts`.
+- Explicar la diferencia de 5 entradas de residuo entre origen (1082, hub) y
+  destino (1087, ambiental) antes de dar la migración por cerrada.
+- Recorrido visual completo de las 11 casillas de la definición de terminado
+  (10 confirmadas por código, 1 rota) — con navegador, no solo API/código.
+- CRUD de usuarios en backend (`create/update/delete/import`) — sigue
+  pendiente, sin consumidor real hoy; solo emprender si ADMIN necesita
+  gestionar gestores/validadores desde este repo.
+- Decidir módulo `files` (fotos/actas) — bloqueado por decisión abierta.
+
+### HITO 3 (el corte real)
+- Cerrar las dos anomalías de HITO 2 (`fechaObservacion`, conteo de
+  residuos) antes de considerar la migración de ensayo como definitiva.
+- Aplanar `gestoresInvolucrados` ya está hecho estructuralmente (`uuid[]`);
+  falta decidir y documentar manejo de adjuntos (fotos/actas: mover a
+  storage propio o referenciar el del hub — decisión abierta, ver tabla).
+- Reconciliación con muestreo manual por estado (`BORRADOR`/`ENVIADA`/
+  `APROBADA`/`RECHAZADA`/`PUBLICADA`) — el muestreo de 10 al azar ya se hizo,
+  falta el muestreo estratificado por estado que pide el criterio de
+  terminado.
+- Definir momento exacto de corte de escritura (ventana de mantenimiento,
+  hub en solo-lectura) — decisión abierta, la tiene Josh.
+
+### HITO 4
+- No arranca hasta que HITO 2 y 3 estén cerrados. Nada ejecutable todavía:
+  congelar escritura del legacy, verificar HITO 3 reconciliado, reemplazar
+  entrada del sidebar, borrar `gestor-ambiental/` del hub,
+  borrar `scripts/migrate-from-legacy.ts` de este repo.
+
+### Entregable UAESP — documentos pendientes, uno por uno
+
+No existe hoy un checklist formal de qué exige el acta de entrega — lista
+inferida de lo ya mencionado en `ESTADO-EXTRACCION.md` (sección PII) y de
+qué necesitaría cualquier entrega de datos/software a una entidad. Confirmar
+con Josh/UAESP si falta algo antes de tratarla como completa.
+
+| Documento | Estado | Esfuerzo |
+|---|---|---|
+| Diccionario de datos de los 26 campos nuevos + los históricos, con las 3 columnas PII señaladas explícitamente (`nombreResponsable`, `direccionResponsable`, `telefonoActor`) | No existe todavía como documento entregable — el detalle vive disperso en `ESTADO-EXTRACCION.md` y en el código (entidad, DTO) | Medio |
+| Acta de entrega formal (documento narrativo: qué se entrega, alcance, qué no incluye) | No existe | Medio |
+| Declaración de datos personales para el acta (qué campos son PII, de quién, por qué se recolectan) | Contenido ya está en `ESTADO-EXTRACCION.md`; falta trasladarlo al formato que pida la UAESP | Bajo |
+| Reporte de integridad de la migración (conteos origen/destino, muestreo, anomalías conocidas y su explicación) | Parcial — el conteo agregado ya está (este reporte), falta el muestreo estratificado por estado y cerrar las 2 anomalías detectadas | Medio |
+| Manual de usuario por rol (GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN) | No existe | Alto |
+| Manual técnico / arquitectura para quien mantenga el sistema después | Parcialmente cubierto por `CLAUDE.md` y `PLAN-MAESTRO.md`, pero están escritos para un asistente de código, no para un lector humano no técnico de la UAESP | Medio |
 
 ## Decisiones abiertas
 
