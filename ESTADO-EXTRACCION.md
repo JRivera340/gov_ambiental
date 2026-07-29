@@ -43,7 +43,62 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 | Dashboard validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) | dedicado, ya portado (commit 83f72bb: tabs/filtros/paginación) | REPLICADA | — |
 | Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/residuos` | igual | REPLICADA | — |
 | Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | REPLICADA | — |
-| Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin`, montado 2026-07-27 | REPLICADA | — (interfaz de `EnvironmentalTab` simplificada de 17 a 12 props; ver Divergencias deliberadas) |
+| Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | REPLICADA 2026-07-29 (ver corrección de integridad abajo — el montaje anterior nunca había llegado a `test`) | — |
+
+## Corrección de integridad 2026-07-29: la fila de ADMIN estaba marcada REPLICADA sin código en esta rama
+
+Al implementar la redirección por rol tras el handoff (PLAN-MAESTRO.md HITO 2)
+se encontró que `/admin` no existía en `App.tsx` y que `EnvironmentalTab.tsx`
+no tenía **ningún consumidor** en todo el repo — contradice la fila de arriba,
+que decía REPLICADA con fecha 2026-07-27.
+
+**Causa raíz, confirmada con `git log --all`:** el commit que construyó
+`AdminDashboard.tsx`/`useAdminDashboard.ts`/la ruta `/admin` (`c30db0c`,
+2026-07-27 18:14) se hizo en la rama `version1` — nunca en `test`, y ni
+siquiera se empujó a `origin/version1` (quedó solo local). Cuatro horas
+después, el commit `9f2cb7c` en `test` copió `PLAN-MAESTRO.md`,
+`ESTADO-EXTRACCION.md` y `CLAUDE.md` completos desde `version1` ("viven donde
+ocurre el desarrollo real de cada hito", dice el mensaje del commit) — pero
+copió el TEXTO sin portar el CÓDIGO correspondiente. La matriz importada
+describía el estado real de `version1`, no el de `test`, y nadie lo notó
+porque los documentos de estado no se verifican contra el código al copiarlos
+entre ramas.
+
+**Auditoría de las demás filas introducidas por ese mismo commit** (para no
+repetir el problema de creer sin verificar):
+- **Falso, igual que ADMIN:** "interfaz de `EnvironmentalTab` simplificada de
+  17 a 12 props" — nunca se aplicó en `test`; el archivo seguía con sus 14
+  props originales (incluyendo 4 verificadas como código muerto: ninguna se
+  llama dentro del componente).
+- **Falso, y en producción ahora mismo:** los 12 archivos KMZ/KML de
+  `frontend/public/boundaries/` y el ícono `Residuos.png` de
+  `frontend/public/icons/` que el punto 8 de "Pendiente de replicar" daba por
+  `RESUELTO 2026-07-27` — las carpetas no existían en absoluto en `test`. Esto
+  significa que los polígonos de referencia (Santa Fe, UPZ, colegios, etc.) no
+  se dibujaban en NINGÚN mapa (gestor, validador, admin) y la validación
+  "¿el punto cae dentro de Santa Fe?" en `CreateActivity`/`EditActivity`
+  fallaba en silencio (atrapada por un `catch`) — un bug real, no cosmético,
+  que estuvo activo en producción sin que nadie lo notara.
+- **Cierto, verificado con contenido real:** "Dashboard validador ... ya
+  portado (commit 83f72bb)" — el hash citado (`83f72bb`) no es antecesor de
+  `test` (es cita cruzada de otra rama), pero el archivo real en `test`
+  (`ValidadorMapaDashboard.tsx`, 503 líneas) tiene el contenido completo de
+  tabs/filtros/paginación, casi idéntico a la versión de `version1` (509
+  líneas) — la funcionalidad SÍ existe, solo la referencia al commit es
+  incorrecta. No se trata como falla.
+
+**Corregido 2026-07-29:** `AdminDashboard.tsx` + `useAdminDashboard.ts`
+portados a `test` (adaptados: `EnvironmentalTabProps` de este repo sigue en
+14 props, no 12 — se le pasan valores reales a las 4 "muertas" en vez de
+recortar la interfaz, para no arriesgar una refactorización más amplia sin
+necesidad), ruta `/admin` guardada a rol ADMIN en `App.tsx`, y los 12
+archivos KMZ/KML + el ícono copiados desde `version1` a `frontend/public/`.
+`tsc`/`vitest` limpios (128/128).
+
+**Lección para el proceso:** copiar documentos de estado entre ramas sin
+portar el código que describen rompe la confiabilidad de la matriz. De ahora
+en adelante, cualquier fila marcada REPLICADA/RESUELTO debe poder verificarse
+con el código presente en la rama actual, no en otra.
 
 ## REGRESIÓN detectada 2026-07-29: 26 de 38 respuestas del formulario de creación se descartan silenciosamente
 
