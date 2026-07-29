@@ -42,82 +42,6 @@ export interface PaginatedResponse<T> {
   total: number;
 }
 
-// Tipos para datos específicos de cada subtipo de operativo
-export interface IvcEstablecimientoComercioData {
-  tipo: 'IVC_ESTABLECIMIENTO_COMERCIO';
-  establecimientosVisitados?: number;
-  sellamientos?: boolean;
-  incautaciones?: number;
-  licoresAdulterados?: number;
-  armasCortopunzantes?: number;
-  armasFuegoMunicionTraumaticas?: number;
-  personasSensibilizadas?: number;
-  menoresEdad?: number;
-  kgAproximadoPolvora?: number;
-  gramosSpa?: number;
-  personasTrasladadasCtp?: number;
-  personasCapturadas?: number;
-  vendedoresInformalesRetirados?: number;
-  vendedoresInformalesIntervenidos?: number;
-}
-
-export interface IvcParqueaderosData {
-  tipo: 'IVC_PARQUEADEROS';
-  sellamientos?: boolean;
-  vehiculosReceptados?: number;
-}
-
-export interface IvcPagadiariosData {
-  tipo: 'IVC_PAGADIARIOS';
-  establecimientosVisitados?: number;
-  sellamientos?: boolean;
-  incautaciones?: number;
-  armasCortopunzantes?: number;
-  armasFuegoMunicionTraumaticas?: number;
-  personasSensibilizadas?: number;
-  menoresEdad?: number;
-  kgAproximadoPolvora?: number;
-  gramosSpa?: number;
-  personasTrasladadasCtp?: number;
-  personasCapturadas?: number;
-  vendedoresInformalesRetirados?: number;
-  vendedoresInformalesIntervenidos?: number;
-}
-
-export interface EspacioPublico1801Data {
-  tipo: 'ESPACIO_PUBLICO_1801';
-  estructurasNoConvencionales?: number;
-  cambuches?: number;
-  cachivacherosIntervenidos?: number;
-  comparendos?: number;
-  trasladadosCtp?: number;
-  capturados?: number;
-  armasCortopunzantes?: number;
-  armasFuego?: number;
-  personasSensibilizadas?: number;
-  kgMercanciaIncautada?: number;
-  pipetasIncautadas?: number;
-  bicicletasRecuperadas?: number;
-  celularesRecuperados?: number;
-  carretasIncautadas?: number;
-  mendicidad?: number;
-  vendedoresInformalesRetirados?: number;
-  vendedoresInformalesIntervenidos?: number;
-  m2RecuperadosEspacioPublico?: number;
-}
-
-export interface AmbientalData {
-  tipo: 'AMBIENTAL';
-  puntosCriticosEmergentesAtendidos?: number;
-  comparendosPedagogicos?: number;
-  comparendos?: number;
-  personasSensibilizadas?: number;
-  huertas?: number;
-  m3RecuperadosAproximados?: number;
-  kgMaterialResiduosRecolectados?: number;
-  m2RecuperadosEspacioPublico?: number;
-}
-
 export interface ResiduoNota {
   id: string;
   fecha: string;
@@ -148,28 +72,6 @@ export interface ResiduoEntry {
   aprobadoAt?: string;
   notas?: ResiduoNota[];
 }
-
-export interface AmbientalPuntosAcumulacionData {
-  tipo: 'AMBIENTAL_PUNTOS_ACUMULACION';
-  // Legacy flat fields (backwards compat)
-  quienDispuso?: string;
-  tipoResiduo?: string;
-  percibeOlores?: boolean;
-  percibeVectores?: boolean;
-  volumenEstimadoM3?: number;
-  areaLinealMetros?: number;
-  observaciones?: string;
-  // New multi-residuo array
-  residuos?: ResiduoEntry[];
-}
-
-export type OperativoData =
-  | IvcEstablecimientoComercioData
-  | IvcParqueaderosData
-  | IvcPagadiariosData
-  | EspacioPublico1801Data
-  | AmbientalData
-  | AmbientalPuntosAcumulacionData;
 
 export interface User {
   id: string;
@@ -232,7 +134,6 @@ export interface Activity {
   operativoCategoria: OperativoCategoria;
   operativoSubtipo: OperativoSubtipo;
   isNightShift?: boolean;
-  operativoData?: OperativoData;
 
   // Operativo en grupo
   isGroupOperativo?: boolean;
@@ -331,7 +232,6 @@ export interface CreateActivityDTO {
   operativoCategoria: OperativoCategoria;
   operativoSubtipo: OperativoSubtipo;
   isNightShift?: boolean;
-  operativoData?: OperativoData;
   // Operativo en grupo
   isGroupOperativo?: boolean;
   gestoresInvolucradosIds?: string[];
