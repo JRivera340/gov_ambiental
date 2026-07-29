@@ -362,16 +362,19 @@ trivial sin afectar lógica.
 
 **Objetivo:** cerrar la matriz de paridad de `ESTADO-EXTRACCION.md`.
 
-**Auditoría 2026-07-29 (código, sin navegador):** 10 de las 11 casillas de la
+**Auditoría 2026-07-29 (código, sin navegador):** las 11 casillas de la
 definición de terminado (ver `ESTADO-EXTRACCION.md`) están confirmadas por
-código/tests, pendientes solo de verificación visual. La 11ª está ROTA, no
-solo sin verificar: `SectorRecoleccionPanel.tsx` (consumido por
-`GeneralMapView.tsx`, vista de GESTOR_AMBIENTAL) llama
-`/api/sorver/sectores/*`, el backend real está en `/api/sectores/*` — 404 en
-producción hoy. Ver `ESTADO-EXTRACCION.md`, "Pendiente de replicar" ítem 5,
-para el detalle completo. Esto también reabre la fila 5 de esa lista, que
-estaba marcada RESUELTO sin código real que lo respalde — mismo patrón que ya
-se había encontrado y corregido con la fila ADMIN.
+código/tests, pendientes solo de verificación visual. Una de ellas ("marcar
+sector recogido") estaba ROTA, no solo sin verificar —
+`SectorRecoleccionPanel.tsx`/`process.service.ts` seguían apuntando a
+`/api/sorver/*` pese a estar documentados como RESUELTO 2026-07-27 — y se
+arregló el mismo día. **Causa raíz de por qué pasó dos veces (fila ADMIN y
+esta) investigada y documentada en `ESTADO-EXTRACCION.md`, sección "Causa
+raíz confirmada 2026-07-29"**: 9 commits de esos 3 días se hicieron en
+`version1` en vez de `test` y nunca se pushearon a ningún lado; solo el TEXTO
+de los documentos de estado cruzó a `test`, nunca el código. No es un
+problema de Git perdiendo commits — es no haber verificado la rama activa
+durante 3 días.
 
 **Estado: PARCIAL, avanzado 2026-07-28.** De las tareas priorizadas por la
 sesión nocturna:
@@ -716,17 +719,21 @@ los hitos anteriores ya estén cerradas.
 ## Pendiente por frente (auditoría 2026-07-29, sin porcentajes ni tiempos)
 
 ### HITO 2
-- Arreglar `SectorRecoleccionPanel.tsx` y `process.service.ts`: repuntar de
-  `/api/sorver/*` a `/api/sectores/*` y `/api/procesos/*` (backend real).
-  `process.service.ts` no tiene consumidor — arreglarlo o confirmar que se
-  puede borrar en vez de arreglar.
-- Investigar por qué `fechaObservacion` solo tiene 1/346 valores no nulos
-  frente a sus campos hermanos (40-59) — posible bug de parseo de fecha en
-  `migrate-from-legacy.ts`.
-- Explicar la diferencia de 5 entradas de residuo entre origen (1082, hub) y
-  destino (1087, ambiental) antes de dar la migración por cerrada.
+- ~~Arreglar `SectorRecoleccionPanel.tsx` y `process.service.ts`~~ RESUELTO
+  2026-07-29, ver `ESTADO-EXTRACCION.md`. `process.service.ts` sigue sin
+  consumidor real — confirmar si se puede borrar en vez de mantenerlo.
+- ~~Investigar por qué `fechaObservacion` solo tiene 1/346 valores no
+  nulos~~ INVESTIGADO 2026-07-29: no es bug — el hub mismo solo tiene 1
+  valor no vacío para esa pregunta en todo el dataset ambiental. Ver
+  `ESTADO-EXTRACCION.md`.
+- ~~Explicar la diferencia de 5 entradas de residuo entre origen y
+  destino~~ EXPLICADO 2026-07-29: no hay diferencia real — comparación punto
+  por punto confirma 346/346 y 1087/1087 idénticos entre hub y ambiental hoy.
+  El "1082" era una foto vieja del hub tomada un día antes (el hub sigue
+  siendo el sistema en producción y siguió recibiendo residuos nuevos). Ver
+  `ESTADO-EXTRACCION.md`.
 - Recorrido visual completo de las 11 casillas de la definición de terminado
-  (10 confirmadas por código, 1 rota) — con navegador, no solo API/código.
+  (todas confirmadas por código) — con navegador, no solo API/código.
 - CRUD de usuarios en backend (`create/update/delete/import`) — sigue
   pendiente, sin consumidor real hoy; solo emprender si ADMIN necesita
   gestionar gestores/validadores desde este repo.

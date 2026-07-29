@@ -1,5 +1,5 @@
 # Extracción del módulo ambiental — estado
-Última actualización: 2026-07-29 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva)
+Última actualización: 2026-07-29 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva, causa raíz del patrón "resuelto en docs / roto en código", fix real de rutas /sorver/*, cierre de 2 anomalías de migración)
 
 ## Contexto
 Este repo es la extracción del módulo ambiental de gov-espacio-publico
@@ -99,6 +99,56 @@ portar el código que describen rompe la confiabilidad de la matriz. De ahora
 en adelante, cualquier fila marcada REPLICADA/RESUELTO debe poder verificarse
 con el código presente en la rama actual, no en otra.
 
+## Causa raíz confirmada 2026-07-29: por qué "resuelto en docs" y "código real" divergieron dos veces
+
+La fila ADMIN (arriba) y el hallazgo de `process.service.ts`/
+`SectorRecoleccionPanel.tsx` (ver "Pendiente de replicar" ítem 5) son el
+mismo problema, no dos. Investigado con `git reflog`, `git log --all` y
+comparación local vs `origin` (sin destruir nada, solo lectura de historial):
+
+- La rama local `test` se creó desde `origin/test` recién el **2026-07-27
+  21:10:43**. Desde el **2026-07-24 16:52** hasta ese momento — casi 3 días
+  — el checkout estuvo parado en `version1`, incluidas las sesiones que
+  creían estar avanzando el HITO 2 de `test`.
+- En esos 3 días se hicieron 9 commits en `version1` que en realidad eran
+  trabajo de `test`: creación de `ESTADO-EXTRACCION.md` (`76b0826`), creación
+  de `PLAN-MAESTRO.md` (`ab7ccb2`), el fix de rutas `/sorver/*` → `/procesos`
+  y `/sectores` (`f6b6dcf`), el montaje de `AdminDashboard` (`c30db0c`), los
+  assets KMZ (`acf1feb`), entre otros. **Ninguno de los 9 llegó nunca a
+  `origin`** — ni a `origin/test` (obvio, no estaban en esa rama) ni siquiera
+  a `origin/version1` (confirmado: `origin/version1` seguía en `83f72bb`, sin
+  moverse). No es un problema de push que se cuelga y se pierde — nunca se
+  intentó pushear, se quedaron 100% locales.
+- Cuando por fin se hizo checkout a `test` (`32894c7`, historia idéntica a
+  `origin/main` de 3 días atrás), el primer commit ahí (`9f2cb7c`) mezcló una
+  feature real (handoff) con una copia de archivo completo de los 3 `.md` de
+  estado desde `version1` — el texto que describía los 9 commits como hechos
+  viajó, el código no.
+- Confirmado que NO hay pérdida de trabajo por Git Credential Manager
+  colgándose en push: `test` local y `origin/test` están (y estuvieron
+  siempre) sincronizados sin divergencia — cero commits de diferencia en
+  ambas direcciones en todo momento verificable por `reflog`. Tampoco hay
+  worktrees involucrados (`git worktree list` solo muestra el único checkout
+  activo).
+
+**Causa raíz real: no fue una falla de Git, fue no verificar en qué rama se
+estaba parado durante 3 días, combinada con copiar documentos de estado como
+archivo completo en vez de portar los commits que describen.**
+
+**Cambio de proceso para que no se repita:**
+1. Verificar `git branch --show-current` al empezar cualquier sesión de
+   trabajo, no solo antes de tocar auth (la única excepción que ya
+   mencionaba `CLAUDE.md`).
+2. Nunca copiar `PLAN-MAESTRO.md`/`ESTADO-EXTRACCION.md`/`CLAUDE.md` completos
+   entre ramas. Si hace falta traer el ESTADO de una rama a otra, se
+   cherry-pickean o rehacen los COMMITS de código primero, se verifican en la
+   rama destino (tests, `tsc`, prueba en caliente), y solo entonces se
+   actualizan los documentos para describir lo que YA está confirmado en esa
+   rama.
+3. Ninguna fila de la matriz pasa a REPLICADA/RESUELTO sin una cita
+   verificable (archivo:línea o comando ejecutado) al momento de escribirla
+   — no basta con que "ya se hizo en algún lado".
+
 ## REGRESIÓN detectada 2026-07-29: 26 de 38 respuestas del formulario de creación se descartan silenciosamente
 
 Al convertir el formulario dinámico de "Crear punto" a formulario fijo (ver
@@ -185,7 +235,7 @@ Prioridad alta:
 
 Prioridad media:
 4. ~~Recalculo automático de estado de `Proceso`~~ RESUELTO — ya estaba implementado en `puntos.service.ts:154` (equivalente a `sorver.controller.ts:486-488` del hub), esta fila del documento estaba desactualizada. Verificado 2026-07-28 con 2 tests nuevos (`puntos.service.spec.ts`) que confirman que `approve()` llama a `recalculateStatus` cuando el punto tiene `processId`, y que NO lo llama cuando no lo tiene.
-5. **Corregir `process.service.ts` (frontend) — llama `/sorver/processes*`, backend real es `/procesos`.** Estaba marcado RESUELTO 2026-07-27 pero **el código en `test` sigue roto** (auditoría 2026-07-29, mismo patrón que la fila ADMIN — documento actualizado sin portar el fix): `frontend/src/services/process.service.ts` (6 llamadas) sigue apuntando a `/sorver/processes*` y `frontend/src/components/SectorRecoleccionPanel.tsx` (2 llamadas) sigue apuntando a `/api/sorver/sectores/*`. El backend real está en `/procesos` (`procesos.controller.ts`, prefijo global `/api`) y `/sectores` (`sectores.controller.ts`) — ninguna de las 8 llamadas coincide, todas dan 404. `process.service.ts` no tiene ningún consumidor (código muerto, no rompe pantalla). `SectorRecoleccionPanel.tsx` SÍ tiene consumidor real: `gestor-ambiental/components/GeneralMapView.tsx` — "marcar sector como recogido" está roto en pantalla para GESTOR_AMBIENTAL hoy en `test`. Pendiente de arreglar.
+5. ~~Corregir `process.service.ts` (frontend) — llama `/sorver/processes*`, backend real es `/procesos`.~~ **RESUELTO DE VERDAD 2026-07-29** (había sido marcado RESUELTO el 2026-07-27 sin que el código real llegara a `test` — mismo patrón que la fila ADMIN, causa raíz documentada arriba: commits `f6b6dcf`/`c30db0c` se hicieron en `version1`, nunca en `test`, ni siquiera se pushearon a `origin/version1`). `frontend/src/services/process.service.ts` (6 llamadas, sin consumidor real) y `frontend/src/components/SectorRecoleccionPanel.tsx` (2 llamadas, consumidor real: `gestor-ambiental/components/GeneralMapView.tsx`) repunteados a `/procesos*` y `/api/sectores/*`. Verificado contra el backend real desplegado: `GET /api/sectores/puntos` → 401 (guard, ruta existe) donde antes daba 404 con el prefijo `/sorver/`. `tsc`/`jest` (76/76)/`vitest` (128/128) verdes.
 
 Prioridad baja / depende de decisión abierta:
 6. Módulo `files` (subida de acta/fotos a R2) — ver Decisiones abiertas: no implementar hasta fase 2. **Análisis 2026-07-28** (solo investigación, sin implementar):
@@ -328,12 +378,11 @@ confirmado por código/tests y qué sigue requiriendo verificación visual.
   (`puntos.service.ts:214-220`), `ActivityDetailView.tsx:331` las renderiza
   condicionalmente. **Falta verificación visual.**
 - [ ] Marca un sector como recogido y el estado se refleja en el panel de
-  sector de recolección. **ROTO, no NO-VERIFICADO** — ver hallazgo en
-  "Pendiente de replicar" ítem 5: `SectorRecoleccionPanel.tsx` llama
-  `/api/sorver/sectores/marcar-recogido-masivo`, el backend real está en
-  `/api/sectores/marcar-recogido-masivo` — 404 confirmado por comparación de
-  rutas. Consumidor real: `GeneralMapView.tsx` (vista de GESTOR_AMBIENTAL).
-  Pendiente de arreglar antes de poder marcar esta casilla.
+  sector de recolección. **CONFIRMADO POR CÓDIGO 2026-07-29** — estaba roto
+  (404, ver "Pendiente de replicar" ítem 5 para la causa raíz completa),
+  arreglado el mismo día y verificado contra el backend real desplegado
+  (`GET /api/sectores/puntos` → 401, ya no 404). **Falta verificación
+  visual.**
 
 **ADMIN:**
 - [ ] Ve indicadores agregados que reflejan datos reales. **CONFIRMADO POR
@@ -361,10 +410,10 @@ confirmado por código/tests y qué sigue requiriendo verificación visual.
   propia, no requiere proxy). **Falta verificación visual con el seed
   cargado.**
 
-**Resumen:** 10 de 11 casillas confirmadas por código/tests, pendientes solo
-de verificación visual (ninguna herramienta de navegador disponible en esta
-sesión). 1 de 11 (marcar sector recogido) está ROTA — no es cuestión de
-verificar, es cuestión de arreglar el endpoint primero.
+**Resumen:** 11 de 11 casillas confirmadas por código/tests (la de "marcar
+sector recogido" estaba rota y se arregló el mismo día, ver arriba),
+pendientes solo de verificación visual — ninguna herramienta de navegador
+disponible en esta sesión.
 
 ## Segunda regresión detectada y corregida 2026-07-29: `operativoSubtipo`/`operativoCategoria` siempre falsos
 
@@ -445,23 +494,24 @@ chequeo puntual.
 | `actoresIndisciplina` | 54 | | |
 | `intervencionesPropuestas` | 52 | | |
 
-**Anomalía real, a investigar:** `fechaObservacion` solo tiene **1** valor no
-nulo de 346, muy por debajo de sus campos hermanos del mismo bloque de
-evidencia (`identificacionGenerador` 59, `observoDisposicion` 55,
-`metodoIdentificacion` 40). Es sospechoso de un problema de mapeo/formato en
-`migrate-from-legacy.ts` (posible fallo silencioso de parseo de fecha para
-este campo específico), no necesariamente falta de dato de origen — pendiente
-de revisar contra el hub antes de asumir que el dato de origen simplemente no
-existía.
+**`fechaObservacion` investigado 2026-07-29 — NO es bug de migración.**
+Consulta SOLO LECTURA contra el hub (solo la clave `fechaObservacion` de
+`dynamicAnswers`, nunca el objeto completo — sin exponer PII): el hub mismo
+tiene exactamente **1** actividad `AMBIENTAL` con esa clave no vacía, valor
+`"2026-07-15T10:40"` (formato válido, se parsea sin problema). La migración
+migró correctamente el único valor que existe en el origen — el dato
+simplemente casi nunca se llenó al registrar el punto en el hub. No requiere
+arreglo de código ni re-migración.
 
-**Residuos:** 345 de 346 puntos tienen al menos un residuo embebido (mismo
-1 punto sin residuos ya documentado como caso conocido); **1087** entradas de
-residuo en total (el conteo de línea base en el hub, previo a la migración,
-era 1082 — 5 entradas más en destino que en origen, sin explicación
-documentada todavía; no es alarmante por sí solo pero debe explicarse antes
-de dar la migración por cerrada del todo — posible causa: residuos agregados
-en ambiental después de la migración, vía `AGREGAR_RESIDUO` de seguimiento,
-sobre puntos ya migrados).
+**Residuos: 1087 en ambiental, coincide exacto con el hub HOY.** Comparación
+punto por punto (por `id`, solo conteo de residuos, nunca contenido —
+`jsonb_array_length`, sin exponer datos de residuo): **346/346 puntos
+coinciden, 0 huérfanos, 0 puntos con conteo distinto, suma total idéntica
+(1087 = 1087) en ambos lados.** El "1082" de la línea base de HITO 3 (más
+abajo) fue una foto fija tomada el 2026-07-28 — el hub sigue siendo el
+sistema productivo en uso y ganó 5 residuos nuevos en el día siguiente por
+actividad real de gestores, no por duplicación ni por restos de la corrida
+parcial que se borró. La migración de residuos está limpia y al día.
 
 **Rutas y asignaciones:** `ruta_semanal` = **12** (coincide). `punto_asignacion`
 = **345** (coincide, 1 punto sin asignar, ya documentado).
