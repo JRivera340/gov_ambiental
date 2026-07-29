@@ -271,26 +271,78 @@ sin resolver.
   asignado, validador), se ve el nombre real, no un ID ni un placeholder de
   error — con el seed cargado, no con la base vacía.
 
-## Pendiente de verificar (base estuvo vacía hasta ahora)
+## Segunda regresión detectada y corregida 2026-07-29: `operativoSubtipo`/`operativoCategoria` siempre falsos
 
-Todo lo marcado como REPLICADA en la matriz de paridad de arriba se verificó
-leyendo código y, cuando mucho, con una o dos filas de prueba manual — nunca
-con un conjunto de datos realista. El bug de `operativoData`/`getResiduos()`
-(ver PLAN-MAESTRO.md) sobrevivió sin detectarse exactamente por esta razón:
-nunca hubo residuos reales en pantalla para notar que la lista siempre
-aparecía vacía. Hasta que se cargue el seed de desarrollo (ver
-PLAN-MAESTRO.md) y se recorran las vistas de los 3 roles con datos reales,
-las siguientes filas quedan **PENDIENTE DE VERIFICAR**, no confirmadas:
+Con datos reales ya migrados desde el hub (346 puntos), se auditaron las
+vistas de los 3 roles usando tokens JWT reales contra `ambiental-backend`
+en producción (sin navegador disponible esta sesión — auditoría a nivel de
+API + lectura de código, no captura de pantalla). Se encontró que
+`activity.operativoSubtipo`/`operativoCategoria` son campos que **nunca
+existen** en este backend (son residuo del tipo `Activity` del hub, copiado
+sin querer al frontend de ambiental) — cualquier código que los lee está
+comparando contra `undefined` y siempre toma la rama falsa. Se encontraron
+15 archivos con este patrón. Se corrigieron los 12 que causaban una sección
+vacía o rota en pantalla; se dejaron 3 sin tocar por ser inofensivos.
 
-- Mapa general gestor, planificador de ruta / ruta activa / segmento /
-  historial, dashboard validador, mapa de residuos validador, admin —
-  asignación de puntos + indicadores.
+**Corregidos (comportamiento estaba siempre vacío/roto, ahora correcto):**
+`gestor-ambiental/lib/residuos.ts` (getResiduos/isPuntoEmergencia/isPuntoRecogido),
+`admin/utils/adminHelpers.ts` (getCategoryIcon, getPuntoCriticoTier,
+getAllLocations), `gestor-ambiental/components/ActivityDetailView.tsx`
+(botón "Actualizar punto" bloqueado para TODOS los gestores, bloque de
+"Información del Punto" siempre oculto, ícono de marcador),
+`gestor-ambiental/hooks/useGestorAmbiental.ts` (8 gates distintos — entre
+ellos el filtro de la lista lateral por defecto, que **siempre daba
+vacía**, y el filtro Recogidos/Pendientes, que nunca filtraba nada),
+`gestor-ambiental/components/ActivitySidebar.tsx` y `GeneralMapView.tsx`
+(marcadores de punto crítico), `gestor-ambiental/components/
+PerfilGestorView.tsx` (estadísticas del perfil siempre en cero),
+`admin/tabs/environmental/IndicadoresAmbientalPanel.tsx` (indicadores del
+panel admin siempre en cero — el síntoma que el usuario pidió verificar
+explícitamente), `gestor-ambiental/hooks/useActividadesCalor.ts` (lista de
+"actividades en calor" y auto-marcado de ordinarios), `gestor-ambiental/
+hooks/useRutaAmbiental.ts` (candidatos del planificador de ruta siempre
+vacíos).
 
-Confirmadas independientemente del seed (verificación reciente con
-datos/flujo real, no solo código): edición de punto (con tests dedicados),
-esquema de base de datos (migraciones corridas contra producción), proxy de
-usuarios (probado contra el hub real con tokens reales), handoff (probado
-de punta a punta contra los subdominios reales).
+**Dejados sin tocar (no rompen nada visible, documentados por si alguien
+los revisita):**
+- `ValidadorMapaDashboard.tsx` — envía `operativoCategoria`/`operativoSubtipo`
+  como query params a `activityService.getAll()`; el controller
+  (`puntos.controller.ts`) solo lee `desde`/`hasta`, los ignora.
+- `PublicPuntoPage.tsx` — campo de tipo `operativoSubtipo: string | null`
+  declarado pero nunca leído.
+- `operativoSubtiposCatalog.ts` / `utils/activityLabels.ts` /
+  `ClickableMarker.tsx` — `getActivityTipoLabel()` cae a
+  `activity.activityType` (tampoco existe) y siempre da `''` en el label
+  del popup del mapa; gap cosmético menor, no solicitado explícitamente.
+
+Verificado tras el arreglo: `tsc --noEmit` limpio, 128/128 tests frontend y
+76/76 tests backend en verde, y contra producción real (346 puntos, 345 con
+residuos, 71 con al menos un campo del formulario fijo poblado — el resto
+son puntos históricos migrados del hub sin esas respuestas en
+`dynamicAnswers`).
+
+## Pendiente de verificar (sin navegador esta sesión)
+
+Lo anterior confirma, a nivel de código + API, que los tres síntomas que
+el usuario pidió revisar ya no deberían darse: las respuestas migradas SÍ
+llegan al frontend (antes el gate las ocultaba), los residuos SÍ deberían
+aparecer en listas/mapa (antes las listas base ya venían vacías por el
+mismo bug), y los indicadores del panel admin SÍ deberían mostrar cifras
+(antes el filtro los vaciaba). **No se verificó por captura de pantalla en
+navegador real** — no hay herramienta de navegador disponible esta sesión.
+Queda como pendiente de verificación visual explícita antes de marcar
+cerradas las casillas de "Definición de terminado del HITO 2" de arriba:
+
+- Mapa general gestor, lista lateral de puntos críticos, planificador de
+  ruta / ruta activa / segmento / historial, dashboard validador, mapa de
+  residuos validador, panel admin de indicadores + asignación de puntos.
+
+Confirmadas independientemente (verificación reciente con datos/flujo
+real, no solo código): edición de punto (con tests dedicados), esquema de
+base de datos (migraciones corridas contra producción), proxy de usuarios
+(probado contra el hub real con tokens reales), handoff (probado de punta
+a punta contra los subdominios reales), lectura de datos migrados vía API
+con tokens reales de los 3 roles.
 
 ## Decisiones abiertas
 
