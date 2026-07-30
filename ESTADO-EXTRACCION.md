@@ -1,5 +1,5 @@
 # Extracción del módulo ambiental — estado
-Última actualización: 2026-07-29 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva, causa raíz del patrón "resuelto en docs / roto en código", fix real de rutas /sorver/*, cierre de 2 anomalías de migración)
+Última actualización: 2026-07-30 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva, causa raíz del patrón "resuelto en docs / roto en código", fix real de rutas /sorver/*, cierre de 2 anomalías de migración, verificación fila ADMIN + porte de vistas restantes fase 2)
 
 ## Contexto
 Este repo es la extracción del módulo ambiental de gov-espacio-publico
@@ -53,7 +53,7 @@ se hizo con ADMIN.
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | PENDIENTE DE VERIFICACIÓN VISUAL | El permiso backend está probado con tests; la pantalla no se comparó |
 | Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) + `/validador/residuos` | una sola vista (`ValidadorMapaDashboard.tsx`, tabs/filtros/paginación); `/validador/dashboard` es un `Navigate` a `/validador/residuos` en `App.tsx` — dos rutas, mismo componente, no dos vistas distintas | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
 | Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
-| Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | **PARCIAL — recorrido visual 2026-07-29, ver "Auditoría visual de ADMIN" abajo** | Encabezado, panel de filtros globales, sidebar de lista de residuos, filtro de mapa completo, "Ver detalle" roto, 2 bugs de cálculo — detalle completo abajo |
+| Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | **RESUELTO 2026-07-30 — verificado contra código real, ver nota abajo** | Nada pendiente de esta lista; queda solo verificación visual en navegador |
 
 ## Auditoría visual de ADMIN 2026-07-29: componente existe, pantalla no coincide
 
@@ -93,11 +93,24 @@ filtros:** en el hub ese selector lista IVC/Espacio Público/Ambiental/PYBA/
 Deportes. Acá debe listar solo lo ambiental — no replicar los otros 4
 dominios.
 
-**Pendiente de implementar (aprobado por Josh, no implementado todavía —
-requiere el panel de filtros + sidebar + fix de rutas + fix de 2 métricas):**
-encabezado institucional, panel de filtros globales completo, sidebar de
-lista de residuos completo, separar filtros de mapa, arreglar "Ver detalle",
-arreglar "Ident."/"Val".
+**Corregido — verificado 2026-07-30 contra el código real de `test` (no contra
+este documento, que había quedado desactualizado el mismo día que se generó
+esta lista):** todo lo listado arriba como pendiente ya estaba implementado
+antes de esta sesión — quedó sin reflejar en este documento. Evidencia
+puntual: encabezado institucional en `pages/admin/AdminDashboard.tsx:19-46`
+(degradado rojo, logo, "Sistema de Seguimiento Territorial · Panel de
+Administración"); panel de Filtros Globales completo en el mismo archivo
+líneas 48-143 (Estado/Tipo/Barrio/Mes/Desde-Hasta + Limpiar/Aplicar, atado a
+`useAdminDashboard.ts`); sidebar "Lista de Residuos" completo en líneas
+145-200 (contador real, buscador #, filtro Barrio, tabs Recogidos/
+Pendientes, lista con #/barrio/fecha/"Ver detalle"); ruta
+`/admin/actividad/:id` existe en `App.tsx:95-96` → `AdminActivityDetailPage`
+(heredado del port de la vista de detalle compartida, commit `abeb67d`) —
+"Ver detalle" ya no rompe; `useAdminDashboard.ts:39` cuenta puntos
+(`status === 'PUBLICADA'`) para "Ident.", no entradas de residuo, y línea 73
+cuenta `ENVIADA || APROBADA` para "Val." — los 2 bugs de cálculo ya no
+existen. `tsc --noEmit` y la suite completa (76/76 backend, 158/158
+frontend) verdes al momento de esta verificación.
 
 ## Corrección de integridad 2026-07-29: la fila de ADMIN estaba marcada REPLICADA sin código en esta rama
 
