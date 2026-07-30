@@ -8,6 +8,12 @@ import type { LoginDTO, LoginResponse, User } from '../types';
 const TOKEN_KEY = 'gov_auth_token';
 const USER_KEY = 'gov_auth_user';
 
+// login() no tiene consumidor en esta rama (test/main/production usan JWT
+// del hub vía /handoff, ver CLAUDE.md sección 0 — no hay LoginPage acá).
+// Confirmado 2026-07-29: SÍ tiene consumidor real en `version1`
+// (`pages/LoginPage.tsx` + backend propio `POST /auth/login`, la excepción
+// de auth documentada porque esa rama es el entregable standalone a la
+// UAESP). Se deja el método sin usar en esta rama a propósito, no se borra.
 export const authService = {
   async login(credentials: LoginDTO): Promise<LoginResponse> {
     // Reintenta solo ante errores transitorios del backend (cold-start/502/503/504/red),

@@ -301,6 +301,46 @@ Prioridad baja / depende de decisión abierta:
 7. `bulk-delete` de puntos — ver Decisiones abiertas: no replicar hasta confirmar uso real.
 8. ~~Assets KMZ de capas institucionales faltantes~~ RESUELTO 2026-07-27: ninguno de los archivos que `boundaryValidation.ts`, `BoundaryLayer.tsx`, `BarriosLayer.tsx`, `RecoleccionSectorLayer.tsx`/`useSectoresAmbiental.ts`, `GeneralMapView.tsx`, `ActivityDetailView.tsx` y `EnvironmentalTab.tsx` referencian existía en `frontend/public/` de este repo — carpetas `boundaries/` e `icons/` no existían. El código es idéntico al hub (diff vacío en `boundaryValidation.ts`); el problema era 100% de assets estáticos faltantes, con un único root-cause afectando MÚLTIPLES consumidores a la vez: la validación de "¿el punto cae dentro de Santa Fe/el barrio?" en `CreateActivity`/`EditActivity` fallaba en silencio (catch), y los mapas de gestor/validador/admin no mostraban ningún polígono de referencia. Copiados desde el hub (solo lectura ahí): 12 archivos KMZ/KML en `boundaries/` (`KMZ_Sectores_Catastrales_SF_2026.kmz`, `doc.kml`, `Carrera7.kmz`, `Capa_Colegios.kmz`, `Cestas (1).kmz`, `Vias_FalloSV_LaCapuchina.kmz`, `Vias_FalloSV_SantaInes.kmz`, `PropiedadHorizontal (1).kmz`, `UPZ_SantaFe.kmz`, `Capa_Cambuches.kmz`, `Capa_Bodegas.kmz`, `RecoleccionUrbana.kmz`) y `Residuos.png` en `icons/` (usado por `createPuntoCriticoIcon` en `gestor-ambiental/lib/icons.ts`, roto por la misma razón — mismo bug que ya se había corregido en `adminHelpers.ts` reemplazando por SVG inline, pero ahí no se tocó código, solo se trajo el asset real). Verificado sirviendo con el frontend levantado (`200` en los 5 archivos probados). Ninguno de estos 8+1 layers institucionales es exclusivo de ambiental (confirmado en el hub, son transversales) — se trajeron tal cual porque son datos de referencia geográfica, no código de dominio.
 
+## Familia de bugs "ruta referenciada que no existe" — CERRADA 2026-07-30
+
+Apareció 4 veces en sesiones distintas (fila ADMIN, `/api/sorver/sectores`,
+`/api/procesos`, `/validador/actividad/:id`) antes de auditarla
+sistemáticamente. Auditoría completa 2026-07-30, frontend y backend:
+
+**Frontend — toda referencia interna (`navigate()`, `<a href>`, `window.open`)
+contra `App.tsx`:** 0 rutas rotas. Últimas 2 cerradas esta sesión:
+- `/dashboard` en `CreateActivity.tsx` (líneas 432/447 — justo después de
+  crear un punto y en el botón "volver", la acción más frecuente del rol más
+  usado) → corregido a `/gestor-ambiental/dashboard`, verificado contra el
+  destino real del hub (`dashboardPath` en su `CreateActivity.tsx`, mismo
+  valor para `GESTOR_AMBIENTAL`).
+- `/validador/actividad/:id` (`ValidadorActividadPanel.tsx`,
+  `ValidadorMapaDashboard.tsx`) → página nueva, ver más abajo.
+
+**Backend — toda llamada de `frontend/src/services/*.ts` contra los
+controllers de `src/*/*.controller.ts`:** 0 endpoints rotos. Las 2 únicas
+llamadas sin backend real son conocidas y no son bugs:
+- `/files/acta`, `/files/photos`, `/files/:key` — módulo no implementado a
+  propósito (decisión abierta, ver tabla al final de este documento).
+- `/auth/login` — `authService.login()` sin consumidor en `test`/`main`/
+  `production` (no hay `LoginPage` acá, la sesión llega por `/handoff`), pero
+  **sí tiene consumidor real en `version1`** (`LoginPage.tsx` +
+  `POST /auth/login` propio, confirmado 2026-07-29) — no se borra, solo
+  queda sin uso en esta rama, documentado en el propio archivo.
+
+**Cómo repetir el chequeo** (para que cualquiera lo corra, no solo yo):
+```bash
+# Frontend: toda referencia interna
+grep -rn "navigate(['\"\`]\|window\.open(\|href={\`\|href=\"" frontend/src \
+  --include=*.tsx --include=*.ts | grep -v "\.test\.\|google\.com\|openstreetmap\|maps?q=\|mailto:\|tel:"
+# comparar cada ruta resultante contra: grep -n 'path=' frontend/src/App.tsx
+
+# Backend: toda llamada de servicio
+grep -rn "api\.\(get\|post\|patch\|put\|delete\)\|fetchAuthJSON(" frontend/src/services frontend/src/components \
+  --include=*.ts --include=*.tsx | grep -v "\.test\."
+# comparar cada endpoint contra: grep -n "@Get\|@Post\|@Patch\|@Put\|@Delete\|@Controller" src/*/*.controller.ts
+```
+
 ## Divergencias deliberadas
 
 ### Comparación mecánica GESTOR_AMBIENTAL vs hub (2026-07-29, diff archivo por archivo)

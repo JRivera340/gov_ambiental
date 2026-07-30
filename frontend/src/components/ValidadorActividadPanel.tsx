@@ -380,11 +380,14 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
               )}
             </div>
             
+            {/* block + flex: mismo par redundante que trae el hub (flex ya define el
+                display, block queda inerte) — replicado a proposito para paridad exacta */}
             <a
               href={`/validador/actividad/${activity.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full text-center py-3 rounded-2xl border-2 border-neutral-100 text-neutral-500 text-xs font-bold uppercase tracking-widest hover:border-neutral-200 hover:bg-neutral-50 transition-all flex items-center justify-center gap-2"
+              // eslint-disable-next-line tailwindcss/no-contradicting-classname
+              className="block w-full text-center py-3 rounded-2xl border-2 border-neutral-100 text-neutral-500 text-xs font-bold uppercase tracking-widest hover:border-neutral-200 hover:bg-neutral-50 transition-all flex items-center justify-center gap-2"
             >
               <span>Ver Detalle Completo</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
