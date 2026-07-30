@@ -141,19 +141,22 @@ export function isInside(lat: number, lng: number, geometry: any): boolean {
 /** Crea un DivIcon de Leaflet con color institucional y PNG masqueado */
 export const createMarkerIcon = (
   color: string,
-  cat: string,
-  subtipo?: string,
+  // cat/subtipo se mantienen en la firma por compatibilidad con getCategoryIcon
+  // (que sigue pasando a.operativoSubtipo), pero no se usan para elegir el
+  // ícono: el hub elige entre /icons/{IVC,EspacioPublico,Ambiental,Residuos}.png
+  // según operativoCategoria/operativoSubtipo (campos que este backend no
+  // tiene, ver CLAUDE.md invariantes — mono-dominio, todo punto YA es de
+  // acumulación). Ese branching siempre caía en /icons/Ambiental.png, que no
+  // existe acá — el catch-all SPA de Railway devolvía index.html con 200 en
+  // vez de 404, así que la máscara CSS quedaba vacía y el marcador salía sin
+  // ícono (círculo de color, sin la silueta blanca adentro). Bug real
+  // corregido 2026-07-30, mismo patrón que las otras 12 correcciones de
+  // operativoSubtipo/operativoCategoria siempre-falso ya documentadas.
+  _cat?: string,
+  _subtipo?: string,
   number?: number,
 ): DivIcon => {
-  let ip = '/icons/EspacioPublico.png';
-  const cUpper = (cat || '').toUpperCase();
-  if (cUpper === 'IVC') ip = '/icons/IVC.png';
-  else if (cUpper === 'AMBIENTAL') {
-    ip =
-      subtipo === 'AMBIENTAL_PUNTOS_ACUMULACION'
-        ? '/icons/Residuos.png'
-        : '/icons/Ambiental.png';
-  }
+  const ip = '/icons/Residuos.png';
 
   const html = `
     <div style="position: relative;">

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// leaflet requiere DOM; solo se usa para crear íconos (no probado aquí).
-vi.mock('leaflet', () => ({ DivIcon: class { constructor(_opts: unknown) {} } }));
+// leaflet requiere DOM; el mock guarda las opciones para poder inspeccionar
+// el html generado (mask-image) sin necesitar un DOM real.
+vi.mock('leaflet', () => ({
+  DivIcon: class { options: any; constructor(opts: unknown) { this.options = opts; } },
+}));
 
 import {
   getResiduoLabel,
@@ -14,6 +17,7 @@ import {
   getAllLocations,
   getFirstDayOfMonth,
   getLastDayOfMonth,
+  createMarkerIcon,
 } from './adminHelpers';
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
@@ -112,5 +116,20 @@ describe('helpers de fecha', () => {
   });
   it('el primer día del mes termina en 01', () => {
     expect(getFirstDayOfMonth().endsWith('01')).toBe(true);
+  });
+});
+
+describe('createMarkerIcon', () => {
+  it('siempre usa /icons/Residuos.png, sin importar cat/subtipo (mono-dominio, sin /icons/Ambiental.png ni /icons/EspacioPublico.png reales)', () => {
+    const icon = createMarkerIcon('#7c2d12', 'AMBIENTAL', undefined, 5) as any;
+    expect(icon.options.html).toContain("url('/icons/Residuos.png')");
+    expect(icon.options.html).not.toContain('Ambiental.png');
+    expect(icon.options.html).not.toContain('EspacioPublico.png');
+    expect(icon.options.html).not.toContain('IVC.png');
+  });
+
+  it('ignora cat/subtipo aunque vengan con valores del hub (IVC, ESPACIO_PUBLICO, etc.)', () => {
+    const icon = createMarkerIcon('#000', 'IVC', 'AMBIENTAL_PUNTOS_ACUMULACION') as any;
+    expect(icon.options.html).toContain("url('/icons/Residuos.png')");
   });
 });
