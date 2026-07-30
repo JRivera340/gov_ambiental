@@ -774,6 +774,35 @@ con Josh/UAESP si falta algo antes de tratarla como completa.
 | Manual de usuario por rol (GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN) | No existe | Alto |
 | Manual técnico / arquitectura para quien mantenga el sistema después | Parcialmente cubierto por `CLAUDE.md` y `PLAN-MAESTRO.md`, pero están escritos para un asistente de código, no para un lector humano no técnico de la UAESP | Medio |
 
+## Cuentas de prueba con contraseña conocida — revisar antes de cualquier paso a producción definitivo
+
+2026-07-30: se restableció la contraseña de 2 cuentas de prueba ya
+existentes en la base del hub (`users`, columna `passwordHash`, no se creó
+ninguna cuenta nueva, no se tocó rol/correo/estado) para que Josh pueda
+probar la redirección por rol desde `bogotaneidapp` con los 3 roles:
+
+- `gestor@test.com` (GESTOR_AMBIENTAL) — `name: "test"`, `lastname:
+  "gestor"`, confirmado que no es una persona real antes de tocarla.
+- `ambiental@validadortest.com` (VALIDADOR_AMBIENTAL) — `name: "Ambiental"`,
+  `lastname: "Validador"`, mismo chequeo.
+
+Ambas verificadas con login real contra el backend del hub en producción
+(`POST /auth/login`, 201 en los dos casos) antes de entregarlas.
+
+**Contraseñas no quedan en ningún archivo de este repo ni en ningún log —
+se comunicaron aparte, fuera de este documento.** Quien las necesite de
+nuevo, pide un reset nuevo en vez de buscarlas acá.
+
+`gestor@test.com` además tiene 10 puntos asignados **solo en la base de
+ambiental** (`punto_asignacion`, nunca se tocó la asignación del hub): 2
+`RECHAZADA` (#209, #211), 5 `ENVIADA` (#36, #73, #74, #83, #207), 3
+`PUBLICADA` (#1, #2, #3) — para poder probar los 3 flujos de estado desde
+la cuenta de prueba.
+
+**Pendiente antes de cualquier paso a producción definitivo:** rotar de
+nuevo (o desactivar) estas 2 cuentas — quedaron con contraseña conocida por
+quien las generó, no deben seguir así indefinidamente.
+
 ## Decisiones abiertas
 
 | Decisión | Default mientras no se resuelva | Quién decide |
