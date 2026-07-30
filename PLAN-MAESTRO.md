@@ -1,5 +1,5 @@
 # Plan maestro — Módulo ambiental independiente
-Última actualización: 2026-07-29 (auditoría HITO 2: bug real en sectores/procesos, pendientes concretos por hito, checklist de entregable UAESP)
+Última actualización: 2026-07-30 (canario en producción y funcionando para los 3 roles, fix de Dockerfile/`ValidadorDashboard.tsx`, porte completo de vista de detalle de punto y pantallas de fase 2 — ver ESTADO-EXTRACCION.md para el detalle y el punto de retoma)
 
 ## Objetivo y criterio de terminado
 Convertir el módulo ambiental en un servicio independiente, desplegado aparte
@@ -732,12 +732,29 @@ los hitos anteriores ya estén cerradas.
   El "1082" era una foto vieja del hub tomada un día antes (el hub sigue
   siendo el sistema en producción y siguió recibiendo residuos nuevos). Ver
   `ESTADO-EXTRACCION.md`.
-- Recorrido visual completo de las 11 casillas de la definición de terminado
-  (todas confirmadas por código) — con navegador, no solo API/código.
+- ~~Portar pantallas completas del hub (no solo componentes equivalentes)~~
+  RESUELTO 2026-07-30: vista de detalle de punto porteada por completo
+  (N° Punto, Gestores Participantes, Ubicación, Residuos Recogidos,
+  seguimiento, Información de Validación) y las 5 pantallas restantes
+  auditadas por diff línea por línea contra el hub — sin faltantes de
+  código. Ver matriz y "Punto de retoma" en `ESTADO-EXTRACCION.md`. Quedan
+  sin portar, por requerir backend que no existe aquí: "Re-validar" y
+  "Eliminar" en el detalle de punto, "Agregar residuo nuevo" en
+  seguimiento — documentados con motivo, no son gap de porte.
+- ~~Canario de acceso al módulo nuevo~~ RESUELTO 2026-07-30: en producción,
+  funcionando para los 3 roles con las cuentas de prueba.
+- **Recorrido visual completo de las 11 casillas de la definición de
+  terminado, EN CURSO ahora mismo por Josh** — comparando los 3 roles
+  pantalla por pantalla contra el hub desde `bogotaneidapp.com`. Es el
+  único pendiente activo de HITO 2; la próxima sesión retoma con la lista
+  de hallazgos que traiga de este recorrido (ver "Punto de retoma" en
+  `ESTADO-EXTRACCION.md`).
 - CRUD de usuarios en backend (`create/update/delete/import`) — sigue
   pendiente, sin consumidor real hoy; solo emprender si ADMIN necesita
   gestionar gestores/validadores desde este repo.
-- Decidir módulo `files` (fotos/actas) — bloqueado por decisión abierta.
+- Decidir módulo `files` (fotos/actas) — **sigue bloqueado, esperando
+  decisión de Josh, sin fecha.** No emprender ningún trabajo de este
+  módulo hasta que él decida.
 
 ### HITO 3 (el corte real)
 - Cerrar las dos anomalías de HITO 2 (`fechaObservacion`, conteo de
@@ -774,14 +791,34 @@ con Josh/UAESP si falta algo antes de tratarla como completa.
 | Manual de usuario por rol (GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN) | No existe | Alto |
 | Manual técnico / arquitectura para quien mantenga el sistema después | Parcialmente cubierto por `CLAUDE.md` y `PLAN-MAESTRO.md`, pero están escritos para un asistente de código, no para un lector humano no técnico de la UAESP | Medio |
 
-## Entrada canario — lista blanca de correos (2026-07-30)
+## Entrada canario — lista blanca de correos (2026-07-30, EN PRODUCCIÓN)
 
-La entrada al módulo ambiental nuevo, en los 3 lugares del hub donde existe
-(sidebar de ADMIN, menú secundario de GESTOR_AMBIENTAL, header de
-VALIDADOR_AMBIENTAL — todos en `gov-espacio-publico`, rama
-`feature/ambiental-handoff-sidebar`), está condicionada a
-`VITE_AMBIENTAL_CANARY_EMAILS`, una lista de correos separados por coma
-(hoy: `gestor@test.com,ambiental@validadortest.com,admin@test.com`).
+**Estado 2026-07-30, fin de sesión: mergeado a `main` y desplegado en
+`gov-espacio-publico`. Confirmado funcionando en producción para los 3
+roles** — gestor, validador y admin ya pueden entrar al módulo nuevo desde
+`bogotaneidapp.com` con las 3 cuentas de prueba. Verificado por grep
+directo del bundle de producción (`bogotaneidapp.com/assets/index-*.js`):
+los 3 correos aparecen baked-in en 4 sitios del código (ver detalle abajo).
+
+La entrada al módulo ambiental nuevo existe en 4 lugares del hub (no 3 —
+el cuarto se encontró y corrigió esta sesión): sidebar de ADMIN, menú
+secundario de GESTOR_AMBIENTAL, header de `ValidadorMapaDashboard.tsx`
+(ruta `/validador/residuos`) y header de `ValidadorDashboard.tsx` (ruta
+`/validador/dashboard` — la ruta real de aterrizaje tras login de
+VALIDADOR_AMBIENTAL; el primer despliegue del canario no la cubría y un
+validador real no veía el botón nunca, aunque estuviera en la lista
+blanca). Los 4 sitios están condicionados a `VITE_AMBIENTAL_CANARY_EMAILS`,
+una lista de correos separados por coma (hoy:
+`gestor@test.com,ambiental@validadortest.com,admin@test.com`).
+
+**Gap de infraestructura encontrado y corregido esta misma sesión:** el
+`Dockerfile` de `packages/frontend` no declaraba `ARG`/`ENV` para
+`VITE_AMBIENTAL_CANARY_EMAILS` (solo tenía las de
+`VITE_AMBIENTAL_API_URL`/`VITE_SURVEYS_API_URL`) — sin esa línea, Vite
+horneaba la variable como `undefined` en el build sin importar lo que
+Railway tuviera configurado, y el canario quedaba mudo para todos aunque
+la variable existiera en Railway. Corregido y verificado: los 3 correos ya
+aparecen en el bundle desplegado.
 
 **Esto OCULTA el enlace, no restringe el acceso.** La lista de correos viaja
 en el bundle del frontend — cualquiera con las devtools abiertas puede

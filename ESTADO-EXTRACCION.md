@@ -1,5 +1,5 @@
 # Extracción del módulo ambiental — estado
-Última actualización: 2026-07-30 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva, causa raíz del patrón "resuelto en docs / roto en código", fix real de rutas /sorver/*, cierre de 2 anomalías de migración, verificación fila ADMIN + porte de vistas restantes fase 2, porte completo de vista de detalle de punto, fix de `dateTime` en endpoint público)
+Última actualización: 2026-07-30 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva, causa raíz del patrón "resuelto en docs / roto en código", fix real de rutas /sorver/*, cierre de 2 anomalías de migración, verificación fila ADMIN + porte de vistas restantes fase 2, porte completo de vista de detalle de punto, fix de `dateTime` en endpoint público, canario en producción para los 3 roles, ver "Punto de retoma" al final)
 
 ## Contexto
 Este repo es la extracción del módulo ambiental de gov-espacio-publico
@@ -47,11 +47,13 @@ se hizo con ADMIN.
 
 | Vista | Rol(es) | Ruta hub | Ruta aquí | Estado | Qué falta |
 |---|---|---|---|---|---|
-| Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` | igual | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
-| Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
+| Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` (`GeneralMapView`) | igual | CÓDIGO COMPLETO 2026-07-30 (diff contra hub, sin faltantes) — PENDIENTE VERIFICACIÓN VISUAL | Diff línea por línea confirma paridad de código; falta pasarla por navegador |
+| Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | CÓDIGO COMPLETO 2026-07-30 (diff idéntico al hub en `PlanificadorRutaView`/`RutaActivaView`/`HistorialRutasView`) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador |
 | Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla; el mapeo de datos ya se verificó (ver "Formulario" abajo), falta el diseño de la pantalla |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | PENDIENTE DE VERIFICACIÓN VISUAL | El permiso backend está probado con tests; la pantalla no se comparó |
-| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) + `/validador/residuos` | una sola vista (`ValidadorMapaDashboard.tsx`, tabs/filtros/paginación); `/validador/dashboard` es un `Navigate` a `/validador/residuos` en `App.tsx` — dos rutas, mismo componente, no dos vistas distintas | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
+| Perfil del gestor | GESTOR_AMBIENTAL | `PerfilGestorView` (hub) | igual | CÓDIGO COMPLETO 2026-07-30 (diff contra hub, solo adaptaciones mono-dominio documentadas) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador |
+| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (`ValidadorDashboard.tsx`) + `/validador/residuos` (`ValidadorMapaDashboard.tsx`) | mismas dos pantallas, mismo componente por ruta que el hub | CÓDIGO COMPLETO 2026-07-30 (diff línea por línea contra `ValidadorActividadPanel`/`ValidadorMapaDashboard` del hub, solo diferencias esperadas del modelo de datos) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador. El detalle de punto que abre desde aquí ya usa `PuntoDetailView.tsx` porteado (ver fila de abajo), con permisos `VALIDADOR_AMBIENTAL` verificados |
+| Detalle del validador (`ValidadorActivityDetailPage.tsx`) | VALIDADOR_AMBIENTAL | mismo `ActivityDetail.tsx` que ADMIN, con permisos de rol distintos | mismo `PuntoDetailView.tsx` que ADMIN (componente compartido) | RESUELTO 2026-07-30 — hereda el porte completo de la fila "Detalle de punto"; `canEdit`/`canApprove`/`canReject` confirmados correctos para `VALIDADOR_AMBIENTAL` (`activity.status === 'ENVIADA'`) | Nada — ver limitaciones ya anotadas en "Detalle de punto" (Re-validar/Eliminar) |
 | Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla. Bug corregido 2026-07-30: `toPublicPunto()` no incluía `dateTime` por residuo, dejaba en 0/"No registrada" el cálculo de días desde recolección |
 | Detalle de punto (admin/validador, `PuntoDetailView.tsx`) | ADMIN, VALIDADOR_AMBIENTAL | `ActivityDetail.tsx` (componente multi-dominio compartido) | `PuntoDetailView.tsx` (componente propio, mono-dominio) | RESUELTO 2026-07-30 — porteado completo desde el hub: N° Punto, Tipo de Actividad, Reportado por, Estado, Datos Operativo (equivalente fijo), Volumen por residuo, "Residuos Recogidos (N)" con evidencias, Gestores Participantes, Descripción General, Ubicación en grados, Información de Validación, acción "Marcar recogido" | "Re-validar" y "Eliminar" no portados — requieren endpoints de backend que no existen aquí (`POST /:id/send` sin restricción de owner para ADMIN, `DELETE /puntos/:id`); "Agregar residuo nuevo" en seguimiento tampoco portado |
 | Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | **RESUELTO 2026-07-30 — verificado contra código real, ver nota abajo** | Nada pendiente de esta lista; queda solo verificación visual en navegador |
@@ -820,3 +822,55 @@ con tokens reales de los 3 roles.
 |---|---|---|
 | Módulo files / almacenamiento R2 | No implementar nada nuevo. Documentar cómo se suben adjuntos hoy y dejarlo igual hasta la fase 2. | Josh |
 | ¿bulk-delete se usa realmente? | No replicar hasta confirmar que alguien lo usa en producción. Si nadie lo usa, queda fuera de alcance. | Josh |
+
+## PUNTO DE RETOMA (2026-07-30, cierre de sesión)
+
+**Dónde quedamos:** el porte completo de pantallas (fase 1 + fase 2, ver
+matriz arriba) está commiteado y pusheado en `test` (repo A) y el canario
+está mergeado a `main` y desplegado en `gov-espacio-publico` (repo B) —
+funcionando de punta a punta para los 3 roles con las cuentas de prueba
+(`gestor@test.com`, `ambiental@validadortest.com`, `admin@test.com`).
+Confirmado por grep directo del bundle de producción: los 3 correos están
+baked-in en 4 puntos del código (admin, gestor, `ValidadorMapaDashboard`,
+`ValidadorDashboard` — el último fue el fix de esta sesión, la ruta real de
+aterrizaje de `/validador/dashboard` que faltaba).
+
+**Lo siguiente:** Josh va a hacer el recorrido visual de los tres roles
+(gestor, validador, admin) en `bogotaneidapp.com`, comparando pantalla por
+pantalla contra este módulo nuevo, y va a traer una lista de hallazgos
+concretos. Esa lista es el input de la próxima sesión — no hay tarea de
+porte adicional planificada hasta tenerla; todo lo que el porte por código
+podía resolver ya se hizo (ver matriz).
+
+**Qué NO tocar hasta esa lista:** no seguir "adivinando" gaps por diff de
+código — ya se agotó esa vía (fase 1 y 2 la cubrieron). El siguiente ciclo
+de trabajo depende de hallazgos visuales reales, no de más comparación de
+código contra el hub.
+
+## Pendientes de infraestructura (2026-07-30)
+
+- **Railway MCP sin acceso**: `railway login` se corrió 3 veces en esta
+  sesión (cuenta `Joshua Rivera`), la CLI quedó autenticada pero el
+  servidor MCP sigue devolviendo "Unauthorized" — es una sesión cacheada
+  del lado del cliente que un re-login no refresca. Hace falta reiniciar
+  la app/sesión del cliente de código (no solo la CLI) para que el MCP
+  recoja el token nuevo. Además, el proyecto Railway de
+  `gov-espacio-publico` pertenece a la cuenta `julianrivera75`, no a
+  `Joshua Rivera` — si el MCP debe operar sobre ese proyecto, hace falta
+  confirmar con qué cuenta autenticarse antes de repetir el login.
+- **Cuentas de prueba con contraseña conocida**: `gestor@test.com`,
+  `ambiental@validadortest.com`, `admin@test.com` (contraseñas
+  restablecidas manualmente esta sesión, ver sección de cuentas de prueba
+  más abajo) tienen acceso real de producción hoy — son las mismas 3
+  cuentas de la lista blanca del canario. Rotar o desactivar antes de
+  cualquier paso hacia producción definitiva (HITO 3/4); mientras el
+  canario siga activo con estas cuentas, dejarlas como están es
+  aceptable, pero no debe olvidarse antes del corte.
+- **Disciplina de rama rota en el hub**: el último cambio de esta sesión
+  (agregar el botón de canario a `ValidadorDashboard.tsx`) se hizo directo
+  sobre `main` de `gov-espacio-publico`, sin pasar por una rama — porque
+  `feature/ambiental-handoff-sidebar` ya se había mergeado momentos antes
+  y el fix era la continuación lógica del mismo trabajo. Fue una excepción
+  puntual, no la norma: retomar rama por cambio para lo que siga en el
+  hub, incluida cualquier corrección que salga del recorrido visual de
+  Josh.
