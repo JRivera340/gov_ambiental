@@ -391,6 +391,18 @@ Ninguna de las dos se puede descartar sin que alguien con conocimiento de
 campo revise los 4 puntos en el mapa. Queda como pendiente de investigación,
 no de corrección automática.
 
+## Cuándo se permite divergir del hub (regla, 2026-07-30)
+
+- **Datos y cifras: nunca.** Si un número se calcula distinto, los dos
+  sistemas dejan de ser comparables y nadie confía en el nuevo. La paridad
+  manda, sin excepción.
+- **Comportamiento de interfaz: se permite mejorar un defecto que el hub
+  también tiene**, si queda documentado como divergencia deliberada con su
+  motivo. Este módulo se entrega a otras entidades — replicar un defecto
+  conocido solo porque el original lo tiene no le sirve a nadie.
+- **Toda divergencia se registra con su motivo**, para que nadie la
+  "corrija" después creyendo que es un error.
+
 ## Divergencias deliberadas
 
 ### Comparación mecánica GESTOR_AMBIENTAL vs hub (2026-07-29, diff archivo por archivo)
@@ -410,6 +422,28 @@ corregidas:
   documentado como deuda técnica **del hub**, no de acá (ver
   `gov-espacio-publico/DEUDA-TECNICA.md`, ítem 10, rama
   `docs/tailwind-lint-y-usuarios-duplicados`, sin mergear).
+
+### Ícono de tipo de residuo en tarjetas de lista/detalle
+El hub no lo tiene — ni siquiera en su propio `ActivityDetail.tsx`, verificado
+al portar la vista de detalle (2026-07-30). Se agregó (`ResiduoTipoIcon`,
+mismo color por tipo que ya usan los marcadores del mapa) en
+`ResiduoDetailModal.tsx`, `NotasResiduoModal.tsx`, `PublicPuntoPage.tsx` y la
+vista de detalle compartida (`PuntoDetailView.tsx`) — mejora deliberada, no
+gap a cerrar.
+
+### Pestañas "Asignación de Puntos" / "Indicadores" en el panel ADMIN
+El hub tiene 2 `useState(false)` independientes para estas secciones — se
+pueden abrir las dos a la vez, y no hay ninguna indicación visual de cuál
+está "activa" (confirmado en el código real del hub, 2026-07-30, no es un
+recuerdo de sesiones anteriores). Es un defecto de UX real del hub mismo,
+no un gap de paridad de este repo. Por la regla de arriba ("comportamiento
+de interfaz: se permite mejorar un defecto que el hub también tiene"), se
+convirtió a comportamiento de pestañas reales acá: un solo `activeSection`
+(`'none' | 'asignacion' | 'indicadores'`), una sección visible a la vez,
+botón activo marcado visualmente (`aria-pressed`, fondo de color sólido).
+Documentado también como deuda técnica **del hub** (ver
+`gov-espacio-publico/DEUDA-TECNICA.md`, mismo patrón que el ítem del
+conflicto `pt-0`/`pt-2`).
 
 ### Botón "Ver en Google Maps" en las vistas de detalle de punto
 El hub no lo tiene. Se agregó primero en `PublicPuntoPage.tsx` (link directo

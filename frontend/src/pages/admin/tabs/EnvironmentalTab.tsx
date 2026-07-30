@@ -100,29 +100,44 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
   // ESTADO-EXTRACCION.md.
   const ambientalActivities = filteredMapActivities;
 
-  const [showAsignacionPuntos, setShowAsignacionPuntos] = useState(false);
-  const [showIndicadores, setShowIndicadores] = useState(false);
+  // Divergencia deliberada del hub (ver ESTADO-EXTRACCION.md): allá son 2
+  // booleans independientes (se puede tener las dos abiertas a la vez, o
+  // ninguna marcada como "activa" visualmente aunque estén abiertas) —
+  // confirmado en el código real del hub, no es un gap de paridad. Acá se
+  // decidió comportamiento de pestañas: una sola sección visible a la vez,
+  // con indicación visual de cuál está activa.
+  const [activeSection, setActiveSection] = useState<'none' | 'asignacion' | 'indicadores'>('none');
 
   return (
     <div className="flex flex-col gap-3 h-auto lg:h-[calc(100vh-100px)] overflow-y-auto lg:overflow-hidden overflow-x-hidden p-1 lg:p-0">
 
-      {/* ── Barra de acciones ── */}
+      {/* ── Barra de acciones (pestañas) ── */}
       <div className="flex justify-end gap-2 flex-shrink-0">
         <button
-          onClick={() => setShowAsignacionPuntos(v => !v)}
-          className="text-[9px] px-2 py-1 rounded border shadow-sm font-bold flex items-center gap-1 bg-white border-[#2563eb] text-[#2563eb] hover:bg-[#2563eb]/5"
+          onClick={() => setActiveSection(s => s === 'asignacion' ? 'none' : 'asignacion')}
+          aria-pressed={activeSection === 'asignacion'}
+          className={`text-[9px] px-2 py-1 rounded border shadow-sm font-bold flex items-center gap-1 transition-colors ${
+            activeSection === 'asignacion'
+              ? 'bg-[#2563eb] border-[#2563eb] text-white'
+              : 'bg-white border-[#2563eb] text-[#2563eb] hover:bg-[#2563eb]/5'
+          }`}
         >
-          {showAsignacionPuntos ? 'Ocultar Asignación de Puntos' : 'Asignación de Puntos'}
+          {activeSection === 'asignacion' ? 'Ocultar Asignación de Puntos' : 'Asignación de Puntos'}
         </button>
         <button
-          onClick={() => setShowIndicadores(v => !v)}
-          className="text-[9px] px-2 py-1 rounded border shadow-sm font-bold flex items-center gap-1 bg-white border-[#16a34a] text-[#16a34a] hover:bg-[#16a34a]/5"
+          onClick={() => setActiveSection(s => s === 'indicadores' ? 'none' : 'indicadores')}
+          aria-pressed={activeSection === 'indicadores'}
+          className={`text-[9px] px-2 py-1 rounded border shadow-sm font-bold flex items-center gap-1 transition-colors ${
+            activeSection === 'indicadores'
+              ? 'bg-[#16a34a] border-[#16a34a] text-white'
+              : 'bg-white border-[#16a34a] text-[#16a34a] hover:bg-[#16a34a]/5'
+          }`}
         >
-          {showIndicadores ? 'Ocultar Indicadores' : 'Indicadores'}
+          {activeSection === 'indicadores' ? 'Ocultar Indicadores' : 'Indicadores'}
         </button>
       </div>
 
-      {showAsignacionPuntos && (
+      {activeSection === 'asignacion' && (
         <div className="flex-shrink-0">
           <AsignacionPuntosPanel
             actividades={ambientalActivities.map(a => ({
@@ -134,7 +149,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
         </div>
       )}
 
-      {showIndicadores && (
+      {activeSection === 'indicadores' && (
         <div className="flex-shrink-0">
           <IndicadoresAmbientalPanel actividades={ambientalActivities} />
         </div>
