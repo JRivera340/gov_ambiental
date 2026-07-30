@@ -160,7 +160,7 @@ export const EditActivity: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
         {activity.validationNotes && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
             <h3 className="font-semibold text-red-800 mb-1">Observaciones del validador:</h3>

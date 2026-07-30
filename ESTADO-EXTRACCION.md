@@ -303,6 +303,24 @@ Prioridad baja / depende de decisión abierta:
 
 ## Divergencias deliberadas
 
+### Comparación mecánica GESTOR_AMBIENTAL vs hub (2026-07-29, diff archivo por archivo)
+Config global (`tailwind.config.js`, `index.css`) y la mayoría de componentes
+de `gestor-ambiental/` son **idénticos o casi idénticos** al hub (diff real
+de 0-4 líneas por archivo, solo adaptaciones de modelo de datos ya
+documentadas: `operativoSubtipo` eliminado por mono-dominio, `puntoId` en
+vez de `activityId`). 2 diferencias de estilo reales encontradas y
+corregidas:
+- `EditActivity.tsx`: `<main>` tenía `py-8`, el hub usa `py-6` — corregido.
+- `ActivityDetailView.tsx` (2 divs, líneas ~455/538): al hub le falta
+  replicar acá un conflicto de utilidades Tailwind que el hub SÍ tiene
+  (`pt-0` junto a `pt-2` en el mismo `className`) — replicado a propósito
+  para garantizar el mismo renderizado exacto, con
+  `eslint-disable-next-line tailwindcss/no-contradicting-classname` porque
+  este repo SÍ tiene esa regla activa (el hub no). El conflicto en sí queda
+  documentado como deuda técnica **del hub**, no de acá (ver
+  `gov-espacio-publico/DEUDA-TECNICA.md`, ítem 10, rama
+  `docs/tailwind-lint-y-usuarios-duplicados`, sin mergear).
+
 ### Botón "Ver en Google Maps" en las vistas de detalle de punto
 El hub no lo tiene. Se agregó primero en `PublicPuntoPage.tsx` (link directo
 `https://www.google.com/maps?q={lat},{lng}`) y Josh pidió explícitamente
