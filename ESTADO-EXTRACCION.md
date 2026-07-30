@@ -34,15 +34,70 @@ PYBA, DEPORTES, TUTOR, ESTUDIANTE) — fuera de alcance, no replicar.
 
 ## Matriz de paridad
 
+**Definición de REPLICADA, corregida 2026-07-29 tras el recorrido visual de
+Josh como ADMIN:** paridad visual Y funcional contra el hub, no solo que el
+componente exista y compile. La fila ADMIN estaba marcada REPLICADA por esa
+definición vieja — el componente existía, montaba, tenía tests, pero la
+pantalla real es otra (shell minimalista vs. el panel rico del hub). Bajada a
+PARCIAL. **Ninguna otra fila de esta tabla fue comparada visualmente pantalla
+contra pantalla hasta hoy** — se marcaron REPLICADA por existencia de código +
+tests, exactamente el mismo criterio insuficiente. Bajadas todas a PENDIENTE
+DE VERIFICACIÓN VISUAL hasta que alguien las recorra una por una, igual que
+se hizo con ADMIN.
+
 | Vista | Rol(es) | Ruta hub | Ruta aquí | Estado | Qué falta |
 |---|---|---|---|---|---|
-| Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` | igual | REPLICADA | — |
-| Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | REPLICADA | — |
-| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | REPLICADA 2026-07-29, PENDIENTE DE VERIFICAR en pantalla con seed real | Migración ya corrida contra producción (`Postgres-_hTA`); falta verificación visual con datos reales (seed) |
-| Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | REPLICADA (2026-07-28, con tests) | — |
-| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) + `/validador/residuos` | una sola vista (`ValidadorMapaDashboard.tsx`, tabs/filtros/paginación); `/validador/dashboard` es un `Navigate` a `/validador/residuos` en `App.tsx` — dos rutas, mismo componente, no dos vistas distintas | REPLICADA | — |
-| Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | REPLICADA | — |
-| Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | REPLICADA 2026-07-29 (ver corrección de integridad abajo — el montaje anterior nunca había llegado a `test`) | — |
+| Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` | igual | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
+| Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
+| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla; el mapeo de datos ya se verificó (ver "Formulario" abajo), falta el diseño de la pantalla |
+| Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | PENDIENTE DE VERIFICACIÓN VISUAL | El permiso backend está probado con tests; la pantalla no se comparó |
+| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (compartido con PYBA) + `/validador/residuos` | una sola vista (`ValidadorMapaDashboard.tsx`, tabs/filtros/paginación); `/validador/dashboard` es un `Navigate` a `/validador/residuos` en `App.tsx` — dos rutas, mismo componente, no dos vistas distintas | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
+| Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla |
+| Admin — asignación de puntos + indicadores | ADMIN | montado en `/admin/dashboard` (tab `EnvironmentalTab`, uno de varios tabs multi-dominio) | `AdminDashboard.tsx` propio (un solo tab, mono-dominio) + ruta `/admin` | **PARCIAL — recorrido visual 2026-07-29, ver "Auditoría visual de ADMIN" abajo** | Encabezado, panel de filtros globales, sidebar de lista de residuos, filtro de mapa completo, "Ver detalle" roto, 2 bugs de cálculo — detalle completo abajo |
+
+## Auditoría visual de ADMIN 2026-07-29: componente existe, pantalla no coincide
+
+Josh recorrió `/admin` como ADMIN real. El componente existe y funciona (ver
+sección anterior), pero la pantalla no tiene paridad visual con el hub —
+había sido marcada REPLICADA usando "el componente existe y compila" como
+criterio, no "se ve y se comporta igual". Comparación elemento por elemento,
+SOLO LECTURA contra el hub:
+
+| Elemento | Hub | Aquí | Estado |
+|---|---|---|---|
+| Encabezado | Barra roja institucional, logos, "Sistema de Seguimiento Territorial / Alcaldía Local de Santa Fe · Panel de Administración" | Barra blanca, "Admin — Sector Ambiental" | FALTA |
+| Iconos de marcador del mapa | `createMarkerIcon`: círculo de color + PNG enmascarado + badge de número | Idéntico byte a byte (`adminHelpers.ts`/`adminConstants.ts`), mismo `#7c2d12`, mismo `/icons/Residuos.png` | YA COINCIDE — no es gap |
+| Panel de Filtros Globales | Sidebar derecho: Estado, Categoría/Tipo, Barrio, Turno, mes, Desde/Hasta, Limpiar/Aplicar | No existe | FALTA COMPLETO |
+| Filtros del mapa (separados de los globales) | Botón "Filtros" propio del tab mapa | 2 `<select>` inline (Estado, Tipo de Residuo), sin Barrio/Turno/fecha, no separados | PARCIAL |
+| Sidebar "Lista de Residuos" | Panel flotante: contador real, buscador #, filtro Barrio, tabs Recogidos/Pendientes, lista con #/barrio/fecha/"Ver detalle" | Botón existe (`setPointsSidebarOpen`), pero ningún componente escucha ese estado — no se renderiza nada | FALTA COMPLETO, botón fantasma |
+| "Ver detalle" | `/admin/actividad/${id}` — ruta real en el router del hub | Mismo literal copiado, pero esa ruta no existe en `App.tsx` de este repo | ROTO — pestaña en blanco |
+| Panel de Control (Ident/Recog/Tasa/Val) | 4 métricas | Existen visualmente, 2 con cálculo equivocado (ver abajo) | PARCIAL |
+| Estado del Sistema / Tiempo de Recolección / gráficas de torta / leyenda | Existen | Existen, mismo componente reusado | COINCIDE |
+| Sidebar izquierdo multi-tab (IVC/Espacio Público/PYBA/Deportes/etc.) | Existe | No existe | NO ES GAP — divergencia correcta, este repo es mono-dominio por diseño |
+
+**Cifras — 2 bugs de cálculo confirmados en código, no de datos:**
+- `useAdminDashboard.ts:29` — "Ident." cuenta **entradas de residuo**
+  (`for (const r of getResiduos(a)) totalIdentified++`, de ahí 1087), el hub
+  cuenta **puntos**. Corregir la definición al implementar, verificando
+  primero qué cuenta exactamente el hub.
+- `useAdminDashboard.ts:59` — `totalVal` filtra `status === 'APROBADA'`, un
+  estado transitorio que casi nunca tiene filas en reposo (se convierte en
+  `PUBLICADA` casi de inmediato). Debe ser `status === 'ENVIADA'` (11 puntos
+  reales en ese estado, ver conteo del HITO 3).
+- La diferencia 346→342 en Actividades y en metros lineales es deriva normal
+  — el hub sigue en producción y sigue sumando datos, mismo fenómeno que los
+  5 residuos de más ya explicado arriba.
+
+**Filtro Categoría/Tipo, ajuste para cuando se implemente el panel de
+filtros:** en el hub ese selector lista IVC/Espacio Público/Ambiental/PYBA/
+Deportes. Acá debe listar solo lo ambiental — no replicar los otros 4
+dominios.
+
+**Pendiente de implementar (aprobado por Josh, no implementado todavía —
+requiere el panel de filtros + sidebar + fix de rutas + fix de 2 métricas):**
+encabezado institucional, panel de filtros globales completo, sidebar de
+lista de residuos completo, separar filtros de mapa, arreglar "Ver detalle",
+arreglar "Ident."/"Val".
 
 ## Corrección de integridad 2026-07-29: la fila de ADMIN estaba marcada REPLICADA sin código en esta rama
 
