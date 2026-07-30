@@ -1,8 +1,18 @@
+/** @vitest-environment happy-dom */
 import { describe, it, expect, vi } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 vi.mock('leaflet', () => ({ DivIcon: class { constructor(_opts: unknown) {} } }));
 
-import { computeInsights } from './useAdminDashboard';
+const mockActivities: any[] = [];
+vi.mock('../../../services/activity.service', () => ({
+  activityService: { getAll: vi.fn(() => Promise.resolve(mockActivities)) },
+}));
+vi.mock('../../../services/catalog.service', () => ({
+  catalogService: { getBarrios: vi.fn(() => Promise.resolve(['La Candelaria', 'Las Cruces'])) },
+}));
+
+import { computeInsights, useAdminDashboard } from './useAdminDashboard';
 import type { Activity } from '../../../types';
 
 function makeActivity(overrides: Partial<Activity> & { status: Activity['status'] }): Activity {
@@ -62,5 +72,42 @@ describe('computeInsights — paridad con ambientalInsightsData del hub', () => 
     ];
     const insights = computeInsights(activities);
     expect(insights.totalArea.RESIDUOS_ORDINARIOS).toBe(15);
+  });
+});
+
+describe('useAdminDashboard — filtros globales (Barrio, Desde/Hasta)', () => {
+  it('filtra por barrio y por rango de fecha, y clearFilters los resetea', async () => {
+    mockActivities.length = 0;
+    mockActivities.push(
+      makeActivity({ status: 'PUBLICADA', barrio: 'La Candelaria', dateTime: '2026-01-10T00:00:00.000Z' }),
+      makeActivity({ status: 'PUBLICADA', barrio: 'Las Cruces', dateTime: '2026-06-15T00:00:00.000Z' }),
+    );
+
+    const { result } = renderHook(() => useAdminDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.activities).toHaveLength(2);
+
+    act(() => result.current.setBarrioFilter('La Candelaria'));
+    expect(result.current.activities).toHaveLength(1);
+    expect(result.current.activities[0].barrio).toBe('La Candelaria');
+
+    act(() => { result.current.setBarrioFilter(''); result.current.setDesdeFilter('2026-05-01'); });
+    expect(result.current.activities).toHaveLength(1);
+    expect(result.current.activities[0].barrio).toBe('Las Cruces');
+
+    act(() => result.current.clearFilters());
+    expect(result.current.activities).toHaveLength(2);
+    expect(result.current.barrioFilter).toBe('');
+    expect(result.current.desdeFilter).toBe('');
+  });
+
+  it('barriosUnicos combina el catálogo con los barrios reales de los puntos', async () => {
+    mockActivities.length = 0;
+    mockActivities.push(makeActivity({ status: 'PUBLICADA', barrio: 'Barrio Fuera De Catálogo' }));
+
+    const { result } = renderHook(() => useAdminDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.barriosUnicos).toContain('La Candelaria'));
+    expect(result.current.barriosUnicos).toContain('Barrio Fuera De Catálogo');
   });
 });

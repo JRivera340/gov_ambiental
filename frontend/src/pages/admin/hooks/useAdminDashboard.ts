@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { activityService } from '../../../services/activity.service';
+import { catalogService } from '../../../services/catalog.service';
 import type { Activity } from '../../../types';
 import type { LayerVisibility } from '../../../components/MapLayerControl';
 import { getResiduos, getPuntoCriticoTier, findTechnicalResidueKey } from '../utils/adminHelpers';
@@ -95,6 +96,13 @@ export function useAdminDashboard() {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // ── Filtros globales (panel derecho, portado del hub) ──
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [barrioFilter, setBarrioFilter] = useState('');
+  const [desdeFilter, setDesdeFilter] = useState('');
+  const [hastaFilter, setHastaFilter] = useState('');
+  const [barriosCatalog, setBarriosCatalog] = useState<string[]>([]);
+
   const load = () => {
     setLoading(true);
     setError(null);
@@ -105,6 +113,21 @@ export function useAdminDashboard() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { catalogService.getBarrios().then(setBarriosCatalog).catch(() => setBarriosCatalog([])); }, []);
+
+  // Catálogo completo de barrios + los que ya aparecen en los puntos (por si
+  // algún punto migrado trae un barrio fuera del catálogo oficial) — mismo
+  // patrón que `barriosUnicos` del hub.
+  const barriosUnicos = useMemo(() => {
+    const b = new Set<string>(barriosCatalog);
+    activities.forEach(a => { if (a.barrio) b.add(a.barrio); });
+    return Array.from(b).filter(Boolean).sort();
+  }, [activities, barriosCatalog]);
+
+  const clearFilters = () => {
+    setStatusFilter(''); setTipoResiduoFilter(''); setBarrioFilter('');
+    setDesdeFilter(''); setHastaFilter('');
+  };
 
   const filteredActivities = useMemo(() => {
     return activities
@@ -113,8 +136,11 @@ export function useAdminDashboard() {
       .filter(a => {
         if (!tipoResiduoFilter) return true;
         return getResiduos(a).some(r => findTechnicalResidueKey(r.tipoResiduo || '') === findTechnicalResidueKey(tipoResiduoFilter));
-      });
-  }, [activities, statusFilter, emergencyFilter, tipoResiduoFilter]);
+      })
+      .filter(a => !barrioFilter || a.barrio === barrioFilter)
+      .filter(a => !desdeFilter || new Date(a.dateTime).getTime() >= new Date(desdeFilter).getTime())
+      .filter(a => !hastaFilter || new Date(a.dateTime).getTime() <= new Date(hastaFilter + 'T23:59:59').getTime());
+  }, [activities, statusFilter, emergencyFilter, tipoResiduoFilter, barrioFilter, desdeFilter, hastaFilter]);
 
   const ambientalInsightsData = useMemo(() => computeInsights(activities), [activities]);
 
@@ -146,5 +172,15 @@ export function useAdminDashboard() {
     setShowDetailModal,
     getGlobalActivityIndex,
     ambientalInsightsData,
+    sidebarOpen,
+    setSidebarOpen,
+    barrioFilter,
+    setBarrioFilter,
+    desdeFilter,
+    setDesdeFilter,
+    hastaFilter,
+    setHastaFilter,
+    barriosUnicos,
+    clearFilters,
   };
 }
