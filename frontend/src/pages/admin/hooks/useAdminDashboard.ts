@@ -18,23 +18,32 @@ export interface AmbientalInsightsData {
 
 const DAY = 86400000;
 
-function computeInsights(activities: Activity[]): AmbientalInsightsData {
+// Definiciones alineadas 1:1 con el hub (useAdminDashboard.ts del hub,
+// ambientalInsightsData, SOLO LECTURA verificado 2026-07-29): "Ident."/
+// "Recog." cuentan PUNTOS publicados, no entradas de residuo — el hub exige
+// status === 'PUBLICADA' (+ operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION',
+// redundante acá: este repo es mono-dominio, todo punto YA es de acumulación).
+// totalArea/avgCollectionTimes no llevan ese filtro en el hub tampoco — se
+// calculan sobre todos los residuos sin importar el estado del punto.
+export function computeInsights(activities: Activity[]): AmbientalInsightsData {
   let totalIdentified = 0;
   let totalCollected = 0;
   const collectionDaysByTipo: Record<string, number[]> = {};
   const totalArea: Record<string, number> = {};
 
   for (const a of activities) {
-    for (const r of getResiduos(a)) {
+    const residuos = getResiduos(a);
+    const isPublished = a.status === 'PUBLICADA';
+    if (isPublished) {
       totalIdentified++;
+      if (residuos.some(r => r.recogido)) totalCollected++;
+    }
+    for (const r of residuos) {
       const tipo = findTechnicalResidueKey(r.tipoResiduo || '');
-      if (r.recogido) {
-        totalCollected++;
-        if (r.fechaRecogida && r.dateTime) {
-          const dias = (new Date(r.fechaRecogida).getTime() - new Date(r.dateTime).getTime()) / DAY;
-          if (isFinite(dias) && dias >= 0) {
-            (collectionDaysByTipo[tipo] ??= []).push(dias);
-          }
+      if (r.recogido && r.fechaRecogida && r.dateTime) {
+        const dias = (new Date(r.fechaRecogida).getTime() - new Date(r.dateTime).getTime()) / DAY;
+        if (isFinite(dias) && dias >= 0) {
+          (collectionDaysByTipo[tipo] ??= []).push(dias);
         }
       }
       if (typeof r.areaLinealMetros === 'number') {
@@ -56,7 +65,11 @@ function computeInsights(activities: Activity[]): AmbientalInsightsData {
     totalCollected,
     totalAct: activities.length,
     totalPub: activities.filter(a => a.status === 'PUBLICADA').length,
-    totalVal: activities.filter(a => a.status === 'APROBADA').length,
+    // "En Validación": el hub cuenta ENVIADA + APROBADA. APROBADA es un
+    // estado transitorio que casi nunca tiene filas en reposo (se convierte
+    // en PUBLICADA de inmediato al aprobar) — antes solo se contaba APROBADA
+    // y siempre daba 0 pese a haber puntos reales en ENVIADA.
+    totalVal: activities.filter(a => a.status === 'ENVIADA' || a.status === 'APROBADA').length,
     totalRech: activities.filter(a => a.status === 'RECHAZADA').length,
     avgCollectionTimes,
     totalArea,
