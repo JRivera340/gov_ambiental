@@ -111,3 +111,39 @@ describe('useAdminDashboard — filtros globales (Barrio, Desde/Hasta)', () => {
     expect(result.current.barriosUnicos).toContain('Barrio Fuera De Catálogo');
   });
 });
+
+describe('useAdminDashboard — sidebar "Lista de Residuos"', () => {
+  it('mapaEstadoRecoleccionFilter separa Recogidos de Pendientes', async () => {
+    mockActivities.length = 0;
+    mockActivities.push(
+      makeActivity({ status: 'PUBLICADA', pointNumber: 1, residuos: [{ tipoResiduo: 'RESIDUOS_ORDINARIOS', recogido: true }] as any }),
+      makeActivity({ status: 'PUBLICADA', pointNumber: 2, residuos: [{ tipoResiduo: 'RESIDUOS_ORDINARIOS', recogido: false }] as any }),
+    );
+
+    const { result } = renderHook(() => useAdminDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.sidebarActivities).toHaveLength(2);
+
+    act(() => result.current.setMapaEstadoRecoleccionFilter('RECOGIDOS'));
+    expect(result.current.sidebarActivities.map(a => a.pointNumber)).toEqual([1]);
+
+    act(() => result.current.setMapaEstadoRecoleccionFilter('NO_RECOGIDOS'));
+    expect(result.current.sidebarActivities.map(a => a.pointNumber)).toEqual([2]);
+  });
+
+  it('busca por # exacto y ordena descendente por pointNumber', async () => {
+    mockActivities.length = 0;
+    mockActivities.push(
+      makeActivity({ status: 'PUBLICADA', pointNumber: 5 }),
+      makeActivity({ status: 'PUBLICADA', pointNumber: 12 }),
+      makeActivity({ status: 'PUBLICADA', pointNumber: 1 }),
+    );
+
+    const { result } = renderHook(() => useAdminDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.sidebarActivities.map(a => a.pointNumber)).toEqual([12, 5, 1]);
+
+    act(() => result.current.setListSearchNumber('12'));
+    expect(result.current.sidebarActivities.map(a => a.pointNumber)).toEqual([12]);
+  });
+});

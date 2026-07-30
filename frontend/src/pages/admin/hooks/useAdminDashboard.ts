@@ -3,7 +3,7 @@ import { activityService } from '../../../services/activity.service';
 import { catalogService } from '../../../services/catalog.service';
 import type { Activity } from '../../../types';
 import type { LayerVisibility } from '../../../components/MapLayerControl';
-import { getResiduos, getPuntoCriticoTier, findTechnicalResidueKey } from '../utils/adminHelpers';
+import { getResiduos, getPuntoCriticoTier, findTechnicalResidueKey, isPuntoRecogido } from '../utils/adminHelpers';
 import { technicalResidueKeys } from '../utils/adminConstants';
 
 export interface AmbientalInsightsData {
@@ -103,6 +103,9 @@ export function useAdminDashboard() {
   const [hastaFilter, setHastaFilter] = useState('');
   const [barriosCatalog, setBarriosCatalog] = useState<string[]>([]);
 
+  // ── Sidebar "Lista de Residuos" (portado del hub) ──
+  const [mapaEstadoRecoleccionFilter, setMapaEstadoRecoleccionFilter] = useState<'ALL' | 'RECOGIDOS' | 'NO_RECOGIDOS'>('ALL');
+
   const load = () => {
     setLoading(true);
     setError(null);
@@ -141,6 +144,19 @@ export function useAdminDashboard() {
       .filter(a => !desdeFilter || new Date(a.dateTime).getTime() >= new Date(desdeFilter).getTime())
       .filter(a => !hastaFilter || new Date(a.dateTime).getTime() <= new Date(hastaFilter + 'T23:59:59').getTime());
   }, [activities, statusFilter, emergencyFilter, tipoResiduoFilter, barrioFilter, desdeFilter, hastaFilter]);
+
+  // Refinamiento propio del sidebar "Lista de Residuos" sobre lo que ya
+  // filtraron los filtros globales: por # buscado y por Recogidos/Pendientes.
+  const sidebarActivities = useMemo(() => {
+    return filteredActivities
+      .filter(a => {
+        if (mapaEstadoRecoleccionFilter === 'ALL') return true;
+        const recogido = isPuntoRecogido(a);
+        return mapaEstadoRecoleccionFilter === 'RECOGIDOS' ? recogido : !recogido;
+      })
+      .filter(a => !listSearchNumber || a.pointNumber?.toString() === listSearchNumber.trim())
+      .sort((a, b) => (b.pointNumber || 0) - (a.pointNumber || 0));
+  }, [filteredActivities, mapaEstadoRecoleccionFilter, listSearchNumber]);
 
   const ambientalInsightsData = useMemo(() => computeInsights(activities), [activities]);
 
@@ -182,5 +198,8 @@ export function useAdminDashboard() {
     setHastaFilter,
     barriosUnicos,
     clearFilters,
+    mapaEstadoRecoleccionFilter,
+    setMapaEstadoRecoleccionFilter,
+    sidebarActivities,
   };
 }

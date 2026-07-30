@@ -1,4 +1,6 @@
 import React from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { EnvironmentalTab } from './tabs/EnvironmentalTab';
 import { useAdminDashboard } from './hooks/useAdminDashboard';
 
@@ -136,6 +138,63 @@ export const AdminDashboard: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Sidebar "Lista de Residuos" (portado del hub, flotante) ── */}
+      {dash.pointsSidebarOpen && (
+        <div
+          onClick={() => dash.setPointsSidebarOpen(false)}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 70, transition: 'opacity 0.3s ease-in-out' }}
+        />
+      )}
+      <div
+        style={{
+          position: 'fixed', top: 60, right: dash.pointsSidebarOpen ? 0 : '-400px', bottom: 0,
+          width: '400px', maxWidth: '90vw', backgroundColor: '#f9fafb',
+          boxShadow: '-4px 0 15px rgba(0,0,0,0.1)', zIndex: 1060,
+          transition: 'right 0.3s ease-in-out', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '20px', paddingBottom: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0, backgroundColor: 'white' }}>
+          <div className="flex items-center justify-between w-full">
+            <h3 className="text-lg font-semibold text-neutral-800">Lista de Residuos ({dash.activities.length})</h3>
+            <button onClick={() => dash.setPointsSidebarOpen(false)} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors text-neutral-500 hover:text-red-500" aria-label="Cerrar lista">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex flex-col gap-2 w-full">
+            <div className="flex gap-2 w-full">
+              <input type="text" placeholder="Buscar por #" value={dash.listSearchNumber} onChange={(e) => dash.setListSearchNumber(e.target.value)} className="w-24 text-xs p-2 border border-neutral-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+              <select value={dash.barrioFilter} onChange={(e) => dash.setBarrioFilter(e.target.value)} className="flex-1 text-xs p-2 border border-neutral-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-white">
+                <option value="">Todos los barrios</option>
+                {dash.barriosUnicos.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 w-full mt-1">
+              <button onClick={() => dash.setMapaEstadoRecoleccionFilter(prev => prev === 'RECOGIDOS' ? 'ALL' : 'RECOGIDOS')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${dash.mapaEstadoRecoleccionFilter === 'RECOGIDOS' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm' : 'bg-white text-neutral-500 border-neutral-200 hover:bg-neutral-50'}`}>Recogidos</button>
+              <button onClick={() => dash.setMapaEstadoRecoleccionFilter(prev => prev === 'NO_RECOGIDOS' ? 'ALL' : 'NO_RECOGIDOS')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${dash.mapaEstadoRecoleccionFilter === 'NO_RECOGIDOS' ? 'bg-orange-50 text-orange-700 border-orange-200 shadow-sm' : 'bg-white text-neutral-500 border-neutral-200 hover:bg-neutral-50'}`}>Pendientes</button>
+            </div>
+            {(dash.listSearchNumber || dash.barrioFilter || dash.mapaEstadoRecoleccionFilter !== 'ALL') && (
+              <button onClick={() => { dash.setListSearchNumber(''); dash.setBarrioFilter(''); dash.setMapaEstadoRecoleccionFilter('ALL'); }} className="text-xs text-primary font-semibold self-end hover:underline">Limpiar Filtros</button>
+            )}
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {dash.sidebarActivities.map(a => (
+            <div key={a.id} onClick={() => window.open(`/public/actividad/${a.id}`, '_blank')} className="bg-white p-3 rounded-lg border border-neutral-200 hover:border-primary cursor-pointer transition-all shadow-sm hover:shadow-md">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-xs font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded">#{a.pointNumber ?? '—'}</span>
+                <span className="text-xs font-bold text-neutral-700 truncate flex-1">{a.barrio || 'Sin barrio'}</span>
+              </div>
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-neutral-50">
+                <span className="text-[10px] font-mono text-neutral-500">{a.dateTime ? format(new Date(a.dateTime), 'dd/MM/yyyy', { locale: es }) : '--/--/----'}</span>
+                <span className="text-[10px] text-primary font-semibold">Ver detalle →</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
