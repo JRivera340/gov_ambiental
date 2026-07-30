@@ -56,7 +56,7 @@ describe('ValidadorActivityDetailPage', () => {
   it('carga el punto en /validador/actividad/:id, con acciones de validacion', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
-    await waitFor(() => expect(screen.getByText(/Beatriz Lopez/)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(/Beatriz Lopez/).length).toBeGreaterThan(0));
     expect(screen.getByText('Aprobar')).toBeTruthy();
     expect(screen.getByText('Rechazar')).toBeTruthy();
   });

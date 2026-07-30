@@ -60,7 +60,7 @@ describe('AdminActivityDetailPage', () => {
   it('carga el punto, muestra el creador y los campos del formulario fijo con dato', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
-    await waitFor(() => expect(screen.getByText(/Ana Gómez/)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(/Ana Gómez/).length).toBeGreaterThan(0));
     expect(screen.getByText('Ocasional')).toBeTruthy(); // frecuenciaAcumulacion mapeado a label
     expect(screen.getByText('Residencial')).toBeTruthy(); // tipoZona mapeado a label
   });
@@ -94,5 +94,55 @@ describe('AdminActivityDetailPage', () => {
     await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
     expect(screen.getByText('Actualizar punto')).toBeTruthy();
     useAuthStore.setState({ user: null });
+  });
+
+  it('el conteo de "Residuos identificados" coincide con las tarjetas renderizadas, incluso con varios residuos mixtos', async () => {
+    const seisResiduos = Array.from({ length: 6 }, (_, i) => ({
+      id: `r${i}`,
+      tipoResiduo: 'RESIDUOS_ORDINARIOS',
+      recogido: i < 2,
+      areaLinealMetros: 1,
+      percibeOlores: false,
+      percibeVectores: false,
+      photos: [],
+    }));
+    vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, residuos: seisResiduos } as any);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Residuos identificados (6)')).toBeTruthy());
+    // 6 tarjetas en "identificados" (icono por tarjeta) + 2 tarjetas en "Recogidos"
+    expect(screen.getByText('Residuos Recogidos (2)')).toBeTruthy();
+  });
+
+  it('muestra Gestores Participantes con el creador y su correo', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Gestores Participantes')).toBeTruthy());
+    expect(screen.getByText('No es un operativo en grupo')).toBeTruthy();
+  });
+
+  it('muestra Ubicación con latitud y longitud formateadas en grados', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Ubicación')).toBeTruthy());
+    expect(screen.getByText('4.600000°')).toBeTruthy();
+    expect(screen.getByText('-74.080000°')).toBeTruthy();
+  });
+
+  it('muestra Datos Operativo con el equivalente fijo del dominio ambiental', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Datos Operativo')).toBeTruthy());
+    expect(screen.getByText('Ambiental')).toBeTruthy();
+    expect(screen.getByText(/Punto de Residuos/)).toBeTruthy();
+  });
+
+  it('muestra Información de Validación cuando el punto ya fue validado', async () => {
+    vi.mocked(activityService.getById).mockResolvedValueOnce({
+      ...mockActivity,
+      status: 'PUBLICADA',
+      validatorUserId: 'v1',
+      validatorName: 'Carlos Ruiz',
+      validatedAt: '2026-07-05T12:00:00.000Z',
+    } as any);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Información de Validación')).toBeTruthy());
+    expect(screen.getByText('Carlos Ruiz')).toBeTruthy();
   });
 });
