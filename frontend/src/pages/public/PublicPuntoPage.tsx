@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
+import { ResiduoTipoIcon } from '../../components/ResiduoTipoIcon';
 
 interface ResiduoPublico {
   tipoResiduo: string;
@@ -78,7 +79,7 @@ export default function PublicPuntoPage() {
       <div style={{ background: 'linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%)', padding: '24px 32px' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <p style={{ color: '#93C5FD', fontSize: 13, margin: '0 0 4px', fontWeight: 500 }}>
-            Alcaldía Local de Santa Fe · Sistema de Gestión de Espacio Público
+            Alcaldía Local de Santa Fe · Sistema de Gestión Ambiental
           </p>
           <h1 style={{ color: 'white', fontSize: 22, fontWeight: 700, margin: 0 }}>
             Consulta Pública de Punto Crítico
@@ -175,7 +176,8 @@ export default function PublicPuntoPage() {
                     borderLeft: `4px solid ${alarm.border}`,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: '#111827' }}>
+                        <ResiduoTipoIcon tipo={r.tipoResiduo} size={22} />
                         {getTipoLabel(r.tipoResiduo)}
                       </span>
                       <span style={{

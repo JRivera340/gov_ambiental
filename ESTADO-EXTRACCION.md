@@ -303,6 +303,38 @@ Prioridad baja / depende de decisión abierta:
 
 ## Divergencias deliberadas
 
+### Botón "Ver en Google Maps" en las vistas de detalle de punto
+El hub no lo tiene. Se agregó primero en `PublicPuntoPage.tsx` (link directo
+`https://www.google.com/maps?q={lat},{lng}`) y Josh pidió explícitamente
+mantenerlo y llevarlo también a la vista de detalle de ADMIN — es una mejora
+sobre el original, no un gap a cerrar. **No quitarlo ni "corregirlo" hacia el
+hub en una futura auditoría de paridad.**
+
+### Sin panel "Filtros del Mapa" separado del panel de "Filtros Globales" (ADMIN)
+El hub tiene dos paneles de filtros idénticos en campos (Estado/Categoría/
+Barrio/Turno/Mes/rango) porque tiene múltiples tabs (Actividades, Mapa,
+Sector Ambiental) que necesitan estado de filtro independiente entre sí — si
+compartieran un solo estado, cambiar de tab pisaría los filtros del otro.
+Este repo no tiene tabs: es una sola vista. Un segundo panel con los mismos
+5 campos, atado a un segundo estado paralelo, no tendría ningún efecto
+funcional distinto — solo duplicaría UI. Decisión confirmada por Josh
+2026-07-29: **no construirlo**, ni el botón "Filtros" del mapa por
+consistencia visual. El panel único de Filtros Globales cubre ambos usos.
+
+### Filtro de "Turno" no se portó al panel de Filtros Globales (ADMIN)
+El hub filtra por `isNightShift` (diurno/nocturno), un campo que sí es real
+en `ActivityEntity` del hub (seteado al crear la actividad). `PuntoResiduo`
+de este repo no tiene ese campo — nunca existió, no es una omisión de
+migración. Las 38 preguntas del formulario de creación de puntos
+(`camposPuntoAcumulacion.ts`, verificado contra la encuesta viva el
+2026-07-29) tampoco incluyen ninguna pregunta de turno/horario. Se decidió
+**no mostrar el filtro** en vez de mostrarlo sin función: un filtro que
+nunca cambia el resultado es peor que no tenerlo, hace creer al usuario que
+está acotando cuando no pasa nada. Alternativa descartada (poblar el dato):
+requeriría agregar una pregunta nueva al formulario y no hay ningún pedido
+de negocio de la UAESP para capturar turno — no se justifica solo para
+llenar un filtro.
+
 ### Consecuencia sistemática del modelo de datos
 El hub usa `ActivityEntity` única discriminada por `operativoCategoria` /
 `operativoSubtipo` / `operativoData`. Este repo usa `PuntoResiduo` dedicada,

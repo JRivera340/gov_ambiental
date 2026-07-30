@@ -4,6 +4,7 @@ import { es } from 'date-fns/locale';
 import type { Activity, ResiduoEntry } from '../../../types';
 import { activityService } from '../../../services/activity.service';
 import { tipoResiduoLabels } from '../lib/constants';
+import { ResiduoTipoIcon } from '../../../components/ResiduoTipoIcon';
 
 interface NotasResiduoModalProps {
   residuo: ResiduoEntry;
@@ -66,7 +67,8 @@ export const NotasResiduoModal: React.FC<NotasResiduoModalProps> = ({
         <div className="shrink-0 p-4 sm:p-6 border-b border-neutral-100 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-black text-neutral-900 tracking-tight">Notas del Residuo</h2>
-            <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mt-0.5">
+            <p className="inline-flex items-center gap-1.5 text-[11px] font-bold text-neutral-400 uppercase tracking-widest mt-0.5">
+              <ResiduoTipoIcon tipo={residuo.tipoResiduo} size={16} />
               {tipoResiduoLabels[residuo.tipoResiduo] || residuo.tipoResiduo}
             </p>
           </div>

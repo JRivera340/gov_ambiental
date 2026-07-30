@@ -4,6 +4,7 @@ import { es } from 'date-fns/locale';
 import { tipoResiduoLabels } from '../lib/constants';
 import { getActorIndisciplinaLabel, joinLabels } from '../../../types/ambientalCampos';
 import { ResiduoDetailImage } from './ResiduoImages';
+import { ResiduoTipoIcon } from '../../../components/ResiduoTipoIcon';
 
 interface ResiduoDetailModalProps {
   residuo: any;
@@ -31,7 +32,8 @@ export const ResiduoDetailModal: React.FC<ResiduoDetailModalProps> = ({ residuo,
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full uppercase ${residuo.recogido ? 'text-green-700 bg-green-100' : 'text-amber-700 bg-amber-100'}`}>
                 {residuo.recogido ? 'Recogido' : 'Pendiente'}
               </span>
-              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-neutral-400 uppercase tracking-widest">
+                <ResiduoTipoIcon tipo={residuo.tipoResiduo} size={16} />
                 {tipoResiduoLabels[residuo.tipoResiduo] || residuo.tipoResiduo}
               </span>
             </div>
