@@ -184,7 +184,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {dash.sidebarActivities.map(a => (
-            <div key={a.id} onClick={() => window.open(`/public/actividad/${a.id}`, '_blank')} className="bg-white p-3 rounded-lg border border-neutral-200 hover:border-primary cursor-pointer transition-all shadow-sm hover:shadow-md">
+            <div key={a.id} onClick={() => window.open(`/admin/actividad/${a.id}`, '_blank')} className="bg-white p-3 rounded-lg border border-neutral-200 hover:border-primary cursor-pointer transition-all shadow-sm hover:shadow-md">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-xs font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded">#{a.pointNumber ?? '—'}</span>
                 <span className="text-xs font-bold text-neutral-700 truncate flex-1">{a.barrio || 'Sin barrio'}</span>

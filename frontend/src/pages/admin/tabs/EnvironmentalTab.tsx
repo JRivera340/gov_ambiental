@@ -309,7 +309,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                     icon={getCategoryIcon(a, tipoResiduoFilter, false, true, displayIdx)}
                     activity={a}
                     index={displayIdx}
-                    onActivityClick={activity => window.open(`/public/actividad/${activity.id}`, '_blank')}
+                    onActivityClick={activity => window.open(`/admin/actividad/${activity.id}`, '_blank')}
                   />
                 );
               })}

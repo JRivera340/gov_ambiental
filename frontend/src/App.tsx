@@ -8,6 +8,7 @@ import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminActivityDetailPage } from './pages/admin/AdminActivityDetailPage';
 
 // No hay página de login en este repo — la sesión llega desde bogotaneidapp
 // vía /handoff (PLAN-MAESTRO.md HITO 0). Para probar sin pasar por el hub,
@@ -84,6 +85,10 @@ function App() {
       <Route
         path="/admin"
         element={<RutaAdmin><AdminDashboard /></RutaAdmin>}
+      />
+      <Route
+        path="/admin/actividad/:id"
+        element={<RutaAdmin><AdminActivityDetailPage /></RutaAdmin>}
       />
 
       <Route path="/handoff" element={<HandoffPage />} />
