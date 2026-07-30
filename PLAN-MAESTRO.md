@@ -774,6 +774,45 @@ con Josh/UAESP si falta algo antes de tratarla como completa.
 | Manual de usuario por rol (GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN) | No existe | Alto |
 | Manual técnico / arquitectura para quien mantenga el sistema después | Parcialmente cubierto por `CLAUDE.md` y `PLAN-MAESTRO.md`, pero están escritos para un asistente de código, no para un lector humano no técnico de la UAESP | Medio |
 
+## Entrada canario — lista blanca de correos (2026-07-30)
+
+La entrada al módulo ambiental nuevo, en los 3 lugares del hub donde existe
+(sidebar de ADMIN, menú secundario de GESTOR_AMBIENTAL, header de
+VALIDADOR_AMBIENTAL — todos en `gov-espacio-publico`, rama
+`feature/ambiental-handoff-sidebar`), está condicionada a
+`VITE_AMBIENTAL_CANARY_EMAILS`, una lista de correos separados por coma
+(hoy: `gestor@test.com,ambiental@validadortest.com,admin@test.com`).
+
+**Esto OCULTA el enlace, no restringe el acceso.** La lista de correos viaja
+en el bundle del frontend — cualquiera con las devtools abiertas puede
+leerla en texto plano. Sirve para evitar que un GESTOR_AMBIENTAL,
+VALIDADOR_AMBIENTAL o ADMIN real entre por accidente al módulo nuevo
+mientras dura la migración (perdería seguimiento de sus puntos, que siguen
+viviendo en el legacy hasta el corte de HITO 4) — no es control de
+seguridad. Quien conozca la URL exacta del flujo de `/handoff` puede llegar
+igual, con o sin estar en la lista. El backend de ambiental sigue
+aceptando cualquier JWT válido firmado con el `JWT_SECRET` compartido,
+igual que siempre — eso no cambió.
+
+**Si más adelante hace falta restricción real** (no solo ocultar el botón),
+tiene que resolverse en el backend — por ejemplo, que `/api/handoff` valide
+el correo del JWT contra una lista antes de emitir el 302, o un chequeo de
+rol/estado más estricto. No se implementó ahora porque no hacía falta:
+el objetivo de este mecanismo es solo evitar el uso accidental durante la
+migración, con reversión de un solo `git revert`.
+
+**Fail-closed confirmado:** sin `VITE_AMBIENTAL_CANARY_EMAILS` configurada
+(vacía o ausente), la entrada no aparece para nadie, en ninguno de los 3
+roles — probado con tests (`ambientalCanary.test.ts` en el hub, 4 casos).
+
+**Verificado antes de cerrar la entrada de ADMIN (que hasta ese momento la
+veían los 12 administradores reales sin ningún candado):** auditoría de la
+base de ambiental confirmó que ningún admin ni gestor real creó o editó
+puntos ahí — los únicos registros posteriores al despliegue del canario son
+las asignaciones de prueba hechas manualmente para las cuentas de
+`gestor@test.com` (ver sección de cuentas de prueba abajo). Nada en riesgo
+de perderse en la re-migración.
+
 ## Cuentas de prueba con contraseña conocida — revisar antes de cualquier paso a producción definitivo
 
 2026-07-30: se restableció la contraseña de 2 cuentas de prueba ya
