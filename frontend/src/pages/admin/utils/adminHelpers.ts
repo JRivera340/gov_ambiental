@@ -264,3 +264,9 @@ export const getLastDayOfMonth = (): string => {
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 };
 
+/** 1 de enero del año actual — mismo default que globalDateFrom en el hub */
+export const getYearStart = (): string => `${new Date().getFullYear()}-01-01`;
+
+/** 31 de diciembre del año actual — mismo default que globalDateTo en el hub */
+export const getYearEnd = (): string => `${new Date().getFullYear()}-12-31`;
+

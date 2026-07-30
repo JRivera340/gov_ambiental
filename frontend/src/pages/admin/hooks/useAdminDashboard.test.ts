@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 vi.mock('leaflet', () => ({ DivIcon: class { constructor(_opts: unknown) {} } }));
@@ -12,8 +12,17 @@ vi.mock('../../../services/catalog.service', () => ({
   catalogService: { getBarrios: vi.fn(() => Promise.resolve(['La Candelaria', 'Las Cruces'])) },
 }));
 
-import { computeInsights, useAdminDashboard } from './useAdminDashboard';
+import { computeInsights, filterByGeoSectors, useAdminDashboard } from './useAdminDashboard';
+import { getYearStart, getYearEnd } from '../utils/adminHelpers';
 import type { Activity } from '../../../types';
+
+// El hook intenta cargar RecoleccionUrbana.kmz al montar (filtro geográfico
+// de las cifras). Sin mock, el fetch real a localhost falla con 404 (ruidoso
+// pero inofensivo, el hook ya maneja el error) — se mockea para que no
+// dependa de un servidor real y quede silencioso.
+beforeEach(() => {
+  (globalThis as any).fetch = vi.fn(() => Promise.resolve({ ok: false } as Response));
+});
 
 function makeActivity(overrides: Partial<Activity> & { status: Activity['status'] }): Activity {
   return {
@@ -98,7 +107,10 @@ describe('useAdminDashboard — filtros globales (Barrio, Desde/Hasta)', () => {
     act(() => result.current.clearFilters());
     expect(result.current.activities).toHaveLength(2);
     expect(result.current.barrioFilter).toBe('');
-    expect(result.current.desdeFilter).toBe('');
+    // clearFilters resetea al año en curso, no a vacío — mismo default que
+    // el hub (globalDateFrom/globalDateTo), no "sin filtro".
+    expect(result.current.desdeFilter).toBe(getYearStart());
+    expect(result.current.hastaFilter).toBe(getYearEnd());
   });
 
   it('barriosUnicos combina el catálogo con los barrios reales de los puntos', async () => {
@@ -145,5 +157,37 @@ describe('useAdminDashboard — sidebar "Lista de Residuos"', () => {
 
     act(() => result.current.setListSearchNumber('12'));
     expect(result.current.sidebarActivities.map(a => a.pointNumber)).toEqual([12]);
+  });
+});
+
+describe('filterByGeoSectors — paridad con ambientalInsightsData del hub', () => {
+  // Cuadrado simple alrededor de (4.60, -74.08), en formato GeoJSON [lng, lat].
+  const sectorCuadrado = {
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[
+        [-74.10, 4.58], [-74.06, 4.58], [-74.06, 4.62], [-74.10, 4.62], [-74.10, 4.58],
+      ]],
+    },
+  };
+
+  it('sin sectores cargados, no filtra nada (mismo fallback que el hub)', () => {
+    const activities = [
+      makeActivity({ status: 'PUBLICADA', lat: 4.60, lng: -74.08 } as any),
+      makeActivity({ status: 'PUBLICADA', lat: 10, lng: -60 } as any),
+    ];
+    expect(filterByGeoSectors(activities, [])).toHaveLength(2);
+  });
+
+  it('con sectores cargados, excluye los puntos fuera de todos los polígonos', () => {
+    const dentro = makeActivity({ status: 'PUBLICADA', pointNumber: 1, lat: 4.60, lng: -74.08 } as any);
+    const fuera = makeActivity({ status: 'PUBLICADA', pointNumber: 2, lat: 10, lng: -60 } as any);
+    const resultado = filterByGeoSectors([dentro, fuera], [sectorCuadrado]);
+    expect(resultado.map(a => a.pointNumber)).toEqual([1]);
+  });
+
+  it('excluye puntos con lat/lng inválidos en vez de reventar', () => {
+    const sinCoords = makeActivity({ status: 'PUBLICADA', lat: NaN, lng: NaN } as any);
+    expect(filterByGeoSectors([sinCoords], [sectorCuadrado])).toHaveLength(0);
   });
 });

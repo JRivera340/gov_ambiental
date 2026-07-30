@@ -341,6 +341,56 @@ grep -rn "api\.\(get\|post\|patch\|put\|delete\)\|fetchAuthJSON(" frontend/src/s
 # comparar cada endpoint contra: grep -n "@Get\|@Post\|@Patch\|@Put\|@Delete\|@Controller" src/*/*.controller.ts
 ```
 
+## Las cifras del panel ADMIN excluyen puntos fuera del área oficial de recolección (2026-07-30)
+
+**Motivo, para que nadie lo cuestione dentro de 6 meses al no cuadrar un
+número:** el Panel de Control (Ident./Recog./Tasa/Actividades/Pub/Val/Rech)
+replica la misma semántica del hub, confirmada consulta por consulta contra
+`useAdminDashboard.ts` del hub (SOLO LECTURA) — no es una elección propia de
+este repo, es paridad exacta con el original:
+
+1. **Filtro geográfico**: solo cuentan los puntos cuyo `lat/lng` caen dentro
+   de al menos un polígono de `RecoleccionUrbana.kmz`. El mapa y la lista de
+   puntos siguen mostrando TODOS los puntos filtrados, dentro o fuera del
+   área — el filtro geográfico es exclusivo del Panel de Control, igual que
+   en el hub (`ambientalInsightsData` ahí filtra, `filteredMapActivities`
+   no). Implementado en `useAdminDashboard.ts`, función pura exportada
+   `filterByGeoSectors()`, testeada (3 casos, incluida la validación de
+   coordenadas inválidas).
+2. **Rango de fecha por defecto**: 1 de enero a 31 de diciembre del año en
+   curso, siempre activo por defecto (mismo default que `globalDateFrom`/
+   `globalDateTo` del hub, que ahí nunca están "apagados"). Sin este
+   default, hoy no cambiaba nada (los 346 puntos son de 2026), pero en enero
+   el hub pasaría a contar solo el año nuevo y este panel seguiría contando
+   todo el histórico — iban a divergir solos sin que nadie lo tocara.
+   `getYearStart()`/`getYearEnd()` en `adminHelpers.ts`, mismo default en
+   `clearFilters()` y en el reset del selector de mes.
+
+**Los 4 puntos que quedan fuera del área oficial hoy** (calculado corriendo
+el point-in-polygon real contra `RecoleccionUrbana.kmz`, no una estimación):
+
+| # | Barrio | Estado | Lat | Lng |
+|---|---|---|---|---|
+| 76 | RAMIREZ | PUBLICADA | 4.5843689 | -74.0758828 |
+| 224 | EL GUAVIO | PUBLICADA | 4.591317860704099 | -74.07063782209663 |
+| 239 | LOS LACHES | PUBLICADA | 4.582421057068604 | -74.06697038355752 |
+| 295 | RAMIREZ | PUBLICADA | 4.5810215 | -74.0774938 |
+
+**Estos 4 puntos existen, tienen residuos registrados, y hoy no aparecen en
+ninguna cifra del panel de administración de ninguno de los dos sistemas**
+(ni del hub, ni de este repo) — nadie les hace seguimiento agregado, aunque
+siguen siendo visibles en el mapa y en la lista de puntos. Dos hipótesis sin
+resolver, **no se tocan los datos, solo se señala**:
+- El punto se ubicó mal al registrarlo (lat/lng por fuera del barrio real).
+- El polígono de `RecoleccionUrbana.kmz` está incompleto y no cubre una
+  zona donde sí hay recolección real (los 4 caen en RAMIREZ, EL GUAVIO, LOS
+  LACHES — barrios periféricos de la localidad, plausible que el polígono
+  oficial no llegue hasta ahí).
+
+Ninguna de las dos se puede descartar sin que alguien con conocimiento de
+campo revise los 4 puntos en el mapa. Queda como pendiente de investigación,
+no de corrección automática.
+
 ## Divergencias deliberadas
 
 ### Comparación mecánica GESTOR_AMBIENTAL vs hub (2026-07-29, diff archivo por archivo)

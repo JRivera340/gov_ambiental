@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { EnvironmentalTab } from './tabs/EnvironmentalTab';
 import { useAdminDashboard } from './hooks/useAdminDashboard';
+import { getYearStart, getYearEnd } from './utils/adminHelpers';
 
 // Shell de ADMIN de este repo: un solo tab (Sector Ambiental), a diferencia
 // del AdminDashboard multi-dominio del hub (IVC/ESPACIO_PUBLICO/AMBIENTAL/
@@ -112,8 +113,8 @@ export const AdminDashboard: React.FC = () => {
                     dash.setDesdeFilter(`${year}-${month.padStart(2, '0')}-01`);
                     dash.setHastaFilter(`${year}-${month.padStart(2, '0')}-${lastDay.getDate().toString().padStart(2, '0')}`);
                   } else {
-                    dash.setDesdeFilter('');
-                    dash.setHastaFilter('');
+                    dash.setDesdeFilter(getYearStart());
+                    dash.setHastaFilter(getYearEnd());
                   }
                 }}
                 className="input-field w-full py-2 mb-2 bg-neutral-50"

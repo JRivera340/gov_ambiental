@@ -3,7 +3,7 @@ import { activityService } from '../../../services/activity.service';
 import { catalogService } from '../../../services/catalog.service';
 import type { Activity } from '../../../types';
 import type { LayerVisibility } from '../../../components/MapLayerControl';
-import { getResiduos, getPuntoCriticoTier, findTechnicalResidueKey, isPuntoRecogido } from '../utils/adminHelpers';
+import { getResiduos, getPuntoCriticoTier, findTechnicalResidueKey, isPuntoRecogido, isInside, getYearStart, getYearEnd } from '../utils/adminHelpers';
 import { technicalResidueKeys } from '../utils/adminConstants';
 
 export interface AmbientalInsightsData {
@@ -77,6 +77,21 @@ export function computeInsights(activities: Activity[]): AmbientalInsightsData {
   };
 }
 
+// Filtro geográfico — SOLO para el Panel de Control, igual que el hub
+// (ambientalInsightsData ahí filtra por isInside contra RecoleccionUrbana.kmz;
+// el mapa y la lista de puntos muestran TODOS los puntos filtrados, dentro o
+// fuera del área oficial — ver ESTADO-EXTRACCION.md). Si `sectors` está
+// vacío (KMZ no cargó todavía o falló), no filtra nada — mismo fallback que
+// el hub (`allSectors.length === 0 ? true : ...`).
+export function filterByGeoSectors(activities: Activity[], sectors: any[]): Activity[] {
+  if (sectors.length === 0) return activities;
+  return activities.filter(a => {
+    const lat = Number(a.lat), lng = Number(a.lng);
+    if (isNaN(lat) || isNaN(lng)) return false;
+    return sectors.some(sector => isInside(lat, lng, sector.geometry));
+  });
+}
+
 export function useAdminDashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,9 +114,54 @@ export function useAdminDashboard() {
   // ── Filtros globales (panel derecho, portado del hub) ──
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [barrioFilter, setBarrioFilter] = useState('');
-  const [desdeFilter, setDesdeFilter] = useState('');
-  const [hastaFilter, setHastaFilter] = useState('');
+  // Default = año en curso, mismo default que globalDateFrom/globalDateTo del
+  // hub (siempre activos, "globalFiltersEnabled" es true por defecto allá).
+  // Sin este default, en enero el hub pasaría a contar solo el año nuevo y
+  // este panel seguiría contando todo el histórico — divergirían solos.
+  const [desdeFilter, setDesdeFilter] = useState(getYearStart());
+  const [hastaFilter, setHastaFilter] = useState(getYearEnd());
   const [barriosCatalog, setBarriosCatalog] = useState<string[]>([]);
+
+  // ── Sectores de recolección (RecoleccionUrbana.kmz) — SOLO para las cifras
+  // del Panel de Control, igual que el hub (ambientalInsightsData filtra por
+  // isInside contra estos polígonos; el mapa y la lista de puntos NO se
+  // filtran por esto, ver ESTADO-EXTRACCION.md). ──
+  const [allSectors, setAllSectors] = useState<any[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/boundaries/RecoleccionUrbana.kmz');
+        if (!res.ok) return;
+        const buf = await res.arrayBuffer();
+        const JSZip = (await import('jszip')).default;
+        const zip = await JSZip.loadAsync(buf);
+        const kmlFile = Object.keys(zip.files).find(f => f.toLowerCase().endsWith('.kml'));
+        if (!kmlFile) return;
+        const kmlText = await zip.files[kmlFile].async('string');
+        const parser = new DOMParser();
+        const kml = parser.parseFromString(kmlText, 'text/xml');
+        // @ts-ignore
+        const toGeoJSON = (await import('@mapbox/togeojson')).default;
+        const geoJson = toGeoJSON.kml(kml);
+        if (!geoJson || geoJson.type !== 'FeatureCollection' || cancelled) return;
+        const loaded = geoJson.features.filter((f: any) => {
+          if (!f.geometry) return false;
+          const type = f.geometry.type;
+          if (type === 'Polygon' || type === 'MultiPolygon') return true;
+          if (type === 'GeometryCollection') {
+            return (f.geometry.geometries || []).some((g: any) => g.type === 'Polygon' || g.type === 'MultiPolygon');
+          }
+          return false;
+        });
+        if (!cancelled) setAllSectors(loaded);
+      } catch {
+        // Si falla la carga del KMZ, allSectors queda vacío y el filtro
+        // geográfico no se aplica (mismo comportamiento que el hub).
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Sidebar "Lista de Residuos" (portado del hub) ──
   const [mapaEstadoRecoleccionFilter, setMapaEstadoRecoleccionFilter] = useState<'ALL' | 'RECOGIDOS' | 'NO_RECOGIDOS'>('ALL');
@@ -129,7 +189,7 @@ export function useAdminDashboard() {
 
   const clearFilters = () => {
     setStatusFilter(''); setTipoResiduoFilter(''); setBarrioFilter('');
-    setDesdeFilter(''); setHastaFilter('');
+    setDesdeFilter(getYearStart()); setHastaFilter(getYearEnd());
   };
 
   const filteredActivities = useMemo(() => {
@@ -158,7 +218,12 @@ export function useAdminDashboard() {
       .sort((a, b) => (b.pointNumber || 0) - (a.pointNumber || 0));
   }, [filteredActivities, mapaEstadoRecoleccionFilter, listSearchNumber]);
 
-  const ambientalInsightsData = useMemo(() => computeInsights(activities), [activities]);
+  const activitiesForInsights = useMemo(
+    () => filterByGeoSectors(filteredActivities, allSectors),
+    [filteredActivities, allSectors],
+  );
+
+  const ambientalInsightsData = useMemo(() => computeInsights(activitiesForInsights), [activitiesForInsights]);
 
   // Cada PuntoResiduo ya trae su propio pointNumber del backend (a diferencia
   // del hub, que calcula un índice dentro de una lista multi-dominio) --
