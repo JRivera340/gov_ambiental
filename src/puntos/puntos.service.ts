@@ -12,7 +12,7 @@ import { Role } from '../common/enums/role.enum';
 
 export type PublicResiduo = Pick<
   ResiduoEntry,
-  'id' | 'tipoResiduo' | 'areaLinealMetros' | 'percibeOlores' | 'percibeVectores' | 'observaciones' | 'photos' | 'recogido' | 'fechaRecogida' | 'photosRecogida'
+  'id' | 'tipoResiduo' | 'areaLinealMetros' | 'percibeOlores' | 'percibeVectores' | 'observaciones' | 'photos' | 'recogido' | 'fechaRecogida' | 'photosRecogida' | 'dateTime'
 >;
 
 export type PublicPunto = {
@@ -52,6 +52,7 @@ export function toPublicPunto(punto: PuntoResiduo): PublicPunto {
       recogido: r.recogido,
       fechaRecogida: r.fechaRecogida,
       photosRecogida: r.photosRecogida,
+      dateTime: r.dateTime,
     })),
   };
 }
