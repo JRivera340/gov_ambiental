@@ -40,6 +40,8 @@ vi.mock('../../services/users.service', () => ({
 }));
 
 import { AdminActivityDetailPage } from './AdminActivityDetailPage';
+import { activityService } from '../../services/activity.service';
+import { useAuthStore } from '../../store/authStore';
 
 function renderPage() {
   return render(
@@ -75,5 +77,22 @@ describe('AdminActivityDetailPage', () => {
     await waitFor(() => expect(screen.getByText('Ver en Google Maps')).toBeTruthy());
     const link = screen.getByText('Ver en Google Maps').closest('a');
     expect(link?.getAttribute('href')).toBe('https://www.google.com/maps?q=4.6,-74.08');
+  });
+
+  it('NO muestra Aprobar/Rechazar cuando status = RECHAZADA (getActivityPermissions del hub: solo ENVIADA)', async () => {
+    vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'RECHAZADA' } as any);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
+    expect(screen.queryByText('Aprobar')).toBeNull();
+    expect(screen.queryByText('Rechazar')).toBeNull();
+  });
+
+  it('ADMIN ve "Actualizar punto" sin importar el estado', async () => {
+    useAuthStore.setState({ user: { role: 'ADMIN' } as any });
+    vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'PUBLICADA' } as any);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
+    expect(screen.getByText('Actualizar punto')).toBeTruthy();
+    useAuthStore.setState({ user: null });
   });
 });

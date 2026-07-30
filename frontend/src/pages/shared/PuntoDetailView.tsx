@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { activityService } from '../../services/activity.service';
 import { usersService } from '../../services/users.service';
+import { useAuthStore } from '../../store/authStore';
 import { useFileUrl } from '../../hooks/useFileUrl';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ResiduoTipoIcon } from '../../components/ResiduoTipoIcon';
@@ -70,6 +71,7 @@ export interface PuntoDetailViewProps {
 export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const role = useAuthStore(s => s.user?.role);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [creator, setCreator] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,7 +147,14 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
     );
   }
 
-  const canValidate = activity.status === 'ENVIADA' || activity.status === 'RECHAZADA';
+  // Permisos — copiados de utils/permissions.ts::getActivityPermissions del
+  // hub (SOLO LECTURA), no inventados: canApprove/canReject solo con
+  // status ENVIADA (RECHAZADA no tiene esas acciones en el hub — el gestor
+  // corrige y reenvía, no se re-aprueba directo). canEdit: ADMIN siempre,
+  // VALIDADOR_AMBIENTAL solo con ENVIADA (GESTOR_AMBIENTAL no pasa por esta
+  // vista, tiene la suya con su propia regla de "solo lo asignado").
+  const canValidate = activity.status === 'ENVIADA';
+  const canEdit = role === 'ADMIN' || (role === 'VALIDADOR_AMBIENTAL' && activity.status === 'ENVIADA');
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -171,7 +180,17 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
         {/* Información básica + mapa */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="card p-4">
-            <h2 className="text-base font-semibold mb-3">Información Básica</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Información Básica</h2>
+              {canEdit && (
+                <button
+                  onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
+                  className="btn-secondary text-xs"
+                >
+                  Actualizar punto
+                </button>
+              )}
+            </div>
             <dl className="space-y-3 text-sm">
               <div><dt className="font-medium text-neutral-600">Fecha y Hora</dt><dd className="text-neutral-900">{format(new Date(activity.dateTime), 'dd/MM/yyyy HH:mm', { locale: es })}</dd></div>
               <div><dt className="font-medium text-neutral-600">Barrio</dt><dd className="text-neutral-900">{activity.barrio || 'Sin barrio'}</dd></div>

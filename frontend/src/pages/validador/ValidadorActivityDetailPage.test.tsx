@@ -36,22 +36,44 @@ vi.mock('../../services/users.service', () => ({
 }));
 
 import { ValidadorActivityDetailPage } from './ValidadorActivityDetailPage';
+import { activityService } from '../../services/activity.service';
+import { useAuthStore } from '../../store/authStore';
 
 beforeEach(() => vi.clearAllMocks());
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); useAuthStore.setState({ user: null }); });
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={['/validador/actividad/p1']}>
+      <Routes>
+        <Route path="/validador/actividad/:id" element={<ValidadorActivityDetailPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 describe('ValidadorActivityDetailPage', () => {
   it('carga el punto en /validador/actividad/:id, con acciones de validacion', async () => {
-    render(
-      <MemoryRouter initialEntries={['/validador/actividad/p1']}>
-        <Routes>
-          <Route path="/validador/actividad/:id" element={<ValidadorActivityDetailPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderPage();
     await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
     await waitFor(() => expect(screen.getByText(/Beatriz Lopez/)).toBeTruthy());
     expect(screen.getByText('Aprobar')).toBeTruthy();
     expect(screen.getByText('Rechazar')).toBeTruthy();
+  });
+
+  it('VALIDADOR_AMBIENTAL ve "Actualizar punto" con status ENVIADA, no con PUBLICADA (getActivityPermissions del hub)', async () => {
+    useAuthStore.setState({ user: { role: 'VALIDADOR_AMBIENTAL' } as any });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
+    expect(screen.getByText('Actualizar punto')).toBeTruthy();
+  });
+
+  it('VALIDADOR_AMBIENTAL NO ve "Actualizar punto" ni Aprobar/Rechazar con status PUBLICADA', async () => {
+    useAuthStore.setState({ user: { role: 'VALIDADOR_AMBIENTAL' } as any });
+    vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'PUBLICADA' } as any);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
+    expect(screen.queryByText('Actualizar punto')).toBeNull();
+    expect(screen.queryByText('Aprobar')).toBeNull();
   });
 });
