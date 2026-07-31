@@ -9,7 +9,7 @@
 // percibeOlores, percibeVectores, areaLinealMetros) NO están acá — viven en el
 // sub-formulario de residuo dentro de CreateActivity.tsx.
 
-export type CampoTipo = 'RADIO' | 'SELECT' | 'MULTISELECT' | 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'LOCATION';
+export type CampoTipo = 'RADIO' | 'SELECT' | 'MULTISELECT' | 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'LOCATION' | 'SUBSECTION_HEADER';
 
 export interface CampoOpcion {
   value: string;
@@ -180,11 +180,15 @@ export const SECCIONES_PUNTO_ACUMULACION: SeccionCampos[] = [
         label: 'Intervenciones propuestas',
         type: 'TEXTAREA',
       },
-    ],
-  },
-  {
-    titulo: 'Identificación del presunto generador',
-    campos: [
+      // Sub-bloque dentro de "2. Datos del punto" (no es una sección propia
+      // en el hub, es un grupo dentro de la misma). Ver "Cadena de evidencia
+      // para comparendos" en ESTADO-EXTRACCION.md para por qué estos 7 campos
+      // van juntos.
+      {
+        name: 'identificacionGeneradorHeader',
+        label: 'Identificación del presunto generador',
+        type: 'SUBSECTION_HEADER',
+      },
       {
         name: 'identificacionGenerador',
         label: '¿Se logró identificar quién dispone los residuos?',

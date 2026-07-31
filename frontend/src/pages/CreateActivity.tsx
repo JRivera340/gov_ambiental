@@ -171,6 +171,15 @@ const CamposGenerales: React.FC<CamposGeneralesProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {seccion.campos.map((campo) => {
               if (!isFieldVisible(campo.visibleIf, resolveValueByName)) return null;
+
+              if (campo.type === 'SUBSECTION_HEADER') {
+                return (
+                  <div key={campo.name} className="col-span-full border-t border-neutral-200 pt-5 mt-1">
+                    <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-wide">{campo.label}</h4>
+                  </div>
+                );
+              }
+
               const fullWidth = ['LOCATION', 'TEXTAREA', 'MULTISELECT'].includes(campo.type);
               const colSpan = fullWidth ? 'col-span-full' : 'col-span-1';
               return (
