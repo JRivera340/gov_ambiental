@@ -302,6 +302,7 @@ export class PuntosService {
     if (!residuo) throw new NotFoundException('Residuo no encontrado');
     const nota = { id: randomUUID(), fecha: new Date().toISOString(), autorId: userId, autorNombre: email, texto: body.texto };
     residuo.notas = [...(residuo.notas || []), nota];
+    punto.ultimoSeguimientoAt = new Date();
     return this.repo.save(punto);
   }
 

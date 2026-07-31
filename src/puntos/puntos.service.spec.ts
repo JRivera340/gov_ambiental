@@ -368,6 +368,39 @@ describe('PuntosService — ciclo de vida', () => {
     const actualizado = await service.aprobarResiduo(punto.id, nuevos as any);
     expect(actualizado.residuos).toEqual(nuevos);
   });
+
+  // ultimoSeguimientoAt es lo que la ruta semanal usa para marcar un punto
+  // "visitado" (ver frontend/src/pages/gestor-ambiental/lib/visitado.ts).
+  // Las 3 acciones que deben estamparlo, igual que en el hub
+  // (sorver.repository.typeorm.ts): marcar recogido, agregar residuo nuevo,
+  // agregar una nota.
+  it('seguimiento MARCAR_RECOGIDO estampa ultimoSeguimientoAt', async () => {
+    const { service, repo } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await repo.save({ ...punto, residuos: [{ id: 'r1', tipoResiduo: 'ESCOMBROS', quienDispuso: '', dateTime: new Date().toISOString(), percibeOlores: false, percibeVectores: false, areaLinealMetros: 1, photos: [], recogido: false }] } as any);
+    expect((await repo.findById(punto.id))!.ultimoSeguimientoAt).toBeUndefined();
+    const actualizado = await service.seguimiento('user-1', 'user1@test.com', punto.id, { action: 'MARCAR_RECOGIDO', residuoId: 'r1' });
+    expect(actualizado.ultimoSeguimientoAt).toBeInstanceOf(Date);
+  });
+
+  it('seguimiento AGREGAR_RESIDUO estampa ultimoSeguimientoAt', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    const actualizado = await service.seguimiento('user-1', 'user1@test.com', punto.id, {
+      action: 'AGREGAR_RESIDUO',
+      nuevoResiduo: { tipoResiduo: 'PLANTAS', quienDispuso: 'COMUNIDAD', dateTime: new Date().toISOString(), percibeOlores: false, percibeVectores: false, areaLinealMetros: 2, photos: [] },
+    });
+    expect(actualizado.ultimoSeguimientoAt).toBeInstanceOf(Date);
+  });
+
+  it('agregarNota estampa ultimoSeguimientoAt (paridad con el hub, antes no lo hacia)', async () => {
+    const { service, repo } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await repo.save({ ...punto, residuos: [{ id: 'r1', tipoResiduo: 'ESCOMBROS', quienDispuso: '', dateTime: new Date().toISOString(), percibeOlores: false, percibeVectores: false, areaLinealMetros: 1, photos: [], recogido: false }] } as any);
+    const actualizado = await service.agregarNota('user-1', 'user1@test.com', punto.id, { residuoId: 'r1', texto: 'Se ve mas grande hoy' });
+    expect(actualizado.ultimoSeguimientoAt).toBeInstanceOf(Date);
+    expect(actualizado.residuos[0].notas).toHaveLength(1);
+  });
 });
 
 describe('PuntosService — proyeccion publica', () => {
