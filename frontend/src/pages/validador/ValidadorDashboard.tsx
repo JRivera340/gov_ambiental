@@ -250,7 +250,7 @@ export const ValidadorDashboard: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <p className="stat-value text-red-600">{pending.length}</p>
+                <p className="stat-value text-red-600">{filteredPending.length}</p>
                 <p className="stat-label">Actividades Pendientes</p>
               </div>
             </div>
@@ -263,7 +263,7 @@ export const ValidadorDashboard: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <p className="stat-value text-success">{history.length}</p>
+                <p className="stat-value text-success">{filteredHistory.length}</p>
                 <p className="stat-label">Validaciones Realizadas</p>
               </div>
             </div>
@@ -283,7 +283,7 @@ export const ValidadorDashboard: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Puntos Pendientes
-                  <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">{pending.length}</span>
+                  <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">{filteredPending.length}</span>
                 </span>
               </button>
               <button
@@ -295,7 +295,7 @@ export const ValidadorDashboard: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                   </svg>
                   Historial
-                  <span className="bg-neutral-100 text-neutral-600 text-xs font-semibold px-2 py-0.5 rounded-full">{history.length}</span>
+                  <span className="bg-neutral-100 text-neutral-600 text-xs font-semibold px-2 py-0.5 rounded-full">{filteredHistory.length}</span>
                 </span>
               </button>
               <Link
