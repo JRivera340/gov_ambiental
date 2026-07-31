@@ -8,7 +8,7 @@ dockerfilePath = "Dockerfile"
 # sirviendo mal). Usa el data-source compilado (dist/), no ts-node — no
 # requiere el codigo fuente en la imagen final. Ver package.json,
 # "migration:run:dist".
-startCommand = "npm run migration:run:dist && node dist/main"
+startCommand = "npm run migration:run:dist; code=$?; echo \"[DEPLOY] migration:run:dist exit code: $code\"; if [ \"$code\" -ne 0 ]; then exit \"$code\"; fi; echo \"[DEPLOY] arrancando node dist/main\"; exec node dist/main"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
