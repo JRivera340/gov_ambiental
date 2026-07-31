@@ -136,11 +136,11 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
     }
   };
 
+  // Mono-dominio: siempre ambiental (activity.operativoCategoria no existe en
+  // este backend — la rama del hub para IVC/Espacio Publico nunca aplica acá
+  // y apuntaba a una ruta /gestor/editar-actividad/:id inexistente en este repo).
   const handleEdit = () => {
-    const editPath = activity.operativoCategoria === 'AMBIENTAL' 
-      ? `/gestor-ambiental/editar-actividad/${activity.id}`
-      : `/gestor/editar-actividad/${activity.id}`;
-    navigate(editPath);
+    navigate(`/gestor-ambiental/editar-actividad/${activity.id}`);
   };
 
   return (
@@ -160,7 +160,7 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-black tracking-widest opacity-70 uppercase">Foco de Validación</span>
             </div>
-            <h2 className="text-lg font-bold leading-tight">{activity.activityType}</h2>
+            <h2 className="text-lg font-bold leading-tight">Punto #{activity.pointNumber ?? '—'}</h2>
             <p className="text-xs font-medium opacity-90 mt-0.5">{activity.barrio}</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
