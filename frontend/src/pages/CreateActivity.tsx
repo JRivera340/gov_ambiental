@@ -366,6 +366,7 @@ export const CreateActivity: React.FC = () => {
     }
     setLat(newLat);
     setLng(newLng);
+    handleCampoChange('ubicacion_mapa', { lat: newLat, lng: newLng });
     try {
       const barrioName = await findBarrioByPoint(newLat, newLng);
       if (barrioName && catalogs?.barrios.includes(barrioName)) {
@@ -404,6 +405,7 @@ export const CreateActivity: React.FC = () => {
       }
       setLat(latitude);
       setLng(longitude);
+      handleCampoChange('ubicacion_mapa', { lat: latitude, lng: longitude });
       const bName = await findBarrioByPoint(latitude, longitude);
       if (bName) setBarrio(bName);
       setGettingLocation(false);
@@ -463,7 +465,6 @@ export const CreateActivity: React.FC = () => {
     };
 
     const missingRequired = todosLosCampos.filter((c) => c.required && isCampoVisible(c) && !isAnswered(camposValues[c.name]));
-    if (!isAnswered(camposValues['ubicacion_mapa']) && !(lat && lng)) missingRequired.push({ name: 'ubicacion_mapa', label: 'Ubicación', type: 'LOCATION' });
 
     if (missingRequired.length > 0) {
       setToast({ message: `Faltan campos obligatorios: ${missingRequired.map((c) => c.label).join(', ')}`, type: 'error' });
