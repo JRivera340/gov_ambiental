@@ -11,6 +11,7 @@ import {
 } from '../src/puntos/entities/punto-residuo.entity';
 import { PuntoAsignacion } from '../src/asignaciones/entities/punto-asignacion.entity';
 import { RutaSemanal } from '../src/rutas-semanales/entities/ruta-semanal.entity';
+import { Proceso } from '../src/procesos/entities/proceso.entity';
 
 // Migración de UNA SOLA VEZ (batch) desde el hub (gov-espacio-publico) hacia
 // la base propia de ambiental. Lee del hub en SOLO LECTURA (regla permanente,
@@ -261,6 +262,20 @@ async function migrate() {
   `);
   console.log(`[MIGRACION] ${asignacionesRes.rows.length} asignaciones encontradas para puntos ambientales.`);
 
+  // Procesos (agrupan puntos/actividades) — mismo shape en ambos lados
+  // (tabla "processes" en el hub, "procesos" acá). Alcance: solo los
+  // procesos referenciados por al menos un punto ambiental (por processId),
+  // no toda la tabla del hub (que también agrupa IVC/Espacio Público/PYBA).
+  const procesosRes = await oldClient.query(`
+    SELECT id, nombre, descripcion, "createdByUserId", status, "createdAt", "updatedAt"
+    FROM processes
+    WHERE id IN (
+      SELECT DISTINCT "processId" FROM activities
+      WHERE "operativoCategoria" = 'AMBIENTAL' AND "processId" IS NOT NULL
+    )
+  `);
+  console.log(`[MIGRACION] ${procesosRes.rows.length} procesos encontrados referenciados por puntos ambientales.`);
+
   await oldClient.end();
 
   // Base de ambiental: NUNCA synchronize contra producción (regla permanente,
@@ -274,13 +289,33 @@ async function migrate() {
     password: env.DB_PASSWORD,
     database: env.DB_DATABASE,
     synchronize: false,
-    entities: [PuntoResiduo, PuntoAsignacion, RutaSemanal],
+    entities: [PuntoResiduo, PuntoAsignacion, RutaSemanal, Proceso],
   });
   await dataSource.initialize();
 
   const puntosRepo = dataSource.getRepository(PuntoResiduo);
   const asignacionesRepo = dataSource.getRepository(PuntoAsignacion);
   const rutasRepo = dataSource.getRepository(RutaSemanal);
+  const procesosRepo = dataSource.getRepository(Proceso);
+
+  // Procesos primero: puntos_residuo.processId los referencia (FK logica).
+  let procesosMigrados = 0;
+  for (const p of procesosRes.rows) {
+    await procesosRepo.upsert(
+      {
+        id: p.id,
+        nombre: p.nombre,
+        descripcion: p.descripcion || undefined,
+        createdByUserId: p.createdByUserId,
+        status: p.status,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      } as any,
+      ['id'],
+    );
+    procesosMigrados++;
+  }
+  console.log(`[MIGRACION] ${procesosMigrados} procesos migrados/actualizados.`);
 
   // Idempotencia POR REGISTRO (upsert por id), no por tabla. Si el proceso se
   // corta a mitad, volver a correrlo retoma sin duplicar ni requerir limpiar
@@ -402,6 +437,7 @@ async function migrate() {
   console.log(`  puntos_residuo: ${migrados} (origen: ${rows.length})`);
   console.log(`  ruta_semanal: ${rutasMigradas} (origen: ${rutasRes.rows.length})`);
   console.log(`  punto_asignacion: ${asignacionesMigradas} (origen: ${asignacionesRes.rows.length})`);
+  console.log(`  procesos: ${procesosMigrados} (origen: ${procesosRes.rows.length})`);
 
   await dataSource.destroy();
 }
