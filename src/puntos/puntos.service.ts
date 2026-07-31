@@ -72,10 +72,24 @@ export class PuntosService {
       recogido: false,
       createdByUserId: userId,
     }));
+    const tipoOperativo = dto.tipoOperativo || TipoOperativo.PUNTO_ACUMULACION;
+    // Numero consecutivo visible (#386, #440...) — solo para puntos de
+    // acumulacion, igual que el hub (sorver.repository.typeorm.ts). Mismo
+    // algoritmo: menor numero entero positivo no usado, no simplemente
+    // MAX+1 (si hubiera huecos los llena; en la practica, sin huecos, da
+    // el mismo resultado que continuar tras el mas alto).
+    let pointNumber: number | undefined;
+    if (tipoOperativo === TipoOperativo.PUNTO_ACUMULACION) {
+      const usedNumbers = new Set(await this.repo.findUsedPointNumbers());
+      let nextNumber = 1;
+      while (usedNumbers.has(nextNumber)) nextNumber++;
+      pointNumber = nextNumber;
+    }
     const punto = await this.repo.create({
       createdByUserId: userId,
       status: EstadoPunto.BORRADOR,
-      tipoOperativo: dto.tipoOperativo || TipoOperativo.PUNTO_ACUMULACION,
+      tipoOperativo,
+      pointNumber,
       puntosCriticosEmergentesAtendidos: dto.puntosCriticosEmergentesAtendidos,
       comparendosPedagogicos: dto.comparendosPedagogicos,
       comparendos: dto.comparendos,

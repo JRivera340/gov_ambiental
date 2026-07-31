@@ -52,4 +52,10 @@ export class InMemoryPuntosRepository implements PuntosRepository {
   async deleteMany(ids: string[]): Promise<void> {
     for (const id of ids) this.puntos.delete(id);
   }
+
+  async findUsedPointNumbers(): Promise<number[]> {
+    return Array.from(this.puntos.values())
+      .map((p) => p.pointNumber)
+      .filter((n): n is number => typeof n === 'number' && n > 0);
+  }
 }

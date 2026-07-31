@@ -52,4 +52,13 @@ export class TypeOrmPuntosRepository implements PuntosRepository {
     if (ids.length === 0) return;
     await this.repo.delete(ids);
   }
+
+  async findUsedPointNumbers(): Promise<number[]> {
+    const rows = await this.repo
+      .createQueryBuilder('p')
+      .select('p.pointNumber', 'num')
+      .where('p.pointNumber IS NOT NULL AND p.pointNumber > 0')
+      .getRawMany();
+    return rows.map((r: any) => parseInt(r.num, 10)).filter((n: number) => !isNaN(n));
+  }
 }

@@ -9,4 +9,6 @@ export interface PuntosRepository {
   findAll(filters?: { desde?: string; hasta?: string }): Promise<PuntoResiduo[]>;
   save(punto: PuntoResiduo): Promise<PuntoResiduo>;
   deleteMany(ids: string[]): Promise<void>;
+  /** Todos los pointNumber ya asignados (>0), para calcular el siguiente disponible. */
+  findUsedPointNumbers(): Promise<number[]>;
 }

@@ -22,6 +22,37 @@ describe('PuntosService', () => {
     return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
   };
 
+  it('asigna pointNumber=1 al primer punto de acumulacion creado', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    expect(punto.pointNumber).toBe(1);
+  });
+
+  it('el siguiente punto de acumulacion llena huecos antes de continuar tras el mas alto (igual que el hub)', async () => {
+    const { service, repo } = makeService();
+    // Simula datos migrados: puntos con numero 1 y 440 ya usados, hueco en 2..439.
+    await repo.create({ createdByUserId: 'x', status: EstadoPunto.PUBLICADA, tipoOperativo: TipoOperativo.PUNTO_ACUMULACION, pointNumber: 1, dateTime: new Date(), lat: 1, lng: 1, barrio: 'A', photos: [], isGroupOperativo: false, residuos: [] } as any);
+    await repo.create({ createdByUserId: 'x', status: EstadoPunto.PUBLICADA, tipoOperativo: TipoOperativo.PUNTO_ACUMULACION, pointNumber: 440, dateTime: new Date(), lat: 1, lng: 1, barrio: 'A', photos: [], isGroupOperativo: false, residuos: [] } as any);
+
+    const nuevo = await service.create('user-1', { lat: 2, lng: 2, barrio: 'B' });
+    expect(nuevo.pointNumber).toBe(2);
+  });
+
+  it('sin huecos, el siguiente punto continua tras el numero mas alto', async () => {
+    const { service, repo } = makeService();
+    await repo.create({ createdByUserId: 'x', status: EstadoPunto.PUBLICADA, tipoOperativo: TipoOperativo.PUNTO_ACUMULACION, pointNumber: 1, dateTime: new Date(), lat: 1, lng: 1, barrio: 'A', photos: [], isGroupOperativo: false, residuos: [] } as any);
+    await repo.create({ createdByUserId: 'x', status: EstadoPunto.PUBLICADA, tipoOperativo: TipoOperativo.PUNTO_ACUMULACION, pointNumber: 2, dateTime: new Date(), lat: 1, lng: 1, barrio: 'A', photos: [], isGroupOperativo: false, residuos: [] } as any);
+
+    const nuevo = await service.create('user-1', { lat: 2, lng: 2, barrio: 'B' });
+    expect(nuevo.pointNumber).toBe(3);
+  });
+
+  it('no asigna pointNumber a un operativo GENERICO', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A', tipoOperativo: TipoOperativo.GENERICO } as any);
+    expect(punto.pointNumber).toBeUndefined();
+  });
+
   it('crea un punto con entidad responsable, acompanantes y gestores involucrados', async () => {
     const { service } = makeService();
     const punto = await service.create('user-1', {
