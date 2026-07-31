@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { Icon } from 'leaflet';
 
 import { activityService } from '../services/activity.service';
 import { catalogService } from '../services/catalog.service';
 import { usersService } from '../services/users.service';
-import { BoundaryLayer } from '../components/BoundaryLayer';
-import { BarriosLayer } from '../components/BarriosLayer';
 import { Toast } from '../components/Toast';
 import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
 import { ActaUpload } from '../components/ActaUpload';
+import { CamposGenerales } from '../components/CamposGenerales';
+import type { LayerVisibility } from '../components/MapLayerControl';
+import { SECCIONES_PUNTO_ACUMULACION } from '../config/camposPuntoAcumulacion';
 import type { Activity, Catalogs, ResiduoEntry, User } from '../types';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
 import { loadSantaFeBoundaries, isPointInBoundaries, isPointInCandelaria, findBarrioByPoint } from '../utils/boundaryValidation';
@@ -30,21 +29,15 @@ import type { GeoJSON } from 'geojson';
 // "volver" y navegación tras guardar), sin importar qué rol/ruta la abrió —
 // un VALIDADOR_AMBIENTAL que entraba a editar terminaba en el panel de
 // gestor, cruzando una frontera de rol que nunca debía cruzar.
-
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-const defaultIcon = new Icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-
-function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void }) {
-  useMapEvents({ click: (e) => onClick(e.latlng.lat, e.latlng.lng) });
-  return null;
-}
+//
+// Corregido 2026-08-01 (recorrido visual siguiente): el formulario abría con
+// los 26 campos del formulario fijo (frecuenciaAcumulacion, tipoZona,
+// tipoSuelo, camarasPunto, identificacionGenerador, etc. — ver
+// config/camposPuntoAcumulacion.ts) completamente ausentes — nunca se
+// renderizaban acá, solo ubicación/fotos/acta/entidad/residuos. Ahora usa
+// `CamposGenerales` (extraído de CreateActivity.tsx a
+// components/CamposGenerales.tsx para no reconstruirlo a mano) precargado
+// con `camposValues` desde el punto cargado.
 
 export const EditActivity: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -75,11 +68,25 @@ export const EditActivity: React.FC = () => {
   const [nuevoResiduoValues, setNuevoResiduoValues] = useState<Record<string, any>>({});
   const [editingResiduoId, setEditingResiduoId] = useState<string | null>(null);
 
-  const [entidadResponsable, setEntidadResponsable] = useState('');
   const [entidadesAcompanantes, setEntidadesAcompanantes] = useState<string[]>([]);
   const [gestoresInvolucradosIds, setGestoresInvolucradosIds] = useState<string[]>([]);
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
   const [gestores, setGestores] = useState<User[]>([]);
+
+  // Los 26 campos del formulario fijo (ver config/camposPuntoAcumulacion.ts),
+  // renderizados con el mismo CamposGenerales que CreateActivity.tsx.
+  const [camposValues, setCamposValues] = useState<Record<string, any>>({});
+  const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>({
+    barrios: false, carrera7: false, colegios: false, cestas: false, falloSanVictorino: false,
+    propiedadHorizontal: false, upz: false, cambuches: false, bodegas: false,
+  });
+  const [gettingLocation, setGettingLocation] = useState(false);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [locationError, setLocationError] = useState('');
+
+  const handleCampoChange = (name: string, value: any) => {
+    setCamposValues((prev) => ({ ...prev, [name]: value }));
+  };
 
   useEffect(() => {
     loadData();
@@ -111,9 +118,39 @@ export const EditActivity: React.FC = () => {
       setPhotos(data.photos || []);
       setActaPdfUrl(data.actaPdfUrl || '');
       setResiduos(data.residuos || []);
-      setEntidadResponsable(data.entidadResponsable || '');
       setEntidadesAcompanantes(data.entidadesAcompanantes || []);
       setGestoresInvolucradosIds((data.gestoresInvolucrados || []).map((g) => g.id));
+      setCamposValues({
+        ubicacion_mapa: { lat: data.lat, lng: data.lng },
+        fecha_operativo: data.dateTime ? data.dateTime.slice(0, 16) : undefined,
+        entidad_responsable: data.entidadResponsable || undefined,
+        frecuenciaAcumulacion: data.frecuenciaAcumulacion ?? undefined,
+        observaciones: data.observaciones ?? undefined,
+        entornoEscolar: data.entornoEscolar ?? undefined,
+        nombreEntornoEscolar: data.nombreEntornoEscolar ?? undefined,
+        especificarEntorno: data.especificarEntorno ?? undefined,
+        tipoZona: data.tipoZona ?? undefined,
+        tipoSuelo: data.tipoSuelo ?? undefined,
+        condicionesZona: data.condicionesZona ?? undefined,
+        poblacionHabitanteCalle: data.poblacionHabitanteCalle ?? undefined,
+        factoresAcumulacion: data.factoresAcumulacion ?? undefined,
+        camarasPunto: data.camarasPunto ?? undefined,
+        operadorAseo: data.operadorAseo ?? undefined,
+        recoleccionPuertaAPuerta: data.recoleccionPuertaAPuerta ?? undefined,
+        m2Invasion: data.m2Invasion ?? undefined,
+        actoresIndisciplina: data.actoresIndisciplina ?? undefined,
+        intervencionesPropuestas: data.intervencionesPropuestas ?? undefined,
+        identificacionGenerador: data.identificacionGenerador ?? undefined,
+        tipoGenerador: data.tipoGenerador ?? undefined,
+        nombreResponsable: data.nombreResponsable ?? undefined,
+        direccionResponsable: data.direccionResponsable ?? undefined,
+        observoDisposicion: data.observoDisposicion ?? undefined,
+        fechaObservacion: data.fechaObservacion ? data.fechaObservacion.slice(0, 16) : undefined,
+        metodoIdentificacion: data.metodoIdentificacion ?? undefined,
+        actoresEstrategicos: data.actoresEstrategicos ?? undefined,
+        telefonoActor: data.telefonoActor ?? undefined,
+        intervencionesRecomendadas: data.intervencionesRecomendadas ?? undefined,
+      });
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al cargar el punto', type: 'error' });
       setTimeout(() => navigate(backTo), 2000);
@@ -134,8 +171,73 @@ export const EditActivity: React.FC = () => {
     }
     setLat(newLat);
     setLng(newLng);
+    handleCampoChange('ubicacion_mapa', { lat: newLat, lng: newLng });
     const barrioName = await findBarrioByPoint(newLat, newLng);
     if (barrioName) setBarrio(barrioName);
+  };
+
+  const getLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocalización no disponible en este navegador');
+      return;
+    }
+    setLocationError('');
+    setLocationAccuracy(null);
+    setGettingLocation(true);
+
+    const ACCURACY_THRESHOLD = 150;
+    let watchId: number;
+    let bestPos: GeolocationPosition | null = null;
+
+    const applyPosition = async (pos: GeolocationPosition) => {
+      const { latitude, longitude } = pos.coords;
+      const inCandelaria = await isPointInCandelaria(latitude, longitude);
+      if (inCandelaria) {
+        setLocationError('Ubicación dentro de Candelaria — no permitida');
+        setGettingLocation(false);
+        setLocationAccuracy(null);
+        return;
+      }
+      if (boundaries && !isPointInBoundaries(latitude, longitude, boundaries)) {
+        setLocationError('Ubicación fuera de los límites de Santa Fe — debe estar dentro de la localidad');
+        setGettingLocation(false);
+        setLocationAccuracy(null);
+        return;
+      }
+      setLat(latitude);
+      setLng(longitude);
+      handleCampoChange('ubicacion_mapa', { lat: latitude, lng: longitude });
+      const bName = await findBarrioByPoint(latitude, longitude);
+      if (bName) setBarrio(bName);
+      setGettingLocation(false);
+      setLocationAccuracy(null);
+    };
+
+    const fallbackTimer = setTimeout(() => {
+      navigator.geolocation.clearWatch(watchId);
+      if (bestPos) applyPosition(bestPos);
+      else { setLocationError('No se pudo obtener ubicación'); setGettingLocation(false); setLocationAccuracy(null); }
+    }, 10000);
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        bestPos = pos;
+        setLocationAccuracy(pos.coords.accuracy);
+        if (pos.coords.accuracy <= ACCURACY_THRESHOLD) {
+          clearTimeout(fallbackTimer);
+          navigator.geolocation.clearWatch(watchId);
+          applyPosition(pos);
+        }
+      },
+      (err) => {
+        clearTimeout(fallbackTimer);
+        navigator.geolocation.clearWatch(watchId);
+        setLocationError(err.code === 1 ? 'Permiso de ubicación denegado' : 'Error al obtener ubicación');
+        setGettingLocation(false);
+        setLocationAccuracy(null);
+      },
+      { enableHighAccuracy: true, maximumAge: 0 },
+    );
   };
 
   const save = async (thenSend: boolean) => {
@@ -146,9 +248,39 @@ export const EditActivity: React.FC = () => {
     }
     setSaving(true);
     try {
+      // Mismo mapeo de camposValues -> DTO que CreateActivity.tsx (rama
+      // PUNTO_ACUMULACION de onSubmit), para no divergir en cómo se coercionan
+      // los booleanos guardados como radio 'true'/'false'.
       await activityService.update(activity.id, {
         lat, lng, barrio, photos, actaPdfUrl, residuos,
-        entidadResponsable, entidadesAcompanantes, gestoresInvolucradosIds,
+        entidadResponsable: camposValues['entidad_responsable'],
+        entidadesAcompanantes, gestoresInvolucradosIds,
+        frecuenciaAcumulacion: camposValues['frecuenciaAcumulacion'],
+        observaciones: camposValues['observaciones'],
+        entornoEscolar: camposValues['entornoEscolar'] !== undefined ? camposValues['entornoEscolar'] === 'true' || camposValues['entornoEscolar'] === true : undefined,
+        nombreEntornoEscolar: camposValues['nombreEntornoEscolar'],
+        especificarEntorno: camposValues['especificarEntorno'],
+        tipoZona: camposValues['tipoZona'],
+        tipoSuelo: camposValues['tipoSuelo'],
+        condicionesZona: camposValues['condicionesZona'],
+        poblacionHabitanteCalle: camposValues['poblacionHabitanteCalle'] !== undefined ? camposValues['poblacionHabitanteCalle'] === 'true' || camposValues['poblacionHabitanteCalle'] === true : undefined,
+        factoresAcumulacion: camposValues['factoresAcumulacion'],
+        camarasPunto: camposValues['camarasPunto'],
+        operadorAseo: camposValues['operadorAseo'],
+        recoleccionPuertaAPuerta: camposValues['recoleccionPuertaAPuerta'] !== undefined ? camposValues['recoleccionPuertaAPuerta'] === 'true' || camposValues['recoleccionPuertaAPuerta'] === true : undefined,
+        m2Invasion: camposValues['m2Invasion'],
+        actoresIndisciplina: camposValues['actoresIndisciplina'],
+        intervencionesPropuestas: camposValues['intervencionesPropuestas'],
+        identificacionGenerador: camposValues['identificacionGenerador'],
+        tipoGenerador: camposValues['tipoGenerador'],
+        nombreResponsable: camposValues['nombreResponsable'],
+        direccionResponsable: camposValues['direccionResponsable'],
+        observoDisposicion: camposValues['observoDisposicion'] !== undefined ? camposValues['observoDisposicion'] === 'true' || camposValues['observoDisposicion'] === true : undefined,
+        fechaObservacion: camposValues['fechaObservacion'] ? new Date(camposValues['fechaObservacion']).toISOString() : undefined,
+        metodoIdentificacion: camposValues['metodoIdentificacion'],
+        actoresEstrategicos: camposValues['actoresEstrategicos'],
+        telefonoActor: camposValues['telefonoActor'],
+        intervencionesRecomendadas: camposValues['intervencionesRecomendadas'],
       } as any);
       if (thenSend) {
         await activityService.send(activity.id);
@@ -195,21 +327,29 @@ export const EditActivity: React.FC = () => {
           </div>
         )}
 
+        <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
+          <CamposGenerales
+            secciones={SECCIONES_PUNTO_ACUMULACION}
+            values={camposValues}
+            onChange={handleCampoChange}
+            lat={lat}
+            lng={lng}
+            barrio={barrio}
+            boundaries={boundaries}
+            layerVisibility={layerVisibility}
+            onLayerVisibilityChange={(l, v) => setLayerVisibility((p) => ({ ...p, [l]: v }))}
+            onToggleAllLayers={(v) => setLayerVisibility({ barrios: v, carrera7: v, colegios: v, cestas: v, falloSanVictorino: v, propiedadHorizontal: v, upz: v, cambuches: v, bodegas: v })}
+            onMapClick={handleMapClick}
+            getLocation={getLocation}
+            gettingLocation={gettingLocation}
+            locationAccuracy={locationAccuracy}
+            locationError={locationError}
+            gestores={gestores}
+          />
+        </div>
+
         <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100 space-y-6">
-          <h2 className="text-lg font-bold text-primary">Ubicación</h2>
-          <div className="h-80 rounded-2xl overflow-hidden border-2 border-neutral-100 shadow-inner">
-            <MapContainer center={[lat, lng]} zoom={16} style={{ height: '100%', width: '100%' }}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <BoundaryLayer kmlPath="/boundaries/KMZ_Sectores_Catastrales_SF_2026.kmz" color="#DC2626" fillOpacity={0.1} />
-              <BarriosLayer color="#2563eb" fillColor="#2563eb" fillOpacity={0.05} weight={1} />
-              <Marker position={[lat, lng]} icon={defaultIcon} />
-              <MapClickHandler onClick={handleMapClick} />
-            </MapContainer>
-          </div>
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center">
-            <span className="text-[10px] text-emerald-600 uppercase font-bold block">Barrio</span>
-            <span className="text-sm font-bold text-emerald-800">{barrio || 'Toca el mapa para detectar el barrio'}</span>
-          </div>
+          <h2 className="text-lg font-bold text-primary">Fotos y Acta</h2>
 
           <div>
             <label className="block text-sm font-semibold text-neutral-700 mb-2">Fotos del punto</label>
@@ -224,14 +364,6 @@ export const EditActivity: React.FC = () => {
 
         <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100 space-y-6">
           <h2 className="text-lg font-bold text-primary">Entidades y Gestores</h2>
-
-          <div>
-            <label className="block text-sm font-semibold text-neutral-700 mb-2">Entidad responsable</label>
-            <select value={entidadResponsable} onChange={(e) => setEntidadResponsable(e.target.value)} className="input-field">
-              <option value="">Seleccionar entidad</option>
-              {(catalogs?.entidades || []).map((e) => <option key={e} value={e}>{e}</option>)}
-            </select>
-          </div>
 
           <div>
             <label className="block text-sm font-semibold text-neutral-700 mb-2">Entidades acompañantes</label>
@@ -295,6 +427,13 @@ export const EditActivity: React.FC = () => {
                       <button type="button" onClick={() => setResiduos(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700 p-2 text-xl font-bold leading-none">×</button>
                     </div>
                   </div>
+                  {r.photos?.length > 0 && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {r.photos.map((url, pi) => (
+                        <img key={pi} src={url.startsWith('http') ? url : `https://pub-cabe26a560384a89a7e2a82367fb1813.r2.dev/${url}`} alt="" className="w-14 h-14 object-cover rounded-lg border border-neutral-200" />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
