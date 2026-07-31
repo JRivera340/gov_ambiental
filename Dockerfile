@@ -12,9 +12,16 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/scripts/run-migrations-dist.js ./scripts/run-migrations-dist.js
 COPY package*.json ./
 EXPOSE 3001
-# Migracion antes de arrancar: si falla, el contenedor no arranca (mejor
-# caido que sirviendo contra un esquema viejo). Usa dist/, no requiere
-# ts-node ni el codigo fuente en esta imagen. El codigo de salida se imprime
-# explicitamente (diagnostico temporal: node dist/main no llegaba a arrancar
-# tras la migracion y no habia forma de ver por que).
-CMD ["sh", "-c", "npm run migration:run:dist; code=$?; echo \"[DEPLOY] migration:run:dist exit code: $code\"; if [ \"$code\" -ne 0 ]; then exit \"$code\"; fi; echo \"[DEPLOY] arrancando node dist/main\"; exec node dist/main"]
+# Migracion automatica en el arranque REVERTIDA 2026-07-31: 4 intentos
+# distintos (CLI directo, script propio con destroy(), sin destroy(), con
+# diagnostico de codigo de salida) rompieron el healthcheck sin que los logs
+# mostraran una causa clara — ni el echo de diagnostico llegaba a imprimirse,
+# senal de que el problema esta en como Railway ejecuta este CMD/startCommand,
+# no en el script en si. La migracion pendiente (TipoOperativoGenerico) ya
+# corrio y quedo comprometida en produccion (confirmado en logs: CREATE TYPE,
+# ALTER TABLE, COMMIT) antes de que el contenedor de ese intento muriera, asi
+# que no bloquea este revert. Migraciones futuras: correr a mano con
+# "npm run migration:run:dist" (requiere DB_HOST/DB_PORT del proxy publico,
+# no el hostname interno, si se corre fuera de la red de Railway). Pendiente
+# de investigar con mas tiempo/acceso interactivo — ver RESUMEN-NOCHE.md.
+CMD ["node", "dist/main"]

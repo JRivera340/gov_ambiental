@@ -3,12 +3,9 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# La migracion corre ANTES de levantar la app: si falla, el deploy falla y el
-# codigo nuevo nunca sirve trafico contra un esquema viejo (mejor caido que
-# sirviendo mal). Usa el data-source compilado (dist/), no ts-node — no
-# requiere el codigo fuente en la imagen final. Ver package.json,
-# "migration:run:dist".
-startCommand = "npm run migration:run:dist; code=$?; echo \"[DEPLOY] migration:run:dist exit code: $code\"; if [ \"$code\" -ne 0 ]; then exit \"$code\"; fi; echo \"[DEPLOY] arrancando node dist/main\"; exec node dist/main"
+# Migracion automatica en el arranque REVERTIDA 2026-07-31 — ver Dockerfile
+# para el detalle. startCommand explicito eliminado para que el CMD del
+# Dockerfile mande sin ambiguedad.
 healthcheckPath = "/api/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
