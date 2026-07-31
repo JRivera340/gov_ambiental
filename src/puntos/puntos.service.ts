@@ -144,19 +144,26 @@ export class PuntosService {
     return this.repo.findByCreator(userId);
   }
 
-  // Solo el creador puede editar, y solo mientras el punto no esté publicado
-  // (BORRADOR o RECHAZADA — para corregir y reenviar). Una vez ENVIADA o
-  // PUBLICADA, los cambios pasan por seguimiento/aprobar-residuo, no por acá.
+  // Permisos igual que el hub (utils/permissions.ts::getActivityPermissions,
+  // SOLO LECTURA): GESTOR_AMBIENTAL solo lo suyo y solo BORRADOR/RECHAZADA;
+  // ADMIN cualquier punto en cualquier estado; VALIDADOR_AMBIENTAL cualquier
+  // punto pero solo con status ENVIADA. Corregido 2026-08-01: antes el
+  // status quedaba restringido a BORRADOR/RECHAZADA para TODOS los roles
+  // por igual — el backend rechazaba con 400 la edición de un punto ENVIADA
+  // aunque el frontend ya mostraba el botón "Editar" a VALIDADOR_AMBIENTAL
+  // para ese mismo caso (canEdit sí era fiel al hub, el backend no).
   async update(id: string, userId: string, role: Role, dto: UpdatePuntoDto): Promise<PuntoResiduo> {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
-    // GESTOR_AMBIENTAL solo puede editar lo suyo. VALIDADOR_AMBIENTAL/ADMIN
-    // pueden editar cualquier punto, igual que en el hub.
-    const puedeEditarCualquiera = role === Role.VALIDADOR_AMBIENTAL || role === Role.ADMIN;
-    if (!puedeEditarCualquiera && punto.createdByUserId !== userId) {
-      throw new ForbiddenException('Solo el creador puede editar el punto');
+
+    const esGestorPropio = role === Role.GESTOR_AMBIENTAL && punto.createdByUserId === userId;
+    const esAdmin = role === Role.ADMIN;
+    const esValidadorEnEnviada = role === Role.VALIDADOR_AMBIENTAL && punto.status === EstadoPunto.ENVIADA;
+
+    if (!esGestorPropio && !esAdmin && !esValidadorEnEnviada) {
+      throw new ForbiddenException('No tiene permiso para editar este punto en su estado actual');
     }
-    if (punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
+    if (esGestorPropio && punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
       throw new BadRequestException('Solo se puede editar un punto en borrador o rechazado');
     }
 

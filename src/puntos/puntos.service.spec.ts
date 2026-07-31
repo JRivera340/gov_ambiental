@@ -200,16 +200,24 @@ describe('PuntosService', () => {
       await expect(service.update(punto.id, 'otro-user', Role.GESTOR_AMBIENTAL, { barrio: 'X' })).rejects.toThrow();
     });
 
-    it('permite a VALIDADOR_AMBIENTAL editar un punto que no creo', async () => {
+    it('permite a VALIDADOR_AMBIENTAL editar un punto ENVIADA que no creo (canEdit del hub: validador + ENVIADA)', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      await service.send(punto.id, 'user-1');
       const actualizado = await service.update(punto.id, 'validador-1', Role.VALIDADOR_AMBIENTAL, { barrio: 'Editado por validador' });
       expect(actualizado.barrio).toBe('Editado por validador');
     });
 
-    it('permite a ADMIN editar un punto que no creo', async () => {
+    it('rechaza a VALIDADOR_AMBIENTAL editar un punto en BORRADOR (todavia no ENVIADA) — bug real corregido 2026-08-01', async () => {
       const { service } = makeService();
       const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      await expect(service.update(punto.id, 'validador-1', Role.VALIDADOR_AMBIENTAL, { barrio: 'X' })).rejects.toThrow();
+    });
+
+    it('permite a ADMIN editar un punto que no creo, en cualquier estado', async () => {
+      const { service } = makeService();
+      const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+      await service.send(punto.id, 'user-1');
       const actualizado = await service.update(punto.id, 'admin-1', Role.ADMIN, { barrio: 'Editado por admin' });
       expect(actualizado.barrio).toBe('Editado por admin');
     });

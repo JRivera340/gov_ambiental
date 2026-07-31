@@ -15,14 +15,21 @@ import { ActaUpload } from '../components/ActaUpload';
 import type { Activity, Catalogs, ResiduoEntry, User } from '../types';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
 import { loadSantaFeBoundaries, isPointInBoundaries, isPointInCandelaria, findBarrioByPoint } from '../utils/boundaryValidation';
+import { useAuthStore } from '../store/authStore';
 import type { GeoJSON } from 'geojson';
 
 // Reescrito (no es un recorte línea por línea del `EditActivity` genérico del
 // monolito — ese maneja IVC/Espacio Público/PYBA con campos legacy que no
-// existen en este backend). Acá el alcance es el real de este repo: corregir
-// un punto en BORRADOR o RECHAZADA (lat/lng/barrio/fotos/acta/residuos) antes
-// de reenviarlo a validación — el backend (`PATCH /puntos/:id`) solo permite
-// editar en esos dos estados, igual que antes.
+// existen en este backend). Compartido por 3 roles, igual que en el hub
+// (`canEdit` de utils/permissions.ts): GESTOR_AMBIENTAL corrige lo suyo en
+// BORRADOR/RECHAZADA y puede reenviar a validación; ADMIN edita cualquier
+// punto en cualquier estado; VALIDADOR_AMBIENTAL edita cualquier punto solo
+// mientras está ENVIADA — ninguno de los dos últimos "reenvía" (ver botón
+// más abajo, gateado por rol). Corregido 2026-08-01: antes esta vista
+// SIEMPRE expulsaba a `/gestor-ambiental/dashboard` (guard de carga, botón
+// "volver" y navegación tras guardar), sin importar qué rol/ruta la abrió —
+// un VALIDADOR_AMBIENTAL que entraba a editar terminaba en el panel de
+// gestor, cruzando una frontera de rol que nunca debía cruzar.
 
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -42,6 +49,14 @@ function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => v
 export const EditActivity: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+
+  // Adónde vuelve esta vista según quién la abrió — nunca un panel de otro
+  // rol. GESTOR_AMBIENTAL vuelve a su dashboard (como siempre); ADMIN y
+  // VALIDADOR_AMBIENTAL vuelven al detalle del punto que estaban editando.
+  const backTo = role === 'ADMIN' ? `/admin/actividad/${id}`
+    : role === 'VALIDADOR_AMBIENTAL' ? `/validador/actividad/${id}`
+    : '/gestor-ambiental/dashboard';
 
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,9 +93,15 @@ export const EditActivity: React.FC = () => {
     if (!id) return;
     try {
       const data = await activityService.getById(id);
-      if (data.status !== 'BORRADOR' && data.status !== 'RECHAZADA') {
-        setToast({ message: 'Solo se puede editar un punto en borrador o rechazado', type: 'error' });
-        setTimeout(() => navigate('/gestor-ambiental/dashboard'), 2000);
+      // Mismo permiso que el backend (puntos.service.ts::update) — ver
+      // comentario del archivo. GESTOR_AMBIENTAL: solo BORRADOR/RECHAZADA.
+      // ADMIN: cualquier estado. VALIDADOR_AMBIENTAL: solo ENVIADA.
+      const puedeEditar = role === 'ADMIN'
+        || (role === 'VALIDADOR_AMBIENTAL' && data.status === 'ENVIADA')
+        || (role === 'GESTOR_AMBIENTAL' && (data.status === 'BORRADOR' || data.status === 'RECHAZADA'));
+      if (!puedeEditar) {
+        setToast({ message: 'No tiene permiso para editar este punto en su estado actual', type: 'error' });
+        setTimeout(() => navigate(backTo), 2000);
         return;
       }
       setActivity(data);
@@ -95,7 +116,7 @@ export const EditActivity: React.FC = () => {
       setGestoresInvolucradosIds((data.gestoresInvolucrados || []).map((g) => g.id));
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al cargar el punto', type: 'error' });
-      setTimeout(() => navigate('/gestor-ambiental/dashboard'), 2000);
+      setTimeout(() => navigate(backTo), 2000);
     } finally {
       setLoading(false);
     }
@@ -135,13 +156,19 @@ export const EditActivity: React.FC = () => {
       } else {
         setToast({ message: 'Cambios guardados', type: 'success' });
       }
-      setTimeout(() => navigate('/gestor-ambiental/dashboard'), 1500);
+      setTimeout(() => navigate(backTo), 1500);
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al guardar', type: 'error' });
     } finally {
       setSaving(false);
     }
   };
+
+  // "Reenviar a validación" es una acción exclusiva de GESTOR_AMBIENTAL
+  // corrigiendo lo suyo (BORRADOR/RECHAZADA) — el backend `send()` es
+  // creador-only, y no tiene sentido para VALIDADOR_AMBIENTAL/ADMIN
+  // editando un punto ajeno ya ENVIADA/PUBLICADA.
+  const puedeReenviar = role === 'GESTOR_AMBIENTAL';
 
   if (loading) return <Loading />;
   if (!activity) return null;
@@ -151,7 +178,7 @@ export const EditActivity: React.FC = () => {
       <header className="bg-white shadow-sm border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <button onClick={() => navigate('/gestor-ambiental/dashboard')} className="text-neutral-600 mr-4">←</button>
+            <button onClick={() => navigate(backTo)} className="text-neutral-600 mr-4">←</button>
             <h1 className="text-xl font-bold text-institutional-black">Corregir Punto</h1>
           </div>
           {activity.status === 'RECHAZADA' && (
@@ -340,12 +367,14 @@ export const EditActivity: React.FC = () => {
         </div>
 
         <div className="flex gap-4">
-          <button onClick={() => save(false)} disabled={saving} className="btn-secondary flex-1 py-4">
+          <button onClick={() => save(false)} disabled={saving} className={`btn-secondary py-4 ${puedeReenviar ? 'flex-1' : 'w-full'}`}>
             {saving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
-          <button onClick={() => save(true)} disabled={saving} className="btn-primary flex-1 py-4">
-            {saving ? 'Guardando...' : 'Guardar y Reenviar a Validación'}
-          </button>
+          {puedeReenviar && (
+            <button onClick={() => save(true)} disabled={saving} className="btn-primary flex-1 py-4">
+              {saving ? 'Guardando...' : 'Guardar y Reenviar a Validación'}
+            </button>
+          )}
         </div>
       </main>
 
