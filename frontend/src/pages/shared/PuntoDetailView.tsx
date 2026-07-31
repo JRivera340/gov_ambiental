@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { format } from 'date-fns';
@@ -93,15 +93,37 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const role = useAuthStore(s => s.user?.role);
+  const user = useAuthStore(s => s.user);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [creator, setCreator] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showValidationFlow, setShowValidationFlow] = useState<'APPROVE' | 'REJECT' | null>(null);
-  const [notes, setNotes] = useState('');
+  // Barra flotante "Acciones" + modales de Aprobar/Rechazar — portados de
+  // components/ActivityDetail.tsx del hub (SOLO LECTURA) para que el bloque
+  // de acciones sea idéntico al del hub (hallazgo del recorrido visual
+  // 2026-08-01). No se porta el selector de fotos del modal de aprobación:
+  // el hub mismo lo omite cuando `operativoCategoria === 'AMBIENTAL'`. Tampoco
+  // el mapa de ubicaciones múltiples: el hub solo lo muestra si hay más de
+  // una ubicación, y un punto acá siempre tiene una sola.
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [approveNotes, setApproveNotes] = useState('');
+  const [rejectNotes, setRejectNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [expandedPhoto, setExpandedPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowActionsDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Seguimiento — marcar un residuo pendiente como recogido (única acción
   // portada del modal de seguimiento del hub; "agregar residuo nuevo" queda
@@ -142,11 +164,11 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
     if (!activity) return;
     setProcessing(true);
     try {
-      const updated = await activityService.approve(activity.id, notes || undefined);
+      const updated = await activityService.approve(activity.id, approveNotes || undefined);
       setActivity(updated);
       showToast('Punto aprobado correctamente', 'success');
-      setShowValidationFlow(null);
-      setNotes('');
+      setShowApproveModal(false);
+      setApproveNotes('');
     } catch (e: any) {
       showToast(`Error: ${e?.response?.data?.message || 'No se pudo aprobar'}`, 'error');
     } finally {
@@ -156,14 +178,14 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
 
   const handleReject = async () => {
     if (!activity) return;
-    if (!notes.trim()) { showToast('Ingresá una nota para rechazar', 'error'); return; }
+    if (!rejectNotes.trim()) { showToast('Ingresá una nota para rechazar', 'error'); return; }
     setProcessing(true);
     try {
-      const updated = await activityService.reject(activity.id, notes);
+      const updated = await activityService.reject(activity.id, rejectNotes);
       setActivity(updated);
       showToast('Punto rechazado', 'success');
-      setShowValidationFlow(null);
-      setNotes('');
+      setShowRejectModal(false);
+      setRejectNotes('');
     } catch (e: any) {
       showToast(`Error: ${e?.response?.data?.message || 'No se pudo rechazar'}`, 'error');
     } finally {
@@ -212,6 +234,8 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
   // VALIDADOR_AMBIENTAL solo con ENVIADA (GESTOR_AMBIENTAL no pasa por esta
   // vista, tiene la suya con su propia regla de "solo lo asignado").
   const canValidate = activity.status === 'ENVIADA';
+  const canApprove = canValidate;
+  const canReject = canValidate;
   const canEdit = role === 'ADMIN' || (role === 'VALIDADOR_AMBIENTAL' && activity.status === 'ENVIADA');
   const canSeguimiento = (role === 'ADMIN' || role === 'VALIDADOR_AMBIENTAL')
     && activity.status !== 'RECHAZADA' && activity.status !== 'ENVIADA'
@@ -243,17 +267,6 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">Información Básica</h2>
-              {/* Si tambien se muestra el bloque de Validacion (canValidate),
-                  el boton Editar vive ahi agrupado con Aprobar/Rechazar (ver
-                  hallazgo del recorrido visual 2026-07-31) — evita duplicarlo. */}
-              {canEdit && !canValidate && (
-                <button
-                  onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
-                  className="btn-secondary text-xs"
-                >
-                  Editar
-                </button>
-              )}
             </div>
             <dl className="space-y-3 text-sm">
               <div><dt className="font-medium text-neutral-600">N° Punto</dt><dd className="font-bold text-amber-700">#{activity.pointNumber ?? '—'}</dd></div>
@@ -592,41 +605,149 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
           </div>
         )}
 
-        {/* Acciones de validación — mismo endpoint que usa el validador */}
-        {canValidate && (
-          <div className="card p-4">
-            <h2 className="text-base font-semibold mb-3">Validación</h2>
-            {showValidationFlow ? (
-              <>
-                <textarea
-                  className="w-full text-sm border-2 border-neutral-200 rounded-xl px-4 py-3 mb-3 min-h-[90px] resize-none focus:outline-none focus:border-primary"
-                  placeholder={showValidationFlow === 'APPROVE' ? 'Opcional: recomendaciones para el gestor...' : 'Obligatorio: motivo del rechazo...'}
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                />
-                <div className="flex gap-3">
-                  <button disabled={processing} onClick={() => { setShowValidationFlow(null); setNotes(''); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-neutral-600 bg-white border border-neutral-200 hover:bg-neutral-50 disabled:opacity-50">Cancelar</button>
-                  <button
-                    disabled={processing}
-                    onClick={showValidationFlow === 'APPROVE' ? handleApprove : handleReject}
-                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold text-white disabled:opacity-50 ${showValidationFlow === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
-                  >
-                    {showValidationFlow === 'APPROVE' ? 'Aprobar' : 'Rechazar'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="flex gap-3">
-                {canEdit && (
-                  <button onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-neutral-600 bg-white border border-neutral-200 hover:bg-neutral-50">Editar</button>
-                )}
-                <button onClick={() => setShowValidationFlow('APPROVE')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100">Aprobar</button>
-                <button onClick={() => setShowValidationFlow('REJECT')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100">Rechazar</button>
-              </div>
-            )}
-          </div>
-        )}
       </main>
+
+      {/* Barra flotante de acciones — idéntica a components/ActivityDetail.tsx del hub */}
+      {(canEdit || canApprove || canReject) && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-auto max-w-[95vw] animate-in fade-in slide-in-from-bottom-10 duration-700">
+          <div className="bg-white/90 backdrop-blur-xl border border-neutral-200/50 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 flex items-center justify-center gap-3 ring-1 ring-black/5">
+            <div className="flex items-center gap-2.5 relative" ref={dropdownRef}>
+              <div className="relative">
+                <button
+                  onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-xl transition-all active:scale-95 shadow-lg group"
+                >
+                  <span>Acciones</span>
+                  <svg className={`w-4 h-4 transition-transform duration-300 ${showActionsDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+
+                {showActionsDropdown && (
+                  <div className="absolute bottom-full left-0 w-64 mb-4 bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 z-[110]">
+                    {canEdit && (
+                      <button
+                        onClick={() => { setShowActionsDropdown(false); navigate(`/gestor-ambiental/editar-actividad/${activity.id}`); }}
+                        className="w-full px-5 py-4 text-left text-xs font-bold text-neutral-600 hover:bg-neutral-50 flex items-center gap-3 transition-colors border-b border-neutral-50 group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                          </svg>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="uppercase tracking-widest text-[10px]">Editar</span>
+                          <span className="text-[10px] opacity-40 font-medium normal-case">Modificar datos</span>
+                        </div>
+                      </button>
+                    )}
+
+                    {canApprove && (
+                      <button
+                        onClick={() => { setShowActionsDropdown(false); setShowApproveModal(true); }}
+                        className="w-full px-5 py-4 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-neutral-50 group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="uppercase tracking-widest text-[10px]">Aprobar</span>
+                          <span className="text-[10px] opacity-50 font-medium normal-case text-neutral-400">Validar reporte</span>
+                        </div>
+                      </button>
+                    )}
+
+                    {canReject && (
+                      <button
+                        onClick={() => { setShowActionsDropdown(false); setShowRejectModal(true); }}
+                        className="w-full px-5 py-4 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-600 group-hover:bg-red-100 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="uppercase tracking-widest text-[10px]">Rechazar</span>
+                          <span className="text-[10px] opacity-50 font-medium normal-case text-neutral-400">Devolver reporte</span>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Aprobación — idéntico al del hub (sin selector de fotos ni
+          mapa multi-ubicación: el hub tampoco los muestra para AMBIENTAL) */}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full my-4">
+            <h3 className="text-lg font-semibold mb-4">Validar Actividad</h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              ¿Está seguro de que desea validar y publicar esta actividad?
+              La actividad quedará visible en el mapa público.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded p-3 mb-4">
+              <p className="text-sm text-red-800">
+                <span className="font-medium">Validado por:</span> {user?.name} {user?.lastname}
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Notas (opcional)</label>
+              <textarea
+                value={approveNotes}
+                onChange={(e) => setApproveNotes(e.target.value)}
+                className="input-field w-full"
+                rows={4}
+                placeholder="Observaciones sobre la aprobación..."
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => { setShowApproveModal(false); setApproveNotes(''); }} className="btn-secondary" disabled={processing}>Cancelar</button>
+              <button onClick={handleApprove} disabled={processing} className="btn-success disabled:opacity-50">{processing ? 'Aprobando...' : 'Confirmar Aprobación'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Rechazo — idéntico al del hub */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full my-4">
+            <h3 className="text-lg font-semibold mb-4">Rechazar Actividad</h3>
+            <p className="text-sm text-neutral-600 mb-2">Debes ingresar una observación explicando el motivo del rechazo.</p>
+            <div className="bg-red-50 border border-red-200 rounded p-3 mb-4">
+              <p className="text-sm text-red-800">
+                <span className="font-medium">Rechazado por:</span> {user?.name} {user?.lastname}
+              </p>
+            </div>
+            <textarea
+              value={rejectNotes}
+              onChange={(e) => setRejectNotes(e.target.value)}
+              className="input-field w-full mb-4"
+              rows={5}
+              placeholder="Ingresa las observaciones sobre el rechazo..."
+            />
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => { setShowRejectModal(false); setRejectNotes(''); }} className="btn-secondary" disabled={processing}>Cancelar</button>
+              <button
+                onClick={handleReject}
+                disabled={processing || !rejectNotes.trim()}
+                className="btn-secondary disabled:opacity-50"
+                style={{ backgroundColor: '#e53e3e', color: 'white', borderColor: '#e53e3e' }}
+              >
+                {processing ? 'Rechazando...' : 'Confirmar Rechazo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className={`fixed bottom-6 left-6 right-6 sm:left-auto sm:w-96 px-4 py-3 rounded-xl shadow-xl border z-50 text-xs font-bold flex items-center justify-between ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>

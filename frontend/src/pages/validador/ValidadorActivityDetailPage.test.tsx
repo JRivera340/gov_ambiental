@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 vi.mock('leaflet', () => ({ DivIcon: class { constructor(_opts: unknown) {} } }));
@@ -57,6 +57,7 @@ describe('ValidadorActivityDetailPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
     await waitFor(() => expect(screen.getAllByText(/Beatriz Lopez/).length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByText('Acciones'));
     expect(screen.getByText('Aprobar')).toBeTruthy();
     expect(screen.getByText('Rechazar')).toBeTruthy();
   });
@@ -65,6 +66,7 @@ describe('ValidadorActivityDetailPage', () => {
     useAuthStore.setState({ user: { role: 'VALIDADOR_AMBIENTAL' } as any });
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
+    fireEvent.click(screen.getByText('Acciones'));
     expect(screen.getByText('Editar')).toBeTruthy();
   });
 

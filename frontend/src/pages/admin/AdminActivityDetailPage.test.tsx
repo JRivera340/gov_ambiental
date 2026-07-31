@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 vi.mock('leaflet', () => ({ DivIcon: class { constructor(_opts: unknown) {} } }));
@@ -68,6 +68,7 @@ describe('AdminActivityDetailPage', () => {
   it('muestra el residuo con su tipo y las acciones de validación cuando status = ENVIADA', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText(/Residuos identificados \(1\)/)).toBeTruthy());
+    fireEvent.click(screen.getByText('Acciones'));
     expect(screen.getByText('Aprobar')).toBeTruthy();
     expect(screen.getByText('Rechazar')).toBeTruthy();
   });
@@ -83,6 +84,7 @@ describe('AdminActivityDetailPage', () => {
     vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'RECHAZADA' } as any);
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
+    expect(screen.queryByText('Acciones')).toBeNull();
     expect(screen.queryByText('Aprobar')).toBeNull();
     expect(screen.queryByText('Rechazar')).toBeNull();
   });
@@ -92,6 +94,7 @@ describe('AdminActivityDetailPage', () => {
     vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'PUBLICADA' } as any);
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
+    fireEvent.click(screen.getByText('Acciones'));
     expect(screen.getByText('Editar')).toBeTruthy();
     useAuthStore.setState({ user: null });
   });
