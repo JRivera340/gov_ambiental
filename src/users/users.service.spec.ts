@@ -23,6 +23,10 @@ describe('UsersService', () => {
     process.env.DB_USERNAME = 'u';
     process.env.DB_PASSWORD = 'p';
     process.env.DB_DATABASE = 'd';
+    process.env.S3_ENDPOINT = 'https://s3.test.local';
+    process.env.S3_BUCKET = 'bucket-test';
+    process.env.S3_ACCESS_KEY_ID = 'key-id';
+    process.env.S3_SECRET_ACCESS_KEY = 'secret-key';
   });
 
   afterEach(() => {

@@ -19,6 +19,16 @@ export const envSchema = z.object({
   DB_USERNAME: z.string(),
   DB_PASSWORD: z.string(),
   DB_DATABASE: z.string(),
+
+  // Storage de archivos (actas/fotos) - cliente compatible con S3, no
+  // especifico de un proveedor. S3_ENDPOINT/S3_REGION permiten apuntar a R2,
+  // AWS o cualquier otro compatible sin tocar codigo.
+  S3_ENDPOINT: z.string(),
+  S3_REGION: z.string().default('auto'),
+  S3_BUCKET: z.string(),
+  S3_ACCESS_KEY_ID: z.string(),
+  S3_SECRET_ACCESS_KEY: z.string(),
+  S3_PUBLIC_URL: z.string().optional(),
 });
 
 export type EnvVars = z.infer<typeof envSchema>;
