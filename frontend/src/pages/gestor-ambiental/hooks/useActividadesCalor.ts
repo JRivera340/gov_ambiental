@@ -103,7 +103,6 @@ export function useActividadesCalor({
             residuoId: residuo.id,
             photosRecogida: [],
             fechaRecogida: new Date().toISOString(),
-            recogidoByNombre: `${userName} (Auto-Promoambiental)`,
           });
           marked++;
         }

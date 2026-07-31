@@ -75,8 +75,6 @@ export const activityService = {
     residuoId?: string;
     photosRecogida?: string[];
     fechaRecogida?: string;
-    /** El backend siempre usa el email del JWT como nombre — este campo se acepta pero se ignora. */
-    recogidoByNombre?: string;
     nuevoResiduo?: {
       tipoResiduo: string;
       quienDispuso: string;

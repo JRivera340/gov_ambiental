@@ -177,7 +177,6 @@ export const SeguimientoModal: React.FC<SeguimientoModalProps> = ({
                             residuoId: selectedResiduo.id,
                             photosRecogida: photos,
                             fechaRecogida: new Date(fechaRecogida).toISOString(),
-                            recogidoByNombre: user?.name ? `${user.name} ${user.lastname || ''}`.trim() : user?.email,
                           });
                           onUpdated(updated);
                           setToast({ message: 'Residuo marcado como recogido exitosamente', type: 'success' });
