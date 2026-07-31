@@ -1,5 +1,5 @@
 # Plan maestro — Módulo ambiental independiente
-Última actualización: 2026-07-30 (canario en producción y funcionando para los 3 roles, fix de Dockerfile/`ValidadorDashboard.tsx`, porte completo de vista de detalle de punto y pantallas de fase 2 — ver ESTADO-EXTRACCION.md para el detalle y el punto de retoma)
+Última actualización: 2026-07-31 (5 hallazgos del recorrido visual resueltos: módulo files S3-compatible, formulario de puntos de acumulación anidado correctamente, subtipo AMBIENTAL genérico restaurado con `tipoOperativo`, bug de ruta que nunca marcaba visitado, botón roto del validador eliminado — migración automática al desplegar intentada y revertida por romper el healthcheck, ver ESTADO-EXTRACCION.md para el detalle completo)
 
 ## Objetivo y criterio de terminado
 Convertir el módulo ambiental en un servicio independiente, desplegado aparte
@@ -361,6 +361,26 @@ trivial sin afectar lógica.
 ## HITO 2 — Paridad funcional
 
 **Objetivo:** cerrar la matriz de paridad de `ESTADO-EXTRACCION.md`.
+
+**Migración automática al desplegar — intentada y REVERTIDA 2026-07-31:**
+al agregar `tipoOperativo` a `PuntoResiduo` (hallazgo del recorrido visual,
+ver `ESTADO-EXTRACCION.md`) se intentó automatizar las migraciones para que
+corrieran antes de `node dist/main` en cada deploy (`startCommand` en
+`railway.toml` / `CMD` en `Dockerfile`), para que un cambio de esquema sin
+su migración nunca vuelva a romper producción en silencio. 4 variantes
+distintas (CLI de TypeORM directo, script propio con `destroy()`, sin
+`destroy()`, con diagnóstico explícito de código de salida) rompieron el
+healthcheck sin que los logs mostraran una causa clara — ni el `echo` de
+diagnóstico llegaba a imprimirse en el último intento, señal de que el
+problema está en cómo Railway ejecuta ese comando específico, no en el
+script. Revertido a `CMD ["node", "dist/main"]` sin automatización; la
+migración pendiente ya había corrido y quedado comprometida en producción
+antes de que el contenedor de ese intento muriera, así que el revert no
+perdió el trabajo de esquema. Migraciones futuras: a mano
+(`npm run migration:run:dist`, requiere apuntar al proxy público de
+Railway si se corre fuera de su red). Pendiente de investigar con acceso
+interactivo a la consola de Railway — no es urgente mientras se recuerde
+correr la migración a mano antes de cada deploy que agregue columnas.
 
 **Auditoría 2026-07-29 (código, sin navegador):** las 11 casillas de la
 definición de terminado (ver `ESTADO-EXTRACCION.md`) están confirmadas por
@@ -888,7 +908,7 @@ quien las generó, no deben seguir así indefinidamente.
 | Inventario de `ui/` a replicar en HITO 1 (completo vs. solo lo usado hoy) | Solo lo que ambiental usa hoy (Button, Badge, Card, Input, Select) — no construir primitivas sin consumidor. | Josh |
 | Adjuntos (fotos/actas) en la migración: mover a storage propio o referenciar el del hub | Referenciar el storage del hub (no mover archivos) hasta que el módulo `files` propio (ver `ESTADO-EXTRACCION.md`) esté resuelto. | Josh |
 | Momento exacto de corte de escritura (HITO 4) | Ventana de mantenimiento anunciada, mínimo 24h antes, con el hub en solo-lectura durante la migración final de HITO 3. | Josh |
-| Módulo `files` / almacenamiento R2 (heredado de `ESTADO-EXTRACCION.md`) | No implementar nada nuevo hasta HITO 2. | Josh |
+| ~~Módulo `files` / almacenamiento R2~~ | **RESUELTO 2026-07-31** — implementado, cliente S3-compatible, mismo bucket que el hub, en producción. Ver `ESTADO-EXTRACCION.md`. | — |
 | `bulk-delete` de puntos (heredado de `ESTADO-EXTRACCION.md`) | No replicar hasta confirmar uso real en el hub. | Josh |
 
 ## Fuera de alcance

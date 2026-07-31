@@ -1,5 +1,5 @@
 # Extracción del módulo ambiental — estado
-Última actualización: 2026-07-30 (auditoría de matriz REPLICADA contra código real en `test`, integridad de datos migrados, comparación de las 38 preguntas del formulario contra la encuesta viva, causa raíz del patrón "resuelto en docs / roto en código", fix real de rutas /sorver/*, cierre de 2 anomalías de migración, verificación fila ADMIN + porte de vistas restantes fase 2, porte completo de vista de detalle de punto, fix de `dateTime` en endpoint público, canario en producción para los 3 roles, ver "Punto de retoma" al final)
+Última actualización: 2026-07-31 (5 hallazgos del primer recorrido visual real de Josh, resueltos: módulo files S3-compatible implementado y en producción, formulario de Puntos de Acumulación anidado correctamente, subtipo AMBIENTAL genérico restaurado con modelo de datos propio, bug de ruta que nunca marcaba visitado corregido, botón "Volver al Panel" del validador que rebotaba a sí mismo eliminado — ver "PUNTO DE RETOMA" al final para el detalle completo y lo pendiente)
 
 ## Contexto
 Este repo es la extracción del módulo ambiental de gov-espacio-publico
@@ -49,7 +49,7 @@ se hizo con ADMIN.
 |---|---|---|---|---|---|
 | Mapa general gestor | GESTOR_AMBIENTAL | `/gestor-ambiental/dashboard` (`GeneralMapView`) | igual | CÓDIGO COMPLETO 2026-07-30 (diff contra hub, sin faltantes) — PENDIENTE VERIFICACIÓN VISUAL | Diff línea por línea confirma paridad de código; falta pasarla por navegador |
 | Planificador ruta / ruta activa / segmento / historial | GESTOR_AMBIENTAL | viewModes del dashboard | igual (viewMode extra `historial`) | CÓDIGO COMPLETO 2026-07-30 (diff idéntico al hub en `PlanificadorRutaView`/`RutaActivaView`/`HistorialRutasView`) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador |
-| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría | `CreateActivity` dedicado solo AMBIENTAL, formulario fijo (26 columnas propias, ver detalle abajo) | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla; el mapeo de datos ya se verificó (ver "Formulario" abajo), falta el diseño de la pantalla |
+| Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría, subtipos "Ambiental" y "Puntos de Acumulación de Residuos" | `CreateActivity` con selector de subtipo real (2026-07-31): "Puntos de Acumulación" (formulario fijo, 26 columnas propias) y "Ambiental" genérico (formulario fijo, 7 contadores + campos compartidos vía `tipoOperativo`) | RESUELTO 2026-07-31 — ver "Hallazgos del recorrido visual 2026-07-30" abajo | Falta verificación visual en navegador con datos reales (subida de foto real end-to-end) |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | PENDIENTE DE VERIFICACIÓN VISUAL | El permiso backend está probado con tests; la pantalla no se comparó |
 | Perfil del gestor | GESTOR_AMBIENTAL | `PerfilGestorView` (hub) | igual | CÓDIGO COMPLETO 2026-07-30 (diff contra hub, solo adaptaciones mono-dominio documentadas) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador |
 | Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (`ValidadorDashboard.tsx`) + `/validador/residuos` (`ValidadorMapaDashboard.tsx`) | mismas dos pantallas, mismo componente por ruta que el hub | CÓDIGO COMPLETO 2026-07-30 (diff línea por línea contra `ValidadorActividadPanel`/`ValidadorMapaDashboard` del hub, solo diferencias esperadas del modelo de datos) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador. El detalle de punto que abre desde aquí ya usa `PuntoDetailView.tsx` porteado (ver fila de abajo), con permisos `VALIDADOR_AMBIENTAL` verificados |
@@ -309,10 +309,7 @@ Prioridad media:
 5. ~~Corregir `process.service.ts` (frontend) — llama `/sorver/processes*`, backend real es `/procesos`.~~ **RESUELTO DE VERDAD 2026-07-29** (había sido marcado RESUELTO el 2026-07-27 sin que el código real llegara a `test` — mismo patrón que la fila ADMIN, causa raíz documentada arriba: commits `f6b6dcf`/`c30db0c` se hicieron en `version1`, nunca en `test`, ni siquiera se pushearon a `origin/version1`). `frontend/src/services/process.service.ts` (6 llamadas, sin consumidor real) y `frontend/src/components/SectorRecoleccionPanel.tsx` (2 llamadas, consumidor real: `gestor-ambiental/components/GeneralMapView.tsx`) repunteados a `/procesos*` y `/api/sectores/*`. Verificado contra el backend real desplegado: `GET /api/sectores/puntos` → 401 (guard, ruta existe) donde antes daba 404 con el prefijo `/sorver/`. `tsc`/`jest` (76/76)/`vitest` (128/128) verdes.
 
 Prioridad baja / depende de decisión abierta:
-6. Módulo `files` (subida de acta/fotos a R2) — ver Decisiones abiertas: no implementar hasta fase 2. **Análisis 2026-07-28** (solo investigación, sin implementar):
-   - `frontend/src/services/files.service.ts` espera 3 endpoints que no existen en este backend: `POST /files/acta` (sube 1 PDF, devuelve `{success, key, url, message}`), `POST /files/photos` (sube N imágenes, devuelve `{success, keys, urls, count, message}`), `GET /files/:key` (URL firmada/pública de un archivo ya subido).
-   - Consumidores reales: `components/ActaUpload.tsx` y `components/PhotosUpload.tsx`, usados desde `CreateActivity.tsx`, `EditActivity.tsx` y (solo `PhotosUpload`) `gestor-ambiental/components/SeguimientoModal.tsx` — es decir, TODO el flujo de creación/edición de puntos y de seguimiento de residuos depende de esto. Hoy, al no existir el backend, cualquier intento de subir un archivo real falla (probablemente 404, no se probó en runtime porque no hace falta ejecutar código para confirmar que el controller no existe).
-   - Para implementarlo hace falta: un módulo NestJS `files/` con `FileInterceptor`/`FilesInterceptor` (mismo patrón que `hub/src/files/files.controller.ts`), credenciales de Cloudflare R2 **propias de ambiental** (no reusar el bucket/credenciales del hub — son servicios independientes), y las variables `R2_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`/`R2_BUCKET_NAME`. Los roles que deberían poder subir son los mismos que ya usan `PATCH /puntos/:id/seguimiento`: `GESTOR_AMBIENTAL`, `VALIDADOR_AMBIENTAL`, `ADMIN`.
+6. ~~Módulo `files` (subida de acta/fotos a R2)~~ **RESUELTO 2026-07-31** — módulo NestJS `src/files/` implementado con cliente S3-compatible (`@aws-sdk/client-s3`, no específico de R2 — endpoint/región/credenciales 100% por variables de entorno, falla al arrancar si faltan). Endpoints `POST /files/acta`, `POST /files/photos`, `GET /files/:key` con los mismos límites del hub (PDF ≤10MB, fotos JPG/PNG/WebP ≤10MB c/u, máx. 5 por request). Usa el MISMO bucket que el hub (`gov-espacio-publico-files`) con las credenciales R2 ya rotadas, vía variables `S3_*` propias en Railway (`ambiental-backend`). 10 tests nuevos (`files.service.spec.ts`). Desplegado y verificado en producción (`POST /api/files/photos` sin token → 401, no 404 — ruta registrada y guardada). Pendiente: verificación visual de que una foto real subida se vea al reabrir el punto (necesita browser, no se pudo esta sesión).
    - `frontend/src/services/survey.service.ts` — **no es un gap, no hace falta implementar nada acá.** Llama directo al microservicio externo `gov_encuestas_publico` (`VITE_SURVEYS_API_URL`, fallback hardcodeado a `backendencuestas-production-d973.up.railway.app`), nunca al backend de este repo. Consumidor único: `pages/CreateActivity.tsx:383` (`surveyService.getSurvey(...)` para traer el formulario dinámico de la encuesta del punto). Es el contrato cross-repo esperado por diseño del workspace (ver `CLAUDE.md` del workspace: "gov-espacio-publico CONSUME gov_encuestas_publico vía HTTP") — este repo hace lo mismo directo desde el frontend, sin pasar por su propio backend.
 7. `bulk-delete` de puntos — ver Decisiones abiertas: no replicar hasta confirmar uso real.
 8. ~~Assets KMZ de capas institucionales faltantes~~ RESUELTO 2026-07-27: ninguno de los archivos que `boundaryValidation.ts`, `BoundaryLayer.tsx`, `BarriosLayer.tsx`, `RecoleccionSectorLayer.tsx`/`useSectoresAmbiental.ts`, `GeneralMapView.tsx`, `ActivityDetailView.tsx` y `EnvironmentalTab.tsx` referencian existía en `frontend/public/` de este repo — carpetas `boundaries/` e `icons/` no existían. El código es idéntico al hub (diff vacío en `boundaryValidation.ts`); el problema era 100% de assets estáticos faltantes, con un único root-cause afectando MÚLTIPLES consumidores a la vez: la validación de "¿el punto cae dentro de Santa Fe/el barrio?" en `CreateActivity`/`EditActivity` fallaba en silencio (catch), y los mapas de gestor/validador/admin no mostraban ningún polígono de referencia. Copiados desde el hub (solo lectura ahí): 12 archivos KMZ/KML en `boundaries/` (`KMZ_Sectores_Catastrales_SF_2026.kmz`, `doc.kml`, `Carrera7.kmz`, `Capa_Colegios.kmz`, `Cestas (1).kmz`, `Vias_FalloSV_LaCapuchina.kmz`, `Vias_FalloSV_SantaInes.kmz`, `PropiedadHorizontal (1).kmz`, `UPZ_SantaFe.kmz`, `Capa_Cambuches.kmz`, `Capa_Bodegas.kmz`, `RecoleccionUrbana.kmz`) y `Residuos.png` en `icons/` (usado por `createPuntoCriticoIcon` en `gestor-ambiental/lib/icons.ts`, roto por la misma razón — mismo bug que ya se había corregido en `adminHelpers.ts` reemplazando por SVG inline, pero ahí no se tocó código, solo se trajo el asset real). Verificado sirviendo con el frontend levantado (`200` en los 5 archivos probados). Ninguno de estos 8+1 layers institucionales es exclusivo de ambiental (confirmado en el hub, son transversales) — se trajeron tal cual porque son datos de referencia geográfica, no código de dominio.
@@ -835,20 +832,118 @@ baked-in en 4 puntos del código (admin, gestor, `ValidadorMapaDashboard`,
 `ValidadorDashboard` — el último fue el fix de esta sesión, la ruta real de
 aterrizaje de `/validador/dashboard` que faltaba).
 
-**Lo siguiente:** Josh va a hacer el recorrido visual de los tres roles
-(gestor, validador, admin) en `bogotaneidapp.com`, comparando pantalla por
-pantalla contra este módulo nuevo, y va a traer una lista de hallazgos
-concretos. Esa lista es el input de la próxima sesión — no hay tarea de
-porte adicional planificada hasta tenerla; todo lo que el porte por código
-podía resolver ya se hizo (ver matriz).
+**Lo siguiente (cerrado 2026-07-31):** Josh trajo 5 hallazgos concretos del
+recorrido visual, en orden de prioridad. Los 5 se resolvieron la misma
+noche, sesión autónoma sin supervisión — ver detalle en la sección
+siguiente. Commits en `test`, todos pusheados y confirmados en `origin`.
 
-**Qué NO tocar hasta esa lista:** no seguir "adivinando" gaps por diff de
-código — ya se agotó esa vía (fase 1 y 2 la cubrieron). El siguiente ciclo
-de trabajo depende de hallazgos visuales reales, no de más comparación de
-código contra el hub.
+## Hallazgos del recorrido visual 2026-07-30 — resueltos 2026-07-31
 
-## Pendientes de infraestructura (2026-07-30)
+Sesión nocturna autónoma (Josh no supervisó en vivo). Los 5 en orden de
+prioridad que pidió, commit por bloque, cada uno desplegado y verificado
+contra Railway antes de seguir al siguiente.
 
+1. **Módulo `files` bloqueaba TODA creación de puntos** (`Cannot POST
+   /api/files/photos`) — RESUELTO. Ver "Pendiente de replicar" ítem 6 arriba
+   para el detalle técnico completo.
+2. **Formulario de "Puntos de Acumulación" no coincidía en estructura** —
+   RESUELTO. El único defecto estructural real: "Identificación del
+   presunto generador" estaba como sección propia (`section-box` completo
+   con su propio encabezado), debía ser un sub-bloque DENTRO de "2. Datos
+   del punto" (mismo `section-box`, solo un divisor interno). El resto
+   (secciones 3/4/5, sub-formulario de residuo con sus 9 campos exactos:
+   Tipo de Residuo 13 opciones, Quién dispuso 5, Actores indisciplina 6,
+   fecha/hora, olores, vectores, área, observaciones, foto) ya coincidía
+   byte a byte con el hub — verificado comparando `RESIDUO_TIPOS`/
+   `ACTORES_INDISCIPLINA` (conteos exactos) y las clases Tailwind de
+   `section-box`/header contra `DynamicFields` del hub.
+3. **Subtipo "Ambiental" genérico eliminado por error como código muerto**
+   en una sesión anterior (commit `9369cdc`, "elimina survey.service.ts y
+   todo lo que quede del formulario dinámico") — CONFIRMADO real y
+   RESUELTO. Verificado con la API pública de `gov_encuestas_publico`
+   (sin tocar su base de datos): la categoría AMBIENTAL tiene 2
+   subcategorías reales, "Ambiental" (genérico) y "Puntos de Acumulación
+   de Residuos", ambas con encuesta activa. Las 9 secciones y todos los
+   campos/límites (fotos máx. 5/10MB, acta PDF mín. 3 páginas/máx. 10MB,
+   20 entidades) coinciden exactos con lo que describió Josh. Modelo de
+   datos elegido (aprobado por Josh): extender `PuntoResiduo` con
+   discriminador `tipoOperativo` (`PUNTO_ACUMULACION` default | `GENERICO`)
+   en vez de una entidad aparte — evita duplicar la máquina de estados y
+   los endpoints de asignación/validación, que es donde se producen los
+   errores (mismo razonamiento que ya protege `PuntoAsignacion` como tabla
+   separada, pero aplicado al revés aquí: dos variantes del MISMO dominio
+   comparten TODO el ciclo de vida). De los ~12 campos que Josh listó como
+   nuevos, solo 7 son genuinamente nuevos (contadores numéricos); el resto
+   ya existían como columnas compartidas y se REUTILIZAN en vez de
+   duplicarse: `photos` (evidencia fotográfica), `results` (descripción
+   general), `actaPdfUrl`, `entidadResponsable`, `isGroupOperativo`
+   (operativo en grupo), `gestoresInvolucradosIds` (gestores
+   acompañantes). Migración `1785460184016-TipoOperativoGenerico` corrida
+   contra producción (`Postgres-_hTA`) — confirmada en logs de Railway:
+   `CREATE TYPE`, `ALTER TABLE` × 8, `COMMIT`, "executed successfully".
+4. **Ruta nunca marcaba puntos visitados (0/7 fijo)** — causa raíz real:
+   `PuntosService.agregarNota()` (agregar una nota a un residuo) no
+   estampaba `ultimoSeguimientoAt`, a diferencia del hub
+   (`sorver.repository.typeorm.ts:1288`, con test dedicado) — confirmado
+   que es un gap real, no una divergencia. `MARCAR_RECOGIDO`/
+   `AGREGAR_RESIDUO` sí lo estampaban ya. Corregido con 3 tests nuevos
+   cubriendo las 3 acciones. **Algoritmo de ruta comparado archivo por
+   archivo contra el hub — 100% idéntico** (`geo.ts`, `rutaModos.ts`,
+   `ruta.ts`, diff vacío salvo el nombre de campo esperado
+   `activityId`→`puntoId`). No hacía falta ningún cambio ahí.
+5. **"Volver al Panel" del validador rebotaba a sí mismo** — causa raíz:
+   el botón (código idéntico al hub, `navigate('/validador/dashboard')`)
+   navega a una ruta que en `App.tsx` de ESTE repo es un `<Navigate
+   to="/validador/residuos" replace />` — un alias a la MISMA pantalla
+   donde vive el botón (porque acá no hay, como en el hub, un shell
+   multi-dominio distinto al que volver). El click no rompía nada, solo
+   redirigía de vuelta al mismo lugar — se sentía como un refresh sin
+   efecto. **Decisión tomada (no consultada, sesión autónoma): se quitó el
+   botón** en vez de apuntarlo a otro lado — no hay ningún "panel" distinto
+   dentro de este repo mono-dominio al que volver desde acá. La ruta
+   `/validador/dashboard` en sí NO se tocó — sigue siendo el destino real
+   del canario desde `bogotaneidapp.com` tras login. Auditoría completa de
+   rutas (frontend: todo `navigate()`/`window.open`/`href` interno;
+   backend: toda llamada de servicio contra los controllers) — 0 rotas
+   fuera de esta ya conocida.
+
+**Incidente de infraestructura durante el hallazgo 3** (ver
+`PLAN-MAESTRO.md`, sección HITO 2, para el detalle completo): la migración
+automática al desplegar (`startCommand`/`CMD` corriendo la migración antes
+de `node dist/main`) se intentó y se revirtió — rompía el healthcheck sin
+causa clara identificada, incluso con diagnóstico explícito de código de
+salida. La migración pendiente ya había corrido y quedado comprometida en
+producción antes de que el contenedor de ese intento muriera, así que no
+bloqueó el resto de la noche, pero las migraciones futuras vuelven a
+correrse a mano hasta investigarlo con más tiempo.
+
+**Pendiente de verificación visual (necesita browser, no se pudo esta
+sesión):** subir una foto real desde el formulario, guardar el punto,
+reabrirlo y confirmar que la imagen se ve. El endpoint está desplegado y
+protegido (`401` sin token, no `404`) y la lógica está cubierta por 10
+tests unitarios, pero el recorrido real en navegador con una cuenta de
+prueba lo tiene que hacer Josh.
+
+## Pendientes de infraestructura (2026-07-31)
+
+- **`git push` se colgaba indefinidamente** (Git Credential Manager, sin
+  prompt visible ni siquiera con `GIT_TERMINAL_PROMPT=0`) — bloqueó el
+  trabajo varias veces esta noche hasta que Josh desactivó el credential
+  helper local (`git config --local credential.helper ""`) en ambos repos
+  (`gov_ambiental` y `gov-espacio-publico`) y puso un GitHub PAT embebido en
+  la URL del remoto (`origin`) como solución temporal para esta sesión.
+  **Dos secretos quedaron expuestos en el chat de esta sesión y deben
+  rotarse**: un token de Railway y el PAT de GitHub — Josh dijo que los
+  revoca al día siguiente. La URL del remoto con el token embebido queda
+  como está a propósito (instrucción explícita de Josh, no tocar) hasta que
+  él la revoque/cambie.
+- **Railway MCP sin acceso** (persiste desde la sesión anterior, no se
+  resolvió): la sesión cacheada del cliente sigue devolviendo
+  "Unauthorized" pese a que la CLI (`railway whoami`) sí está autenticada
+  — toda la verificación de despliegue de esta noche se hizo con la CLI
+  directamente (`railway status`, `railway logs`, `railway link`,
+  `railway run`), no con las tools MCP. Sigue pendiente reiniciar la
+  sesión del cliente para que el MCP recoja el token.
 - **Railway MCP sin acceso**: `railway login` se corrió 3 veces en esta
   sesión (cuenta `Joshua Rivera`), la CLI quedó autenticada pero el
   servidor MCP sigue devolviendo "Unauthorized" — es una sesión cacheada
