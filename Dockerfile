@@ -9,6 +9,7 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/scripts/run-migrations-dist.js ./scripts/run-migrations-dist.js
 COPY package*.json ./
 EXPOSE 3001
 # Migracion antes de arrancar: si falla, el contenedor no arranca (mejor
