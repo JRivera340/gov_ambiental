@@ -4,6 +4,7 @@ import { useAuthStore } from './store/authStore';
 import { GestorAmbientalDashboard } from './pages/gestor-ambiental/GestorAmbientalDashboard';
 import { CreateActivity } from './pages/CreateActivity';
 import { EditActivity } from './pages/EditActivity';
+import { ValidadorDashboard } from './pages/validador/ValidadorDashboard';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import { ValidadorActivityDetailPage } from './pages/validador/ValidadorActivityDetailPage';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
@@ -76,7 +77,7 @@ function App() {
 
       <Route
         path="/validador/dashboard"
-        element={<Navigate to="/validador/residuos" replace />}
+        element={<RutaProtegida><ValidadorDashboard /></RutaProtegida>}
       />
       <Route
         path="/validador/residuos"

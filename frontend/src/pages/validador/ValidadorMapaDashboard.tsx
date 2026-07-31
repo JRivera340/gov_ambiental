@@ -205,13 +205,17 @@ export const ValidadorMapaDashboard: React.FC = () => {
       </header>
 
       {/* Stats bar */}
-      {/* "Volver al Panel" (navegaba a /validador/dashboard) se quito 2026-07-31:
-          esa ruta es un redirect a esta misma pantalla (App.tsx) — no hay un
-          "panel" distinto al que volver en este repo mono-dominio, a
-          diferencia del hub, donde /validador/dashboard es un shell
-          multi-dominio real. El boton solo rebotaba a si mismo (se sentia
-          como un refresh sin efecto). Ver RESUMEN-NOCHE.md. */}
       <div className="shrink-0 bg-white border-b border-neutral-200 px-4 py-2.5 flex items-center gap-4 overflow-x-auto">
+        <button
+          onClick={() => navigate('/validador/dashboard')}
+          className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 hover:text-red-600 transition-colors shrink-0 mr-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Volver al Panel
+        </button>
+        <div className="w-px h-6 bg-neutral-200 hidden sm:block" />
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-lg font-black text-neutral-800">{stats.countA}</span>
           <span className="text-[10px] font-bold text-neutral-400 uppercase">{stats.labelA}</span>

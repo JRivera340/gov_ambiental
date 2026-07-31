@@ -52,7 +52,7 @@ se hizo con ADMIN.
 | Crear punto | GESTOR_AMBIENTAL | `CreateActivity` genérico multi-categoría, subtipos "Ambiental" y "Puntos de Acumulación de Residuos" | `CreateActivity` con selector de subtipo real (2026-07-31): "Puntos de Acumulación" (formulario fijo, 26 columnas propias) y "Ambiental" genérico (formulario fijo, 7 contadores + campos compartidos vía `tipoOperativo`) | RESUELTO 2026-07-31 — ver "Hallazgos del recorrido visual 2026-07-30" abajo | Falta verificación visual en navegador con datos reales (subida de foto real end-to-end) |
 | Editar punto | GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN | permite editar a validador/admin | `PATCH /puntos/:id` permite los 3 roles; GESTOR_AMBIENTAL sigue restringido a lo suyo, VALIDADOR_AMBIENTAL/ADMIN pueden editar cualquier punto | PENDIENTE DE VERIFICACIÓN VISUAL | El permiso backend está probado con tests; la pantalla no se comparó |
 | Perfil del gestor | GESTOR_AMBIENTAL | `PerfilGestorView` (hub) | igual | CÓDIGO COMPLETO 2026-07-30 (diff contra hub, solo adaptaciones mono-dominio documentadas) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador |
-| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (`ValidadorDashboard.tsx`) + `/validador/residuos` (`ValidadorMapaDashboard.tsx`) | mismas dos pantallas, mismo componente por ruta que el hub | CÓDIGO COMPLETO 2026-07-30 (diff línea por línea contra `ValidadorActividadPanel`/`ValidadorMapaDashboard` del hub, solo diferencias esperadas del modelo de datos) — PENDIENTE VERIFICACIÓN VISUAL | Diff confirma paridad de código; falta pasarla por navegador. El detalle de punto que abre desde aquí ya usa `PuntoDetailView.tsx` porteado (ver fila de abajo), con permisos `VALIDADOR_AMBIENTAL` verificados |
+| Dashboard validador / Mapa de residuos validador | VALIDADOR_AMBIENTAL | `/validador/dashboard` (`ValidadorDashboard.tsx`) + `/validador/residuos` (`ValidadorMapaDashboard.tsx`) | **CORREGIDO 2026-07-31 — la fila de abajo (2026-07-30) decía "CÓDIGO COMPLETO" para `ValidadorDashboard.tsx` sin que el archivo existiera en este repo** (`/validador/dashboard` era un `<Navigate>` a `/validador/residuos`, mismo componente para ambas rutas). Mismo patrón "resuelto en docs / roto en código" ya documentado para la fila ADMIN — ver "Familia de bugs" más abajo. Detectado por Josh en el recorrido visual, no por auditoría de código. `ValidadorDashboard.tsx` porteado de verdad 2026-07-31 (ver sección propia más abajo). | RESUELTO 2026-07-31 — `ValidadorDashboard.tsx` ahora existe, mono-dominio | Falta verificación visual real en navegador (no repetir el error de marcarlo RESUELTO solo por existencia de código) |
 | Detalle del validador (`ValidadorActivityDetailPage.tsx`) | VALIDADOR_AMBIENTAL | mismo `ActivityDetail.tsx` que ADMIN, con permisos de rol distintos | mismo `PuntoDetailView.tsx` que ADMIN (componente compartido) | RESUELTO 2026-07-30 — hereda el porte completo de la fila "Detalle de punto"; `canEdit`/`canApprove`/`canReject` confirmados correctos para `VALIDADOR_AMBIENTAL` (`activity.status === 'ENVIADA'`) | Nada — ver limitaciones ya anotadas en "Detalle de punto" (Re-validar/Eliminar) |
 | Vista pública de punto | público | `GET /sorver/public/actividad/:id` | `GET /puntos/public/:id` | PENDIENTE DE VERIFICACIÓN VISUAL | Nunca comparada pantalla contra pantalla. Bug corregido 2026-07-30: `toPublicPunto()` no incluía `dateTime` por residuo, dejaba en 0/"No registrada" el cálculo de días desde recolección |
 | Detalle de punto (admin/validador, `PuntoDetailView.tsx`) | ADMIN, VALIDADOR_AMBIENTAL | `ActivityDetail.tsx` (componente multi-dominio compartido) | `PuntoDetailView.tsx` (componente propio, mono-dominio) | RESUELTO 2026-07-30 — porteado completo desde el hub: N° Punto, Tipo de Actividad, Reportado por, Estado, Datos Operativo (equivalente fijo), Volumen por residuo, "Residuos Recogidos (N)" con evidencias, Gestores Participantes, Descripción General, Ubicación en grados, Información de Validación, acción "Marcar recogido" | "Re-validar" y "Eliminar" no portados — requieren endpoints de backend que no existen aquí (`POST /:id/send` sin restricción de owner para ADMIN, `DELETE /puntos/:id`); "Agregar residuo nuevo" en seguimiento tampoco portado |
@@ -535,18 +535,41 @@ requeriría agregar una pregunta nueva al formulario y no hay ningún pedido
 de negocio de la UAESP para capturar turno — no se justifica solo para
 llenar un filtro.
 
-### Botón "Volver al Panel" en el mapa de residuos del validador (quitado 2026-07-31)
-El hub tiene este botón porque su `/validador/dashboard` es un shell real
-multi-dominio (IVC, Espacio Público, Ambiental, PYBA) — "volver al panel"
-significa "salir de este dominio y elegir otro". Este repo es mono-dominio:
-`/validador/dashboard` acá es un alias (`<Navigate>`) a la MISMA pantalla
-donde vive el botón (`ValidadorMapaDashboard.tsx`), así que el click no
-llevaba a ningún lado distinto — rebotaba a sí mismo. **Decisión de Josh
-2026-07-31, confirmada:** no reemplazar por un link externo a
-`bogotaneidapp.com` — eso expulsaría al usuario del módulo ambiental en vez
-de "volver a un panel", el efecto contrario al que tiene en el hub. Se quita
-el botón sin reemplazo. Divergencia deliberada por mono-dominio, no gap de
-paridad — no reintroducirlo en una futura auditoría.
+### CORRECCIÓN 2026-07-31 (tarde): "Volver al Panel" NO era un alias — faltaba una pantalla entera
+La entrada de esta misma sección escrita horas antes decía que `/validador/dashboard`
+era un `<Navigate>` a `ValidadorMapaDashboard.tsx` y que el botón "Volver al
+Panel" no tenía a dónde ir. **Era incorrecto.** En el hub, `/validador/dashboard`
+renderiza `ValidadorDashboard.tsx` — un componente REAL y distinto de
+`ValidadorMapaDashboard.tsx` (confirmado en `App.tsx` del hub: son dos
+imports, dos rutas separadas), con Actividades Pendientes/Historial,
+paneles de filtros, tabla y paginación propios — no un shell "elegí otro
+dominio" como se asumió. Este repo nunca portó esa pantalla; el `<Navigate>`
+a `/validador/residuos` era un placeholder que quedó desde una sesión
+anterior y nadie lo cuestionó porque "el botón no lleva a nada" parecía
+confirmar la hipótesis del alias, cuando en realidad confirmaba que faltaba
+la pantalla. **RESUELTO 2026-07-31:** `ValidadorDashboard.tsx` porteado del
+hub (contadores Actividades Pendientes/Validaciones Realizadas, tabs Puntos
+Pendientes/Historial/Residuos, panel de filtros por tab — Gestor, Tipo,
+Barrio, Mes/Desde/Hasta, N° Punto, Limpiar — tabla y paginación), adaptado a
+mono-dominio: sin selector de Categoría (siempre ambiental), filtro Tipo
+con las 2 opciones reales de este dominio (`GENERICO`→"Gestión Ambiental",
+`PUNTO_ACUMULACION`→"Puntos de Residuos"), sin filtro de Turno (mismo
+motivo ya documentado para el panel de ADMIN — el dato no existe en este
+modelo). Filtrado y paginación 100% client-side: el backend de este repo no
+tiene los parámetros server-side que tiene el del hub (gestor/categoría/
+turno/paginación) — mismo patrón que el resto de las vistas de este repo.
+Ruta `/validador/dashboard` en `App.tsx` actualizada para renderizar el
+componente nuevo en vez del `<Navigate>`. Botón "Volver al Panel"
+restaurado en `ValidadorMapaDashboard.tsx`, ahora navega a una pantalla
+real.
+
+**Lección para el proceso, otra vez:** "el botón no rompe nada, solo no
+lleva a ningún lado" no es evidencia de que el destino sea innecesario —
+puede ser evidencia de que el destino nunca se construyó. Verificar contra
+el código REAL del hub (qué componente renderiza esa ruta) antes de
+concluir "es un alias"/"no aplica" — ya van dos veces con este mismo error
+de razonamiento (ver también la fila ADMIN, `ESTADO-EXTRACCION.md`,
+2026-07-29).
 
 ### Consecuencia sistemática del modelo de datos
 El hub usa `ActivityEntity` única discriminada por `operativoCategoria` /

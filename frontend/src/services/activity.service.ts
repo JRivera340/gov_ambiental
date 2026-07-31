@@ -45,6 +45,12 @@ export const activityService = {
     return Array.isArray(data) ? data.map(normalizeActivity) : [];
   },
 
+  // VALIDADOR_AMBIENTAL: puntos en ENVIADA (pendientes de validación).
+  async getPending(): Promise<Activity[]> {
+    const { data } = await api.get<any[]>('/puntos/pending');
+    return Array.isArray(data) ? data.map(normalizeActivity) : [];
+  },
+
   // VALIDADOR_AMBIENTAL: Aprobar punto
   async approve(id: string, notes?: string): Promise<Activity> {
     const { data } = await api.post<Activity>(`/puntos/${id}/approve`, { notes: notes || undefined });

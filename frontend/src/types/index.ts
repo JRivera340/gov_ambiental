@@ -90,6 +90,10 @@ export interface Activity {
   createdByNombre?: string;
   status: ActivityStatus;
 
+  // Subtipo de operativo ambiental (ver ESTADO-EXTRACCION.md, hallazgo del
+  // recorrido visual 2026-07-30). Default 'PUNTO_ACUMULACION' en el backend.
+  tipoOperativo?: 'PUNTO_ACUMULACION' | 'GENERICO';
+
   // Información básica
   dateTime: string;
   activityType: string;
