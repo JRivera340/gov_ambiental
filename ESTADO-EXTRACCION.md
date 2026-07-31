@@ -788,6 +788,25 @@ residuos, 71 con al menos un campo del formulario fijo poblado — el resto
 son puntos históricos migrados del hub sin esas respuestas en
 `dynamicAnswers`).
 
+## Re-migración limpia (2026-07-31)
+
+Los datos de prueba (10 puntos reasignados a `gestor@test.com` desde otros
+gestores, más 2 puntos de verificación #109/#110 creados por pruebas de API)
+desalinearon ambiental del hub. Se truncaron `puntos_residuo`,
+`punto_asignacion`, `ruta_semanal` y `procesos` en ambiental (autorizado
+explícitamente por Josh, credenciales de un solo uso) y se re-corrió
+`migrate-from-legacy.ts` completo desde el hub. Verificado: conteos por
+tabla y por gestor coinciden exactamente hub↔ambiental (346 puntos, 345
+asignaciones, 12 rutas), muestreo de 10 puntos al azar coincide campo por
+campo. El punto huérfano `acc78a89-...` (bajo Fredy en el hub) resultó ser
+una fila de `punto_asignacion` sin actividad real detrás (0 filas en
+`activities` para ese id) — documentado en
+`gov-espacio-publico/DEUDA-TECNICA.md` ítem 10, no se migró (el JOIN contra
+`activities` ya lo excluye naturalmente). Tras la re-migración se volvieron
+a reasignar 10 puntos a `gestor@test.com` **solo en ambiental**, para
+pruebas — lista exacta a revertir antes del corte en `DEUDA-TECNICA.md`
+ítem 3 de este repo.
+
 ## Integridad de datos migrados (verificado 2026-07-29 contra `Postgres-_hTA`, SOLO LECTURA)
 
 Consulta directa (`SELECT`/`COUNT`, sin exportar filas) contra la base de

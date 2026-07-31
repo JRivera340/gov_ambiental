@@ -83,3 +83,39 @@ ejecución de Railway. Alternativas a explorar cuando se retome: un
 config de Railway, corre en un paso previo al deploy en vez de dentro del
 mismo `CMD`), o correr la migración desde un healthcheck endpoint propio
 que la dispare de forma controlada.
+
+---
+
+## 3. 10 puntos reasignados a gestor@test.com — SOLO en ambiental, revertir antes del corte
+
+**Qué es:** tras la re-migración limpia del 2026-07-31 (truncado completo de
+`puntos_residuo`/`punto_asignacion`/`ruta_semanal`/`procesos` en ambiental y
+re-migración 1:1 desde el hub, ver ESTADO-EXTRACCION.md), se reasignaron a
+propósito los puntos #1 a #10 al usuario de prueba `gestor@test.com`
+(id `6563267f-0daa-417f-bc1f-3a8812735ef1`, rol `GESTOR_AMBIENTAL` en el
+hub) para que el usuario pudiera seguir probando ese rol con datos reales.
+Esto NO se tocó en el hub — es una divergencia deliberada y temporal solo en
+la base de ambiental.
+
+**Puntos afectados (`puntoResiduoId` → `gestorId` original a restaurar):**
+| pointNumber | puntoResiduoId | gestorId original |
+|---|---|---|
+| 1 | d7af2a4e-3418-47c1-86e1-f7eaca2dc512 | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+| 2 | 0228a853-aece-4186-a3d3-bb6db7d35a0e | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+| 3 | b5e73941-1f77-43dd-bf37-35285fde7b31 | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+| 4 | 4b0ea1a2-2d9a-4e2d-903f-ddd6add0ccc2 | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+| 5 | 88b092a6-ad19-490f-ad51-04fd35831e0b | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+| 6 | c239e32e-1935-4a6d-96cc-f007f053712f | ce3c71f0-31ba-4449-924f-d33791c57109 |
+| 7 | 57b74f53-952c-4f66-83ce-d1ed6de2dc4c | 136f9559-27b5-45b5-bf34-cd5d59d28735 |
+| 8 | ce6174b1-073f-4d10-bf5f-489cc1ecf5be | ce3c71f0-31ba-4449-924f-d33791c57109 |
+| 9 | ca15df11-a4bf-4b65-8fe2-2f275d60aa44 | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+| 10 | 6d22db74-3d19-473e-b840-61acda2b9e11 | b75e3ff3-9a18-47fe-b170-49d4282e294a |
+
+**Impacto:** BAJO mientras se sepa que existe — pero si se olvida, el corte
+final quedaría con 10 asignaciones que no reflejan la realidad del hub.
+
+**Esfuerzo:** BAJO. Antes del corte definitivo, un `UPDATE punto_asignacion
+SET "gestorId" = <original> WHERE "puntoResiduoId" = <id>` por cada fila de
+la tabla de arriba (o re-correr `npm run migrate:legacy`, que sobreescribe
+por upsert y restaura el valor real del hub para estos 10 igual que para
+cualquier otro punto).
