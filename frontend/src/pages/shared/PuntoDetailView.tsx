@@ -19,9 +19,11 @@ import type { Activity, ResiduoEntry, User } from '../../types';
 // Vista de detalle compartida por ADMIN y VALIDADOR_AMBIENTAL — portada de
 // components/ActivityDetail.tsx del hub (SOLO LECTURA), que también es UN
 // SOLO componente compartido entre roles ahí (parametrizado por `role`,
-// ver ActivityDetailPage.tsx de admin y de validador en el hub). La única
-// diferencia entre roles en el hub es el botón "Actualizar punto"
-// (role==='ADMIN'), que esta vista nunca tuvo — no hay nada que diferenciar.
+// ver ActivityDetailPage.tsx de admin y de validador en el hub). La
+// diferencia entre roles la maneja `canEdit` (ver más abajo): ADMIN siempre,
+// VALIDADOR_AMBIENTAL solo con status ENVIADA — corregido 2026-07-31, este
+// comentario decía lo contrario (que "Actualizar punto" era ADMIN-only y
+// esta vista "nunca lo tuvo"), quedó desactualizado frente al código real.
 //
 // A diferencia del hub (que auto-renderiza respuestas de encuesta genéricas
 // vía __fieldMeta), este repo tiene los 26 campos del formulario fijo como
@@ -241,12 +243,15 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">Información Básica</h2>
-              {canEdit && (
+              {/* Si tambien se muestra el bloque de Validacion (canValidate),
+                  el boton Editar vive ahi agrupado con Aprobar/Rechazar (ver
+                  hallazgo del recorrido visual 2026-07-31) — evita duplicarlo. */}
+              {canEdit && !canValidate && (
                 <button
                   onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
                   className="btn-secondary text-xs"
                 >
-                  Actualizar punto
+                  Editar
                 </button>
               )}
             </div>
@@ -612,6 +617,9 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
               </>
             ) : (
               <div className="flex gap-3">
+                {canEdit && (
+                  <button onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-neutral-600 bg-white border border-neutral-200 hover:bg-neutral-50">Editar</button>
+                )}
                 <button onClick={() => setShowValidationFlow('APPROVE')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100">Aprobar</button>
                 <button onClick={() => setShowValidationFlow('REJECT')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100">Rechazar</button>
               </div>

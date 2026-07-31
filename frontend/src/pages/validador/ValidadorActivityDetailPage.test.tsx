@@ -61,19 +61,19 @@ describe('ValidadorActivityDetailPage', () => {
     expect(screen.getByText('Rechazar')).toBeTruthy();
   });
 
-  it('VALIDADOR_AMBIENTAL ve "Actualizar punto" con status ENVIADA, no con PUBLICADA (getActivityPermissions del hub)', async () => {
+  it('VALIDADOR_AMBIENTAL ve "Editar" con status ENVIADA, no con PUBLICADA (getActivityPermissions del hub)', async () => {
     useAuthStore.setState({ user: { role: 'VALIDADOR_AMBIENTAL' } as any });
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
-    expect(screen.getByText('Actualizar punto')).toBeTruthy();
+    expect(screen.getByText('Editar')).toBeTruthy();
   });
 
-  it('VALIDADOR_AMBIENTAL NO ve "Actualizar punto" ni Aprobar/Rechazar con status PUBLICADA', async () => {
+  it('VALIDADOR_AMBIENTAL NO ve "Editar" ni Aprobar/Rechazar con status PUBLICADA', async () => {
     useAuthStore.setState({ user: { role: 'VALIDADOR_AMBIENTAL' } as any });
     vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'PUBLICADA' } as any);
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #7')).toBeTruthy());
-    expect(screen.queryByText('Actualizar punto')).toBeNull();
+    expect(screen.queryByText('Editar')).toBeNull();
     expect(screen.queryByText('Aprobar')).toBeNull();
   });
 });

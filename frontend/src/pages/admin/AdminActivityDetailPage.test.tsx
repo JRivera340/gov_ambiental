@@ -87,12 +87,12 @@ describe('AdminActivityDetailPage', () => {
     expect(screen.queryByText('Rechazar')).toBeNull();
   });
 
-  it('ADMIN ve "Actualizar punto" sin importar el estado', async () => {
+  it('ADMIN ve "Editar" sin importar el estado', async () => {
     useAuthStore.setState({ user: { role: 'ADMIN' } as any });
     vi.mocked(activityService.getById).mockResolvedValueOnce({ ...mockActivity, status: 'PUBLICADA' } as any);
     renderPage();
     await waitFor(() => expect(screen.getByText('Punto #12')).toBeTruthy());
-    expect(screen.getByText('Actualizar punto')).toBeTruthy();
+    expect(screen.getByText('Editar')).toBeTruthy();
     useAuthStore.setState({ user: null });
   });
 
