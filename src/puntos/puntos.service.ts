@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PuntosRepository } from './puntos.repository';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
-import { EstadoPunto, PuntoResiduo, ResiduoEntry } from './entities/punto-residuo.entity';
+import { EstadoPunto, PuntoResiduo, ResiduoEntry, TipoOperativo } from './entities/punto-residuo.entity';
 import { CreatePuntoDto } from './dto/create-punto.dto';
 import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
@@ -75,6 +75,14 @@ export class PuntosService {
     const punto = await this.repo.create({
       createdByUserId: userId,
       status: EstadoPunto.BORRADOR,
+      tipoOperativo: dto.tipoOperativo || TipoOperativo.PUNTO_ACUMULACION,
+      puntosCriticosEmergentesAtendidos: dto.puntosCriticosEmergentesAtendidos,
+      comparendosPedagogicos: dto.comparendosPedagogicos,
+      comparendos: dto.comparendos,
+      personasSensibilizadas: dto.personasSensibilizadas,
+      huertas: dto.huertas,
+      kgMaterialResiduosRecolectados: dto.kgMaterialResiduosRecolectados,
+      m2RecuperadosEspacioPublico: dto.m2RecuperadosEspacioPublico,
       dateTime: dto.dateTime ? new Date(dto.dateTime) : new Date(),
       lat: dto.lat,
       lng: dto.lng,
@@ -181,6 +189,14 @@ export class PuntosService {
     if (dto.actoresEstrategicos !== undefined) punto.actoresEstrategicos = dto.actoresEstrategicos;
     if (dto.telefonoActor !== undefined) punto.telefonoActor = dto.telefonoActor;
     if (dto.intervencionesRecomendadas !== undefined) punto.intervencionesRecomendadas = dto.intervencionesRecomendadas;
+    if (dto.tipoOperativo !== undefined) punto.tipoOperativo = dto.tipoOperativo;
+    if (dto.puntosCriticosEmergentesAtendidos !== undefined) punto.puntosCriticosEmergentesAtendidos = dto.puntosCriticosEmergentesAtendidos;
+    if (dto.comparendosPedagogicos !== undefined) punto.comparendosPedagogicos = dto.comparendosPedagogicos;
+    if (dto.comparendos !== undefined) punto.comparendos = dto.comparendos;
+    if (dto.personasSensibilizadas !== undefined) punto.personasSensibilizadas = dto.personasSensibilizadas;
+    if (dto.huertas !== undefined) punto.huertas = dto.huertas;
+    if (dto.kgMaterialResiduosRecolectados !== undefined) punto.kgMaterialResiduosRecolectados = dto.kgMaterialResiduosRecolectados;
+    if (dto.m2RecuperadosEspacioPublico !== undefined) punto.m2RecuperadosEspacioPublico = dto.m2RecuperadosEspacioPublico;
     if (dto.residuos !== undefined) {
       punto.residuos = dto.residuos.map((r: any) => ({
         id: r.id || randomUUID(),

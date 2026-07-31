@@ -5,6 +5,7 @@ import {
   IdentificacionGenerador,
   MetodoIdentificacion,
   TipoGenerador,
+  TipoOperativo,
   TipoSuelo,
   TipoZona,
 } from '../entities/punto-residuo.entity';
@@ -13,6 +14,42 @@ import {
 // Residuos" (ver ESTADO-EXTRACCION.md). Clase base compartida por
 // CreatePuntoDto y UpdatePuntoDto para no duplicar las 26 validaciones.
 export class FormularioFijoPuntoDto {
+  @IsOptional()
+  @IsEnum(TipoOperativo)
+  tipoOperativo?: TipoOperativo;
+
+  // Contadores del subtipo GENERICO ("Ambiental" en el hub). Los campos que
+  // ese subtipo comparte con el punto de acumulación (fecha, ubicación,
+  // fotos, descripción, acta, entidad, grupo, gestores) ya están declarados
+  // más abajo/en CreatePuntoDto — no se duplican acá.
+  @IsOptional()
+  @IsNumber()
+  puntosCriticosEmergentesAtendidos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  comparendosPedagogicos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  comparendos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  personasSensibilizadas?: number;
+
+  @IsOptional()
+  @IsNumber()
+  huertas?: number;
+
+  @IsOptional()
+  @IsNumber()
+  kgMaterialResiduosRecolectados?: number;
+
+  @IsOptional()
+  @IsNumber()
+  m2RecuperadosEspacioPublico?: number;
+
   @IsOptional()
   @IsEnum(FrecuenciaAcumulacion)
   frecuenciaAcumulacion?: FrecuenciaAcumulacion;

@@ -15,6 +15,19 @@ export enum EstadoPunto {
   PUBLICADA = 'PUBLICADA',
 }
 
+// Subtipo de operativo ambiental. Ambos comparten el mismo ciclo de vida
+// (estados, asignación, validación) — ver ESTADO-EXTRACCION.md, hallazgo del
+// recorrido visual 2026-07-30: el subtipo genérico "Ambiental" (comparendos,
+// huertas, kg recolectados, etc.) es alcanzable en el hub igual que "Puntos de
+// Acumulación de Residuos" y se había descartado por error como código
+// muerto. Se modela en la MISMA tabla (no una entidad aparte) a propósito:
+// una tabla separada duplicaría la máquina de estados y los endpoints de
+// asignación/validación, que es donde se producen los errores.
+export enum TipoOperativo {
+  PUNTO_ACUMULACION = 'PUNTO_ACUMULACION',
+  GENERICO = 'GENERICO',
+}
+
 // Campos del formulario fijo de "Identificación de Puntos de Acumulación de
 // Residuos" (antes formulario dinámico traído de gov_encuestas_publico, ver
 // ESTADO-EXTRACCION.md — regresión detectada y corregida 2026-07-29). Los
@@ -130,6 +143,12 @@ export class PuntoResiduo {
 
   @Column({ type: 'enum', enum: EstadoPunto, default: EstadoPunto.BORRADOR })
   status!: EstadoPunto;
+
+  // Default PUNTO_ACUMULACION: todo lo migrado del hub y todo lo creado antes
+  // de este campo era de ese subtipo.
+  @Column({ type: 'enum', enum: TipoOperativo, default: TipoOperativo.PUNTO_ACUMULACION })
+  @Index()
+  tipoOperativo!: TipoOperativo;
 
   @Column({ type: 'timestamptz' })
   @Index()
@@ -306,6 +325,33 @@ export class PuntoResiduo {
 
   @Column({ type: 'text', array: true, nullable: true })
   intervencionesRecomendadas?: string[];
+
+  // ── Formulario "Ambiental" genérico (tipoOperativo = GENERICO) ─────────
+  // Comparte con el punto de acumulación: dateTime, lat/lng/barrio, photos
+  // (evidencia fotográfica), results (descripción general), actaPdfUrl,
+  // entidadResponsable, isGroupOperativo (operativo en grupo) y
+  // gestoresInvolucradosIds (gestores acompañantes) — mismo campo, mismo
+  // significado, no se duplican. Solo estos 7 contadores son exclusivos.
+  @Column({ type: 'int', nullable: true })
+  puntosCriticosEmergentesAtendidos?: number;
+
+  @Column({ type: 'int', nullable: true })
+  comparendosPedagogicos?: number;
+
+  @Column({ type: 'int', nullable: true })
+  comparendos?: number;
+
+  @Column({ type: 'int', nullable: true })
+  personasSensibilizadas?: number;
+
+  @Column({ type: 'int', nullable: true })
+  huertas?: number;
+
+  @Column({ type: 'double precision', nullable: true })
+  kgMaterialResiduosRecolectados?: number;
+
+  @Column({ type: 'double precision', nullable: true })
+  m2RecuperadosEspacioPublico?: number;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

@@ -7,6 +7,7 @@ import {
   IdentificacionGenerador,
   MetodoIdentificacion,
   TipoGenerador,
+  TipoOperativo,
   TipoSuelo,
   TipoZona,
 } from './entities/punto-residuo.entity';
@@ -86,6 +87,43 @@ describe('PuntosService', () => {
         expect(valorReabierto).toEqual(valorEsperado);
       }
     }
+  });
+
+  it('crea un punto GENERICO (subtipo Ambiental) con sus 7 contadores y campos compartidos, sin residuos', async () => {
+    const { service, repo } = makeService();
+    const operativoGenerico = {
+      lat: 4.6, lng: -74.08, barrio: 'La Candelaria',
+      tipoOperativo: TipoOperativo.GENERICO,
+      results: 'Jornada de sensibilizacion y limpieza en el sector',
+      photos: ['photos/op-1/a.jpg'],
+      actaPdfUrl: 'actas/op-1/acta.pdf',
+      entidadResponsable: 'UAESP',
+      isGroupOperativo: true,
+      gestoresInvolucradosIds: ['gestor-2'],
+      puntosCriticosEmergentesAtendidos: 3,
+      comparendosPedagogicos: 2,
+      comparendos: 1,
+      personasSensibilizadas: 40,
+      huertas: 1,
+      kgMaterialResiduosRecolectados: 250.5,
+      m2RecuperadosEspacioPublico: 18.2,
+    };
+
+    const creado = await service.create('user-1', operativoGenerico as any);
+    const reabierto = await repo.findById(creado.id);
+
+    expect(reabierto?.tipoOperativo).toBe(TipoOperativo.GENERICO);
+    expect(reabierto?.residuos).toEqual([]);
+    for (const [campo, valorEsperado] of Object.entries(operativoGenerico)) {
+      if (['lat', 'lng', 'barrio', 'entidadResponsable', 'tipoOperativo'].includes(campo)) continue;
+      expect((reabierto as any)[campo]).toEqual(valorEsperado);
+    }
+  });
+
+  it('un punto sin tipoOperativo explicito queda como PUNTO_ACUMULACION por defecto', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    expect(punto.tipoOperativo).toBe(TipoOperativo.PUNTO_ACUMULACION);
   });
 
   describe('update', () => {

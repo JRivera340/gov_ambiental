@@ -12,9 +12,12 @@ import { catalogService } from '../services/catalog.service';
 import { Toast } from '../components/Toast';
 import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
+import { ActaUpload } from '../components/ActaUpload';
 import { usersService } from '../services/users.service';
+import { useAuthStore } from '../store/authStore';
 import type { Catalogs, ResiduoEntry, User } from '../types';
 import { SECCIONES_PUNTO_ACUMULACION, type CampoDef } from '../config/camposPuntoAcumulacion';
+import { SECCIONES_AMBIENTAL_GENERICO } from '../config/camposAmbientalGenerico';
 import { isFieldVisible } from '../lib/fieldVisibility';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
 import { ACTORES_INDISCIPLINA } from '../types/ambientalCampos';
@@ -52,10 +55,70 @@ interface CampoInputProps {
   campo: CampoDef;
   value: any;
   onChange: (name: string, value: any) => void;
+  gestores?: User[];
+  currentUserId?: string;
 }
 
-const CampoInput: React.FC<CampoInputProps> = ({ campo, value, onChange }) => {
+const CampoInput: React.FC<CampoInputProps> = ({ campo, value, onChange, gestores, currentUserId }) => {
   const val = value ?? '';
+
+  if (campo.type === 'CHECKBOX') {
+    return (
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          id={campo.name}
+          checked={!!value}
+          onChange={(e) => onChange(campo.name, e.target.checked)}
+          className="w-4 h-4 text-primary border-neutral-300 rounded focus:ring-primary"
+        />
+        <label htmlFor={campo.name} className="text-sm text-neutral-700 cursor-pointer">Confirmar</label>
+      </div>
+    );
+  }
+
+  if (campo.type === 'FILE') {
+    const isActa = campo.config?.accept?.includes('pdf');
+    if (isActa) {
+      return (
+        <ActaUpload
+          onUploadSuccess={(url) => onChange(campo.name, url)}
+          existingUrl={value || null}
+        />
+      );
+    }
+    return (
+      <PhotosUpload
+        onUploadSuccess={(urls) => onChange(campo.name, urls)}
+        existingUrls={value || []}
+        maxPhotos={campo.config?.maxFiles ?? 5}
+      />
+    );
+  }
+
+  if (campo.type === 'ENTITY_SELECT') {
+    const arr: string[] = Array.isArray(value) ? value : [];
+    const opciones = (gestores || [])
+      .filter((g) => g && g.id !== currentUserId)
+      .map((g) => ({ value: `${g.name} ${g.lastname}`, label: `${g.name} ${g.lastname}` }));
+    return (
+      <div className="flex flex-wrap gap-2">
+        {opciones.length === 0 && <p className="text-xs text-neutral-400">No hay gestores disponibles</p>}
+        {opciones.map((o) => {
+          const on = arr.includes(o.value);
+          return (
+            <button
+              type="button" key={o.value}
+              onClick={() => onChange(campo.name, on ? arr.filter((x) => x !== o.value) : [...arr, o.value])}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${on ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-neutral-200 text-neutral-600'}`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   if (campo.type === 'NUMBER') {
     return (
@@ -135,6 +198,7 @@ const CampoInput: React.FC<CampoInputProps> = ({ campo, value, onChange }) => {
 };
 
 interface CamposGeneralesProps {
+  secciones: import('../config/camposAmbientalShared').SeccionCampos[];
   values: Record<string, any>;
   onChange: (name: string, value: any) => void;
   lat: number;
@@ -149,18 +213,21 @@ interface CamposGeneralesProps {
   gettingLocation: boolean;
   locationAccuracy: number | null;
   locationError: string;
+  gestores: User[];
+  currentUserId?: string;
 }
 
 const CamposGenerales: React.FC<CamposGeneralesProps> = ({
-  values, onChange, lat, lng, barrio, boundaries, layerVisibility,
+  secciones, values, onChange, lat, lng, barrio, boundaries, layerVisibility,
   onLayerVisibilityChange, onToggleAllLayers, onMapClick,
   getLocation, gettingLocation, locationAccuracy, locationError,
+  gestores, currentUserId,
 }) => {
   const resolveValueByName = (name: string) => values[name];
 
   return (
     <div className="space-y-10">
-      {SECCIONES_PUNTO_ACUMULACION.map((seccion, sIdx) => (
+      {secciones.map((seccion, sIdx) => (
         <div key={sIdx} className="section-box bg-neutral-50/30 rounded-3xl border border-neutral-100 p-6 md:p-8 space-y-6 shadow-sm">
           <div className="border-b border-neutral-200 pb-4 mb-2">
             <h3 className="text-xl font-bold text-primary flex items-center gap-2">
@@ -180,7 +247,7 @@ const CamposGenerales: React.FC<CamposGeneralesProps> = ({
                 );
               }
 
-              const fullWidth = ['LOCATION', 'TEXTAREA', 'MULTISELECT'].includes(campo.type);
+              const fullWidth = ['LOCATION', 'TEXTAREA', 'MULTISELECT', 'FILE', 'ENTITY_SELECT'].includes(campo.type);
               const colSpan = fullWidth ? 'col-span-full' : 'col-span-1';
               return (
                 <div key={campo.name} className={`${colSpan} space-y-2`}>
@@ -222,7 +289,7 @@ const CamposGenerales: React.FC<CamposGeneralesProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <CampoInput campo={campo} value={values[campo.name]} onChange={onChange} />
+                    <CampoInput campo={campo} value={values[campo.name]} onChange={onChange} gestores={gestores} currentUserId={currentUserId} />
                   )}
                 </div>
               );
@@ -236,8 +303,10 @@ const CamposGenerales: React.FC<CamposGeneralesProps> = ({
 
 export const CreateActivity: React.FC = () => {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const [searchParams] = useSearchParams();
   const processId = searchParams.get('processId');
+  const [tipoOperativo, setTipoOperativo] = useState<'PUNTO_ACUMULACION' | 'GENERICO'>('PUNTO_ACUMULACION');
   const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>({
     barrios: false, carrera7: false, colegios: false, cestas: false, falloSanVictorino: false,
     propiedadHorizontal: false, upz: false, cambuches: false, bodegas: false,
@@ -368,10 +437,17 @@ export const CreateActivity: React.FC = () => {
     );
   };
 
-  const todosLosCampos = useMemo(() => SECCIONES_PUNTO_ACUMULACION.flatMap((s) => s.campos), []);
+  const secciones = tipoOperativo === 'GENERICO' ? SECCIONES_AMBIENTAL_GENERICO : SECCIONES_PUNTO_ACUMULACION;
+  const todosLosCampos = useMemo(() => secciones.flatMap((s) => s.campos), [secciones]);
+
+  const handleTipoOperativoChange = (nuevo: 'PUNTO_ACUMULACION' | 'GENERICO') => {
+    setTipoOperativo(nuevo);
+    setCamposValues({});
+    setResiduos([]);
+  };
 
   const onSubmit = async () => {
-    if (residuos.length === 0) {
+    if (tipoOperativo === 'PUNTO_ACUMULACION' && residuos.length === 0) {
       setToast({ message: 'Debe agregar al menos un residuo al punto', type: 'error' });
       return;
     }
@@ -387,7 +463,7 @@ export const CreateActivity: React.FC = () => {
     };
 
     const missingRequired = todosLosCampos.filter((c) => c.required && isCampoVisible(c) && !isAnswered(camposValues[c.name]));
-    if (!isAnswered(camposValues['ubicacion_mapa']) && !(lat && lng)) missingRequired.push({ name: 'ubicacion_mapa', label: 'Ubicación del punto de acumulación', type: 'LOCATION' });
+    if (!isAnswered(camposValues['ubicacion_mapa']) && !(lat && lng)) missingRequired.push({ name: 'ubicacion_mapa', label: 'Ubicación', type: 'LOCATION' });
 
     if (missingRequired.length > 0) {
       setToast({ message: `Faltan campos obligatorios: ${missingRequired.map((c) => c.label).join(', ')}`, type: 'error' });
@@ -398,40 +474,75 @@ export const CreateActivity: React.FC = () => {
     try {
       const dateTimeVal = camposValues['fecha_operativo'] || new Date().toISOString();
 
-      const dto: any = {
+      let dto: any = {
+        tipoOperativo,
         dateTime: new Date(dateTimeVal).toISOString(),
         lat,
         lng,
         barrio,
         entidadResponsable: camposValues['entidad_responsable'],
-        residuos,
-        frecuenciaAcumulacion: camposValues['frecuenciaAcumulacion'],
-        observaciones: camposValues['observaciones'],
-        entornoEscolar: camposValues['entornoEscolar'] !== undefined ? camposValues['entornoEscolar'] === 'true' || camposValues['entornoEscolar'] === true : undefined,
-        nombreEntornoEscolar: camposValues['nombreEntornoEscolar'],
-        especificarEntorno: camposValues['especificarEntorno'],
-        tipoZona: camposValues['tipoZona'],
-        tipoSuelo: camposValues['tipoSuelo'],
-        condicionesZona: camposValues['condicionesZona'],
-        poblacionHabitanteCalle: camposValues['poblacionHabitanteCalle'] !== undefined ? camposValues['poblacionHabitanteCalle'] === 'true' || camposValues['poblacionHabitanteCalle'] === true : undefined,
-        factoresAcumulacion: camposValues['factoresAcumulacion'],
-        camarasPunto: camposValues['camarasPunto'],
-        operadorAseo: camposValues['operadorAseo'],
-        recoleccionPuertaAPuerta: camposValues['recoleccionPuertaAPuerta'] !== undefined ? camposValues['recoleccionPuertaAPuerta'] === 'true' || camposValues['recoleccionPuertaAPuerta'] === true : undefined,
-        m2Invasion: camposValues['m2Invasion'],
-        actoresIndisciplina: camposValues['actoresIndisciplina'],
-        intervencionesPropuestas: camposValues['intervencionesPropuestas'],
-        identificacionGenerador: camposValues['identificacionGenerador'],
-        tipoGenerador: camposValues['tipoGenerador'],
-        nombreResponsable: camposValues['nombreResponsable'],
-        direccionResponsable: camposValues['direccionResponsable'],
-        observoDisposicion: camposValues['observoDisposicion'] !== undefined ? camposValues['observoDisposicion'] === 'true' || camposValues['observoDisposicion'] === true : undefined,
-        fechaObservacion: camposValues['fechaObservacion'] ? new Date(camposValues['fechaObservacion']).toISOString() : undefined,
-        metodoIdentificacion: camposValues['metodoIdentificacion'],
-        actoresEstrategicos: camposValues['actoresEstrategicos'],
-        telefonoActor: camposValues['telefonoActor'],
-        intervencionesRecomendadas: camposValues['intervencionesRecomendadas'],
       };
+
+      if (tipoOperativo === 'GENERICO') {
+        // Gestores acompañantes: la pregunta guarda NOMBRES ("Nombre
+        // Apellido"), hay que resolverlos a IDs — mismo patrón que el hub.
+        const nombresAcompanantes: string[] = Array.isArray(camposValues['gestores_acompanantes'])
+          ? camposValues['gestores_acompanantes']
+          : [];
+        const gestoresInvolucradosIds = Array.from(new Set(
+          nombresAcompanantes
+            .map((nombre) => gestores.find((g) => `${g.name} ${g.lastname}` === nombre)?.id)
+            .filter((id): id is string => !!id),
+        ));
+
+        dto = {
+          ...dto,
+          residuos: [],
+          results: camposValues['descripcion_general'],
+          photos: camposValues['fotos_evidencia'] || [],
+          actaPdfUrl: camposValues['acta_pdf'],
+          isGroupOperativo: !!camposValues['en_grupo'] || gestoresInvolucradosIds.length > 0,
+          gestoresInvolucradosIds,
+          puntosCriticosEmergentesAtendidos: camposValues['puntosCriticosEmergentesAtendidos'],
+          comparendosPedagogicos: camposValues['comparendosPedagogicos'],
+          comparendos: camposValues['comparendos'],
+          personasSensibilizadas: camposValues['personasSensibilizadas'],
+          huertas: camposValues['huertas'],
+          kgMaterialResiduosRecolectados: camposValues['kgMaterialResiduosRecolectados'],
+          m2RecuperadosEspacioPublico: camposValues['m2RecuperadosEspacioPublico'],
+        };
+      } else {
+        dto = {
+          ...dto,
+          residuos,
+          frecuenciaAcumulacion: camposValues['frecuenciaAcumulacion'],
+          observaciones: camposValues['observaciones'],
+          entornoEscolar: camposValues['entornoEscolar'] !== undefined ? camposValues['entornoEscolar'] === 'true' || camposValues['entornoEscolar'] === true : undefined,
+          nombreEntornoEscolar: camposValues['nombreEntornoEscolar'],
+          especificarEntorno: camposValues['especificarEntorno'],
+          tipoZona: camposValues['tipoZona'],
+          tipoSuelo: camposValues['tipoSuelo'],
+          condicionesZona: camposValues['condicionesZona'],
+          poblacionHabitanteCalle: camposValues['poblacionHabitanteCalle'] !== undefined ? camposValues['poblacionHabitanteCalle'] === 'true' || camposValues['poblacionHabitanteCalle'] === true : undefined,
+          factoresAcumulacion: camposValues['factoresAcumulacion'],
+          camarasPunto: camposValues['camarasPunto'],
+          operadorAseo: camposValues['operadorAseo'],
+          recoleccionPuertaAPuerta: camposValues['recoleccionPuertaAPuerta'] !== undefined ? camposValues['recoleccionPuertaAPuerta'] === 'true' || camposValues['recoleccionPuertaAPuerta'] === true : undefined,
+          m2Invasion: camposValues['m2Invasion'],
+          actoresIndisciplina: camposValues['actoresIndisciplina'],
+          intervencionesPropuestas: camposValues['intervencionesPropuestas'],
+          identificacionGenerador: camposValues['identificacionGenerador'],
+          tipoGenerador: camposValues['tipoGenerador'],
+          nombreResponsable: camposValues['nombreResponsable'],
+          direccionResponsable: camposValues['direccionResponsable'],
+          observoDisposicion: camposValues['observoDisposicion'] !== undefined ? camposValues['observoDisposicion'] === 'true' || camposValues['observoDisposicion'] === true : undefined,
+          fechaObservacion: camposValues['fechaObservacion'] ? new Date(camposValues['fechaObservacion']).toISOString() : undefined,
+          metodoIdentificacion: camposValues['metodoIdentificacion'],
+          actoresEstrategicos: camposValues['actoresEstrategicos'],
+          telefonoActor: camposValues['telefonoActor'],
+          intervencionesRecomendadas: camposValues['intervencionesRecomendadas'],
+        };
+      }
       if (processId) dto.processId = processId;
 
       const created = await activityService.create(dto);
@@ -462,15 +573,30 @@ export const CreateActivity: React.FC = () => {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="card mb-8 p-6 bg-white rounded-2xl shadow-sm border border-neutral-100">
-          <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Tipo de registro</h2>
-          <select value="AMBIENTAL_PUNTOS_ACUMULACION" disabled className="input-field opacity-70">
-            <option value="AMBIENTAL_PUNTOS_ACUMULACION">Puntos de Acumulación de Residuos</option>
-          </select>
+          <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">1. Configuración del Operativo</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-neutral-700 mb-2">Categoría</label>
+              <div className="input-field bg-neutral-50 text-neutral-600 cursor-not-allowed">Ambiental</div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-neutral-700 mb-2">Subtipo de Operativo</label>
+              <select
+                value={tipoOperativo}
+                onChange={(e) => handleTipoOperativoChange(e.target.value as 'PUNTO_ACUMULACION' | 'GENERICO')}
+                className="input-field"
+              >
+                <option value="PUNTO_ACUMULACION">Puntos de Acumulación de Residuos</option>
+                <option value="GENERICO">Ambiental</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
           <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
             <CamposGenerales
+              secciones={secciones}
               values={camposValues}
               onChange={handleCampoChange}
               lat={lat}
@@ -485,9 +611,12 @@ export const CreateActivity: React.FC = () => {
               gettingLocation={gettingLocation}
               locationAccuracy={locationAccuracy}
               locationError={locationError}
+              gestores={gestores}
+              currentUserId={user?.id}
             />
           </div>
 
+          {tipoOperativo === 'PUNTO_ACUMULACION' && (
           <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -672,6 +801,7 @@ export const CreateActivity: React.FC = () => {
               </button>
             )}
           </div>
+          )}
 
           <div className="pt-4">
             <button type="submit" disabled={loading} className="btn-primary w-full py-4 text-lg shadow-xl shadow-primary/20 disabled:opacity-50 disabled:shadow-none transition-all">
