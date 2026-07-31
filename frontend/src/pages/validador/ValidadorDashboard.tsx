@@ -9,7 +9,7 @@ import { Pagination } from '../../components/Pagination';
 import type { Activity, User } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { startOfMonthStr as gSOM, endOfMonthStr as gEOM } from '../../utils/dateRanges';
+import { startOfMonthStr as gSOM, endOfMonthStr as gEOM, startOfYearStr as gSOY, endOfYearStr as gEOY } from '../../utils/dateRanges';
 
 // Ported desde gov-espacio-publico/packages/frontend/src/pages/validador/ValidadorDashboard.tsx
 // (hallazgo del recorrido visual 2026-07-31: "Volver al Panel" SÍ apuntaba a
@@ -75,9 +75,14 @@ export const ValidadorDashboard: React.FC = () => {
   const [historyCreatorSearch, setHistoryCreatorSearch] = useState('');
   const [showHistoryCreatorDropdown, setShowHistoryCreatorDropdown] = useState(false);
   const [historySearchNumber, setHistorySearchNumber] = useState('');
-  const [historyMonthFilter, setHistoryMonthFilter] = useState('');
-  const [historyDesdeFilter, setHistoryDesdeFilter] = useState('');
-  const [historyHastaFilter, setHistoryHastaFilter] = useState('');
+  // Default a año actual, igual que el hub (gSOY/gEOY) — antes quedaba sin
+  // filtro por fecha (historial completo desde siempre), lo que hacía que el
+  // conteo de esta pantalla (337, todo el historico) no se pudiera comparar
+  // contra el de ValidadorMapaDashboard (38, acotado al mes actual): eran
+  // ventanas de tiempo distintas, no un error de conteo.
+  const [historyMonthFilter, setHistoryMonthFilter] = useState(format(new Date(), 'yyyy-MM'));
+  const [historyDesdeFilter, setHistoryDesdeFilter] = useState(gSOY());
+  const [historyHastaFilter, setHistoryHastaFilter] = useState(gEOY());
 
   const gestoresMap = useMemo(() => {
     const map = new Map<string, { name: string; lastname: string; email: string }>();
