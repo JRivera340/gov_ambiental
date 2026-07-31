@@ -160,6 +160,11 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
     setTimeout(() => setToast(null), 4000);
   };
 
+  // Tras aprobar/rechazar, el hub (ActivityDetail.tsx, SOLO LECTURA) navega
+  // a getDashboardPath(role) 1.5s después del toast — no se queda en el
+  // detalle. Acá solo ADMIN y VALIDADOR_AMBIENTAL llegan a esta vista.
+  const dashboardPath = role === 'ADMIN' ? '/admin' : '/validador/dashboard';
+
   const handleApprove = async () => {
     if (!activity) return;
     setProcessing(true);
@@ -169,6 +174,7 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
       showToast('Punto aprobado correctamente', 'success');
       setShowApproveModal(false);
       setApproveNotes('');
+      setTimeout(() => navigate(dashboardPath), 1500);
     } catch (e: any) {
       showToast(`Error: ${e?.response?.data?.message || 'No se pudo aprobar'}`, 'error');
     } finally {
@@ -186,6 +192,7 @@ export const PuntoDetailView: React.FC<PuntoDetailViewProps> = ({ backHref }) =>
       showToast('Punto rechazado', 'success');
       setShowRejectModal(false);
       setRejectNotes('');
+      setTimeout(() => navigate(dashboardPath), 1500);
     } catch (e: any) {
       showToast(`Error: ${e?.response?.data?.message || 'No se pudo rechazar'}`, 'error');
     } finally {
