@@ -171,7 +171,7 @@ export const ValidadorDashboard: React.FC = () => {
   }, [pending, tipoFilter, barrioFilter, gestorFilter, desdeFilter, hastaFilter, pendingSearchNumber]);
 
   const filteredHistory = useMemo(() => {
-    return history.filter((a) => {
+    const filtradas = history.filter((a) => {
       if (historyTipoFilter && a.tipoOperativo !== historyTipoFilter) return false;
       if (historyBarrioFilter && a.barrio !== historyBarrioFilter) return false;
       if (historyStatusFilter && a.status !== historyStatusFilter) return false;
@@ -181,6 +181,13 @@ export const ValidadorDashboard: React.FC = () => {
       if (historyHastaFilter && (!fechaValidacion || fechaValidacion > new Date(`${historyHastaFilter}T23:59:59`))) return false;
       if (historySearchNumber.trim() && (a.pointNumber ?? 0).toString() !== historySearchNumber.trim()) return false;
       return true;
+    });
+    // Mas reciente primero por fecha de validacion, igual que el hub
+    // (sorver.repository.typeorm.ts: orderBy('activity.validatedAt', 'DESC')).
+    return filtradas.sort((a, b) => {
+      const ta = a.validatedAt ? new Date(a.validatedAt).getTime() : 0;
+      const tb = b.validatedAt ? new Date(b.validatedAt).getTime() : 0;
+      return tb - ta;
     });
   }, [history, historyTipoFilter, historyBarrioFilter, historyStatusFilter, historyCreatorFilter, historyDesdeFilter, historyHastaFilter, historySearchNumber]);
 
