@@ -13,13 +13,18 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Header portado del hub (AdminDashboard.tsx, SOLO LECTURA) — mismo
-          degradado rojo institucional y mismo texto, sin el logo centrado
-          "BogotaneidApp" (ese logo es del hub, no aplica a este subdominio). */}
+      {/* Header portado del hub (AdminDashboard.tsx, SOLO LECTURA) — degradado
+          rojo institucional, texto y logo centrado "BogotaneidApp" iguales al
+          hub (hallazgo del recorrido visual 2026-07-31: el comentario previo
+          decía "no aplica a este subdominio", razonamiento incorrecto — el
+          logo institucional es igual en todos los subdominios, ver
+          ESTADO-EXTRACCION.md). `position: fixed` agregado para que el logo
+          centrado (`position: absolute` respecto al header) quede anclado a
+          la barra roja y no a la página completa al hacer scroll. */}
       <header
         className="px-4 sm:px-6 md:px-8"
         style={{
-          height: 60,
+          position: 'fixed', top: 0, left: 0, right: 0, height: 60, zIndex: 60,
           background: 'linear-gradient(90deg, #dc2626 0%, #b91c1c 45%, #991b1b 100%)',
           boxShadow: '0 4px 20px rgba(153, 27, 27, 0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -32,6 +37,10 @@ export const AdminDashboard: React.FC = () => {
             <div style={{ color: 'white', fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>Sistema de Seguimiento Territorial</div>
             <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 11 }}>Alcaldía Local de Santa Fe · Panel de Administración</div>
           </div>
+        </div>
+        {/* Logo centrado */}
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src="/images/bogotaneidapp_sinfondo.png" alt="BogotaneidApp" className="h-[60px] sm:h-[90px] w-auto object-contain" />
         </div>
         <button
           onClick={() => dash.setSidebarOpen(!dash.sidebarOpen)}
@@ -199,7 +208,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      <main className="p-3">
+      <main className="p-3" style={{ marginTop: 60 }}>
         {dash.loading && <p className="text-sm text-neutral-500">Cargando puntos...</p>}
         {dash.error && <p className="text-sm text-red-600">{dash.error}</p>}
         {!dash.loading && !dash.error && (
