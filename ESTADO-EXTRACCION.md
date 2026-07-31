@@ -285,6 +285,51 @@ fuera por omisión, no hace falta excluirlos a mano, pero cualquier futura
 vista "pública" nueva debe revisar esta tabla antes de exponer campos del
 punto.
 
+### Columnas compartidas entre `tipoOperativo` — precisión para el diccionario de datos UAESP
+
+`PuntoResiduo` reutiliza 6 columnas entre los dos subtipos de operativo
+(`PUNTO_ACUMULACION`/`GENERICO`, ver más abajo) en vez de duplicarlas —
+decisión de Josh 2026-07-31: "duplicar columnas con el mismo significado es
+peor que reutilizarlas". Verificado el código real (frontend + migración)
+para las 6, campo por campo:
+
+- **`photos`, `actaPdfUrl`, `entidadResponsable`, `gestoresInvolucradosIds`**:
+  mismo significado en ambos subtipos — evidencia fotográfica general,
+  acta PDF, entidad responsable, gestores acompañantes. Sin ambigüedad.
+- **`isGroupOperativo`**: mismo significado ("¿operativo en grupo?"), pero se
+  DERIVA distinto según el subtipo — en `GENERICO` viene de una pregunta
+  explícita del formulario ("¿Este operativo fue realizado en grupo...?");
+  en `PUNTO_ACUMULACION` no existe esa pregunta, se infiere solo de si hay
+  gestores acompañantes cargados (`gestoresInvolucradosIds.length > 0`).
+  Mismo campo, mismo significado final, distinto origen del dato — no es
+  ambiguo, pero vale la nota para quien audite el dato.
+- **`results` — ESTE SÍ TIENE SIGNIFICADO DISTINTO SEGÚN EL ORIGEN DE LA FILA,
+  no solo según `tipoOperativo`. Requiere lectura atenta antes de usarse en
+  cualquier reporte o exportación:**
+  - **Filas `GENERICO` (creadas en este repo):** contiene la "Descripción
+    general" del formulario del operativo (sección 5, campo obligatorio) —
+    siempre poblado.
+  - **Filas `PUNTO_ACUMULACION` migradas del hub (346 puntos históricos,
+    HITO 3):** contiene la "descripción general" ORIGINAL de la actividad
+    en el hub (`activities.results`, poblado ahí para cualquier subtipo,
+    con default `'Sin descripción'` si el usuario no escribía nada) —
+    migrado verbatim, dato real y con contenido.
+  - **Filas `PUNTO_ACUMULACION` creadas NUEVAS en este repo (después de la
+    conversión a formulario fijo, 2026-07-29):** **siempre `null`.** El
+    formulario fijo de puntos de acumulación (`camposPuntoAcumulacion.ts`)
+    no tiene ningún campo que alimente `results` — ni `CreateActivity.tsx`
+    ni `EditActivity.tsx` lo escriben para este subtipo. El campo más
+    parecido, `observaciones`, es una columna DISTINTA con alcance distinto
+    ("Observaciones adicionales sobre el punto de acumulación", ver sección
+    "2. Datos del punto"), no un reemplazo de `results`.
+  - **Consecuencia práctica:** una consulta que agrupe por `results IS NULL`
+    hoy mezclaría "punto de acumulación nuevo sin ese dato" (esperado, no es
+    un hueco) con cualquier fila realmente incompleta — hay que filtrar por
+    `tipoOperativo` y por fecha de creación (antes/después de 2026-07-29)
+    para interpretar un `results` nulo correctamente. Anotar esta regla en
+    el diccionario de datos de la UAESP tal cual está escrita acá, no
+    simplificarla a "campo de descripción general".
+
 ### Cadena de evidencia para comparendos (campos #17 a #23)
 
 `identificacionGenerador` → `tipoGenerador` → `nombreResponsable` →
@@ -489,6 +534,19 @@ está acotando cuando no pasa nada. Alternativa descartada (poblar el dato):
 requeriría agregar una pregunta nueva al formulario y no hay ningún pedido
 de negocio de la UAESP para capturar turno — no se justifica solo para
 llenar un filtro.
+
+### Botón "Volver al Panel" en el mapa de residuos del validador (quitado 2026-07-31)
+El hub tiene este botón porque su `/validador/dashboard` es un shell real
+multi-dominio (IVC, Espacio Público, Ambiental, PYBA) — "volver al panel"
+significa "salir de este dominio y elegir otro". Este repo es mono-dominio:
+`/validador/dashboard` acá es un alias (`<Navigate>`) a la MISMA pantalla
+donde vive el botón (`ValidadorMapaDashboard.tsx`), así que el click no
+llevaba a ningún lado distinto — rebotaba a sí mismo. **Decisión de Josh
+2026-07-31, confirmada:** no reemplazar por un link externo a
+`bogotaneidapp.com` — eso expulsaría al usuario del módulo ambiental en vez
+de "volver a un panel", el efecto contrario al que tiene en el hub. Se quita
+el botón sin reemplazo. Divergencia deliberada por mono-dominio, no gap de
+paridad — no reintroducirlo en una futura auditoría.
 
 ### Consecuencia sistemática del modelo de datos
 El hub usa `ActivityEntity` única discriminada por `operativoCategoria` /

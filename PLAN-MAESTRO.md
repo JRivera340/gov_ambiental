@@ -804,7 +804,7 @@ con Josh/UAESP si falta algo antes de tratarla como completa.
 
 | Documento | Estado | Esfuerzo |
 |---|---|---|
-| Diccionario de datos de los 26 campos nuevos + los históricos, con las 3 columnas PII señaladas explícitamente (`nombreResponsable`, `direccionResponsable`, `telefonoActor`) | No existe todavía como documento entregable — el detalle vive disperso en `ESTADO-EXTRACCION.md` y en el código (entidad, DTO) | Medio |
+| Diccionario de datos de los 26 campos nuevos + los históricos, con las 3 columnas PII señaladas explícitamente (`nombreResponsable`, `direccionResponsable`, `telefonoActor`) y el significado de `results` según origen/`tipoOperativo` (ver `ESTADO-EXTRACCION.md`, sección "Columnas compartidas entre `tipoOperativo`" — no simplificar a "campo de descripción general") | No existe todavía como documento entregable — el detalle vive disperso en `ESTADO-EXTRACCION.md` y en el código (entidad, DTO) | Medio |
 | Acta de entrega formal (documento narrativo: qué se entrega, alcance, qué no incluye) | No existe | Medio |
 | Declaración de datos personales para el acta (qué campos son PII, de quién, por qué se recolectan) | Contenido ya está en `ESTADO-EXTRACCION.md`; falta trasladarlo al formato que pida la UAESP | Bajo |
 | Reporte de integridad de la migración (conteos origen/destino, muestreo, anomalías conocidas y su explicación) | Parcial — el conteo agregado ya está (este reporte), falta el muestreo estratificado por estado y cerrar las 2 anomalías detectadas | Medio |
