@@ -215,13 +215,14 @@ interface CamposGeneralesProps {
   locationError: string;
   gestores: User[];
   currentUserId?: string;
+  highlightedCampo?: string | null;
 }
 
 const CamposGenerales: React.FC<CamposGeneralesProps> = ({
   secciones, values, onChange, lat, lng, barrio, boundaries, layerVisibility,
   onLayerVisibilityChange, onToggleAllLayers, onMapClick,
   getLocation, gettingLocation, locationAccuracy, locationError,
-  gestores, currentUserId,
+  gestores, currentUserId, highlightedCampo,
 }) => {
   const resolveValueByName = (name: string) => values[name];
 
@@ -249,8 +250,13 @@ const CamposGenerales: React.FC<CamposGeneralesProps> = ({
 
               const fullWidth = ['LOCATION', 'TEXTAREA', 'MULTISELECT', 'FILE', 'ENTITY_SELECT'].includes(campo.type);
               const colSpan = fullWidth ? 'col-span-full' : 'col-span-1';
+              const isHighlighted = highlightedCampo === campo.name;
               return (
-                <div key={campo.name} className={`${colSpan} space-y-2`}>
+                <div
+                  key={campo.name}
+                  id={`campo-${campo.name}`}
+                  className={`${colSpan} space-y-2 rounded-2xl transition-shadow ${isHighlighted ? 'ring-2 ring-red-500 ring-offset-2' : ''}`}
+                >
                   <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
                     {campo.label} {campo.required && <span className="text-red-500">*</span>}
                   </label>
@@ -332,6 +338,7 @@ export const CreateActivity: React.FC = () => {
 
   const [gestores, setGestores] = useState<User[]>([]);
   const [camposValues, setCamposValues] = useState<Record<string, any>>({});
+  const [highlightedCampo, setHighlightedCampo] = useState<string | null>(null);
 
   useEffect(() => {
     loadCatalogs();
@@ -468,6 +475,12 @@ export const CreateActivity: React.FC = () => {
 
     if (missingRequired.length > 0) {
       setToast({ message: `Faltan campos obligatorios: ${missingRequired.map((c) => c.label).join(', ')}`, type: 'error' });
+      const primero = missingRequired[0];
+      setHighlightedCampo(primero.name);
+      setTimeout(() => {
+        document.getElementById(`campo-${primero.name}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+      setTimeout(() => setHighlightedCampo(null), 3000);
       return;
     }
 
@@ -614,6 +627,7 @@ export const CreateActivity: React.FC = () => {
               locationError={locationError}
               gestores={gestores}
               currentUserId={user?.id}
+              highlightedCampo={highlightedCampo}
             />
           </div>
 
