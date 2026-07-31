@@ -17,7 +17,8 @@
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d src/config/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:run": "npm run typeorm -- migration:run",
-    "migration:revert": "npm run typeorm -- migration:revert"
+    "migration:revert": "npm run typeorm -- migration:revert",
+    "migration:run:dist": "node ./node_modules/typeorm/cli.js -d dist/config/data-source.js migration:run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.700.0",

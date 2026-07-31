@@ -151,6 +151,7 @@ enum Role { GESTOR_AMBIENTAL, VALIDADOR_AMBIENTAL, ADMIN }
 - Estructura de `PuntoAsignacion` (PK en `puntoResiduoId`) — cambiarla rompe el mapeo con datos migrados del legacy.
 - `scripts/migrate-from-legacy.ts` — script de migración de datos, no ejecutar contra producción sin confirmar.
 - Patrón TypeORM para updates (heredado del legacy): castear fechas explícitamente antes de `Object.assign` + `save()`, nunca `repo.update()` directo — mismo bug documentado en `gov-espacio-publico/.claude/CLAUDE.md` sección 11 (bug `toISOString`).
+- **Cambio de entidad sin su migración en el mismo commit.** Con `synchronize: false` en producción, TypeORM arma sus `SELECT` con TODAS las columnas mapeadas en la entidad — si el código nuevo llega antes que la columna exista, rompe TODOS los endpoints que tocan esa tabla, no solo la feature nueva. Regla fija: entidad + migración van juntas, un solo commit. Las migraciones corren automáticamente al desplegar (`startCommand` en `railway.toml`, `npm run migration:run:dist` antes de `node dist/main` — si la migración falla, el contenedor no arranca, mejor caído que sirviendo con esquema viejo). Incidente real: commit `2dcd106` (2026-07-30) agregó `tipoOperativo` a `PuntoResiduo` y se pusheó antes de que existiera este mecanismo — corregido el mismo día.
 
 ---
 
@@ -168,6 +169,8 @@ npm run build           # Backend build
 npm run test             # Backend tests (Jest)
 npm run seed              # Poblar datos de prueba
 npm run migrate:legacy    # Migrar datos desde gov-espacio-publico
+npm run migration:run     # Migraciones locales (ts-node contra src/)
+npm run migration:run:dist # Migraciones contra dist/ compilado (lo que corre Railway antes de arrancar)
 
 # Frontend (dentro de frontend/)
 npm run dev

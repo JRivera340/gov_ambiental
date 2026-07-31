@@ -3,6 +3,12 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# La migracion corre ANTES de levantar la app: si falla, el deploy falla y el
+# codigo nuevo nunca sirve trafico contra un esquema viejo (mejor caido que
+# sirviendo mal). Usa el data-source compilado (dist/), no ts-node — no
+# requiere el codigo fuente en la imagen final. Ver package.json,
+# "migration:run:dist".
+startCommand = "npm run migration:run:dist && node dist/main"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
