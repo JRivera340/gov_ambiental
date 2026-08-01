@@ -220,9 +220,6 @@ export const ValidadorDashboard: React.FC = () => {
             <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 11 }}>Alcaldía Local de Santa Fe · Panel de Validación Ambiental</div>
           </div>
         </div>
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src="/images/bogotaneidapp_sinfondo.png" alt="BogotaneidApp" className="h-[60px] sm:h-[90px] w-auto object-contain" />
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{

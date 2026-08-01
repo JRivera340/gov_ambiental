@@ -188,9 +188,6 @@ export const ValidadorMapaDashboard: React.FC = () => {
             <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 11 }}>Alcaldía Local de Santa Fe · Mapa de Residuos</div>
           </div>
         </div>
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-          <img src="/images/bogotaneidapp_sinfondo.png" alt="BogotaneidApp" style={{ height: 72, objectFit: 'contain' }} />
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           <span style={{ color: 'white', fontSize: 13, fontWeight: 600 }}>{user?.name}</span>
           <button

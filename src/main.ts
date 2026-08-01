@@ -29,16 +29,10 @@ async function bootstrap() {
       // Un origen no listado NUNCA debe lanzar: `cors` propaga cualquier Error
       // a través de Express/Nest como excepción no manejada (500 genérico en
       // TODA la app, no solo en la ruta que se está probando). callback(null,
-      // false) simplemente omite las cabeceras CORS de la respuesta -- eso ya
-      // basta para que el navegador bloquee la lectura de un fetch cross-site;
-      // no bloquea la petición en el servidor, que es lo que de verdad importa
-      // para POST de navegación de página completa como /api/handoff (ahí no
-      // aplica CORS en absoluto, solo el fetch/XHR lo respeta).
+      // false) simplemente omite las cabeceras CORS de la respuesta — eso ya
+      // basta para que el navegador bloquee la lectura de un fetch cross-site.
       if (!origin) return callback(null, true);
       if (origins.includes(origin)) return callback(null, true);
-      if (origin.endsWith('.railway.app') || origin.endsWith('.up.railway.app')) {
-        return callback(null, true);
-      }
       return callback(null, false);
     },
     credentials: true,

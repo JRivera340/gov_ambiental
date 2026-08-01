@@ -19,12 +19,12 @@ describe('ReporteService', () => {
       },
     ];
 
-    const buffer = service.generateXlsxReport(puntos as PuntoResiduo[], 'https://ambiental.bogotaneidapp.com');
+    const buffer = service.generateXlsxReport(puntos as PuntoResiduo[], 'https://ambiental.ejemplo.local');
     const wb = XLSX.read(buffer, { type: 'buffer' });
     const rows = XLSX.utils.sheet_to_json(wb.Sheets['Pendientes Recogida']);
 
     expect(rows).toHaveLength(1); // solo el residuo no recogido
     expect((rows[0] as any)['ID o número del punto crítico']).toBe(7);
-    expect((rows[0] as any)['Link público de consulta del punto reportado']).toBe('https://ambiental.bogotaneidapp.com/public/p1');
+    expect((rows[0] as any)['Link público de consulta del punto reportado']).toBe('https://ambiental.ejemplo.local/public/p1');
   });
 });

@@ -6,22 +6,13 @@ import { EnvironmentalTab } from './tabs/EnvironmentalTab';
 import { useAdminDashboard } from './hooks/useAdminDashboard';
 import { getYearStart, getYearEnd } from './utils/adminHelpers';
 
-// Shell de ADMIN de este repo: un solo tab (Sector Ambiental), a diferencia
-// del AdminDashboard multi-dominio del hub (IVC/ESPACIO_PUBLICO/AMBIENTAL/
-// PYBA/DEPORTES). Ver ESTADO-EXTRACCION.md.
+// Shell de ADMIN: un solo tab (Sector Ambiental) — módulo mono-dominio.
 export const AdminDashboard: React.FC = () => {
   const dash = useAdminDashboard();
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Header portado del hub (AdminDashboard.tsx, SOLO LECTURA) — degradado
-          rojo institucional, texto y logo centrado "BogotaneidApp" iguales al
-          hub (hallazgo del recorrido visual 2026-07-31: el comentario previo
-          decía "no aplica a este subdominio", razonamiento incorrecto — el
-          logo institucional es igual en todos los subdominios, ver
-          ESTADO-EXTRACCION.md). `position: fixed` agregado para que el logo
-          centrado (`position: absolute` respecto al header) quede anclado a
-          la barra roja y no a la página completa al hacer scroll. */}
+      {/* `position: fixed` para que el header quede anclado arriba al hacer scroll. */}
       <header
         className="px-4 sm:px-6 md:px-8"
         style={{
@@ -38,10 +29,6 @@ export const AdminDashboard: React.FC = () => {
             <div style={{ color: 'white', fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>Sistema de Seguimiento Territorial</div>
             <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 11 }}>Alcaldía Local de Santa Fe · Panel de Administración</div>
           </div>
-        </div>
-        {/* Logo centrado */}
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src="/images/bogotaneidapp_sinfondo.png" alt="BogotaneidApp" className="h-[60px] sm:h-[90px] w-auto object-contain" />
         </div>
         <div className="flex items-center gap-2">
           <Link
