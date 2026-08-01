@@ -42,12 +42,27 @@ function rand<T>(arr: T[], seed: number): T {
   return arr[seed % arr.length];
 }
 
+// 30 coordenadas verificadas con point-in-polygon contra el KMZ real de la
+// localidad Santa Fe (frontend/public/boundaries/KMZ_Sectores_Catastrales_SF_2026.kmz,
+// mismo algoritmo de frontend/src/utils/boundaryValidation.ts) — no son un
+// bounding box aproximado, las 30 caen efectivamente dentro del polígono.
+// Dato público (coordenadas geográficas), no de ninguna persona.
+const COORDENADAS_SANTA_FE: [number, number][] = [
+  [4.571468, -74.018109], [4.597436, -74.043508], [4.593376, -74.038645],
+  [4.616399, -74.064062], [4.60715, -74.021301], [4.617322, -74.013451],
+  [4.603422, -74.036287], [4.595858, -74.032386], [4.59804, -74.060054],
+  [4.619574, -74.055135], [4.603519, -74.057755], [4.61746, -74.050748],
+  [4.580696, -74.006947], [4.591731, -74.015436], [4.637781, -74.02212],
+  [4.611029, -74.006311], [4.618991, -73.994918], [4.58196, -74.029352],
+  [4.584864, -73.997132], [4.619055, -74.023673], [4.617028, -74.023506],
+  [4.633174, -74.018622], [4.593229, -74.046877], [4.586059, -74.002557],
+  [4.642424, -74.026186], [4.582145, -74.000331], [4.608113, -74.019315],
+  [4.616739, -74.063156], [4.583278, -74.067833], [4.575099, -74.031552],
+];
+
 function coordCercaDeSantaFe(seed: number): { lat: number; lng: number } {
-  // Dispersión pequeña alrededor del centro de la localidad — coordenadas
-  // públicas, no identifican a ninguna persona.
-  const lat = 4.596 + ((seed * 37) % 100) / 100 * 0.02;
-  const lng = -74.082 + ((seed * 53) % 100) / 100 * 0.02;
-  return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+  const [lat, lng] = COORDENADAS_SANTA_FE[seed % COORDENADAS_SANTA_FE.length];
+  return { lat, lng };
 }
 
 function crearResiduo(seed: number, recogido: boolean): ResiduoEntry {
@@ -143,6 +158,10 @@ async function seed() {
     const punto = puntoRepo.create({
       createdByUserId: gestor.id,
       status,
+      // El número de punto se asigna SIEMPRE al crear (igual que
+      // PuntosService.create() en producción) — no solo al publicar. Es el
+      // identificador visible del punto en toda la interfaz.
+      pointNumber: pointNumberSeq++,
       dateTime: new Date(Date.now() - i * 6 * 3600 * 1000),
       lat, lng, barrio,
       photos: [`photos/seed/punto-${i}.jpg`],
@@ -158,7 +177,6 @@ async function seed() {
       } : {}),
       ...(esPublicada ? {
         publishedAt: new Date(Date.now() - i * 2 * 3600 * 1000),
-        pointNumber: pointNumberSeq++,
         processId: i % 5 === 0 ? proceso.id : undefined,
       } : {}),
     });
