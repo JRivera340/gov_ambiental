@@ -1,155 +1,103 @@
-import { HttpException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { UsersService } from './users.service';
+import { Role } from '../common/enums/role.enum';
+import { UserEntity } from './entities/user.entity';
 
-const mockUser = {
-  id: 'user-1',
-  name: 'Ana',
-  lastname: 'Gomez',
-  email: 'ana@example.com',
-  role: 'GESTOR_AMBIENTAL',
-  active: true,
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
-};
+function makeRepoMock() {
+  const rows: UserEntity[] = [];
+  return {
+    rows,
+    find: jest.fn(async (opts: any) => {
+      let result = rows;
+      if (opts?.where?.role?.value) {
+        result = result.filter((r) => opts.where.role.value.includes(r.role));
+      }
+      if (opts?.where?.active !== undefined) {
+        result = result.filter((r) => r.active === opts.where.active);
+      }
+      return [...result];
+    }),
+    findOne: jest.fn(async (opts: any) => {
+      if (opts?.where?.id) return rows.find((r) => r.id === opts.where.id) ?? null;
+      if (opts?.where?.email) return rows.find((r) => r.email === opts.where.email) ?? null;
+      return null;
+    }),
+    create: jest.fn((data: Partial<UserEntity>) => ({ ...data }) as UserEntity),
+    save: jest.fn(async (user: UserEntity) => {
+      const idx = rows.findIndex((r) => r.id === user.id);
+      const saved = { ...user, id: user.id ?? `id-${rows.length + 1}` } as UserEntity;
+      if (idx >= 0) rows[idx] = saved;
+      else rows.push(saved);
+      return saved;
+    }),
+  };
+}
 
 describe('UsersService', () => {
-  const originalFetch = global.fetch;
-  const originalEnv = { ...process.env };
+  let repo: ReturnType<typeof makeRepoMock>;
+  let service: UsersService;
 
   beforeEach(() => {
-    process.env.HUB_API_URL = 'https://hub.test';
-    process.env.JWT_SECRET = 'secret';
-    process.env.DB_HOST = 'localhost';
-    process.env.DB_USERNAME = 'u';
-    process.env.DB_PASSWORD = 'p';
-    process.env.DB_DATABASE = 'd';
-    process.env.S3_ENDPOINT = 'https://s3.test.local';
-    process.env.S3_BUCKET = 'bucket-test';
-    process.env.S3_ACCESS_KEY_ID = 'key-id';
-    process.env.S3_SECRET_ACCESS_KEY = 'secret-key';
+    repo = makeRepoMock();
+    service = new UsersService(repo as any);
   });
 
-  afterEach(() => {
-    global.fetch = originalFetch;
-    process.env = { ...originalEnv };
-    jest.restoreAllMocks();
+  it('create hashea la contraseña y no la expone en el resultado', async () => {
+    const created = await service.create({ name: 'Ana', lastname: 'Gomez', email: 'ana@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
+
+    expect((created as any).passwordHash).toBeUndefined();
+    expect(created.email).toBe('ana@example.com');
+    const stored = repo.rows[0];
+    expect(stored.passwordHash).not.toBe('clave123');
+    expect(await bcrypt.compare('clave123', stored.passwordHash)).toBe(true);
   });
 
-  it('findById pide al hub y devuelve el usuario', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockUser,
-    });
-    global.fetch = fetchMock as any;
-
-    const service = new UsersService();
-    const result = await service.findById('user-1', 'token-abc');
-
-    expect(result).toEqual(mockUser);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.test/api/users/user-1',
-      expect.objectContaining({ headers: { Authorization: 'Bearer token-abc' } }),
-    );
+  it('create rechaza un correo duplicado', async () => {
+    await service.create({ name: 'Ana', lastname: 'Gomez', email: 'ana@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
+    await expect(
+      service.create({ name: 'Otro', lastname: 'Nombre', email: 'ANA@example.com', password: 'clave456', role: Role.ADMIN }),
+    ).rejects.toThrow(ConflictException);
   });
 
-  it('findById cachea y no vuelve a pedir al hub dentro del TTL', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockUser,
-    });
-    global.fetch = fetchMock as any;
-
-    const service = new UsersService();
-    await service.findById('user-1', 'token-abc');
-    await service.findById('user-1', 'token-abc');
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  it('findByEmail es case-insensitive', async () => {
+    await service.create({ name: 'Ana', lastname: 'Gomez', email: 'ana@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
+    const found = await service.findByEmail('ANA@EXAMPLE.COM');
+    expect(found?.email).toBe('ana@example.com');
   });
 
-  it('findById propaga el status del hub cuando falla', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: async () => 'Usuario no encontrado',
-    });
-    global.fetch = fetchMock as any;
+  it('update cambia campos y rehashea la contraseña solo si se envía una nueva', async () => {
+    const created = await service.create({ name: 'Ana', lastname: 'Gomez', email: 'ana@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
+    const oldHash = repo.rows[0].passwordHash;
 
-    const service = new UsersService();
-    await expect(service.findById('user-x', 'token-abc')).rejects.toThrow(HttpException);
+    const updated = await service.update(created.id, { name: 'Ana María' });
+    expect(updated.name).toBe('Ana María');
+    expect(repo.rows[0].passwordHash).toBe(oldHash);
+
+    await service.update(created.id, { password: 'nuevaClave789' });
+    expect(repo.rows[0].passwordHash).not.toBe(oldHash);
   });
 
-  it('findById falla rapido (no se cuelga) si el hub nunca responde', async () => {
-    jest.useFakeTimers();
-    const fetchMock = jest.fn((_url: string, opts: any) => new Promise((_resolve, reject) => {
-      opts.signal.addEventListener('abort', () => {
-        const err = new Error('Aborted');
-        err.name = 'AbortError';
-        reject(err);
-      });
-    }));
-    global.fetch = fetchMock as any;
-
-    const service = new UsersService();
-    const pending = service.findById('user-1', 'token-abc');
-    const assertion = expect(pending).rejects.toThrow(ServiceUnavailableException);
-
-    await jest.advanceTimersByTimeAsync(4_000);
-    await assertion;
-
-    jest.useRealTimers();
+  it('update lanza NotFoundException si el usuario no existe', async () => {
+    await expect(service.update('no-existe', { name: 'X' })).rejects.toThrow(NotFoundException);
   });
 
-  it('findGestores cachea entre llamadas dentro del TTL', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [mockUser],
-    });
-    global.fetch = fetchMock as any;
+  it('setActive desactiva y reactiva un usuario', async () => {
+    const created = await service.create({ name: 'Ana', lastname: 'Gomez', email: 'ana@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
 
-    const service = new UsersService();
-    await service.findGestores('token-a');
-    await service.findGestores('token-b');
+    const desactivado = await service.setActive(created.id, false);
+    expect(desactivado.active).toBe(false);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const reactivado = await service.setActive(created.id, true);
+    expect(reactivado.active).toBe(true);
   });
 
-  it('findGestores filtra a solo GESTOR_AMBIENTAL sin importar el rol de quien llama (VALIDADOR_AMBIENTAL)', async () => {
-    const mixedDomainUsers = [
-      { ...mockUser, id: 'amb-1', role: 'GESTOR_AMBIENTAL' },
-      { ...mockUser, id: 'ivc-1', role: 'GESTOR_IVC' },
-      { ...mockUser, id: 'ep-1', role: 'GESTOR_ESPACIO_PUBLICO' },
-      { ...mockUser, id: 'pyba-1', role: 'GESTOR_PYBA' },
-    ];
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mixedDomainUsers,
-    });
-    global.fetch = fetchMock as any;
+  it('findGestores solo devuelve usuarios activos con rol de gestor/validador/admin', async () => {
+    await service.create({ name: 'Gestor', lastname: 'Uno', email: 'g1@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
+    const inactivo = await service.create({ name: 'Gestor', lastname: 'Inactivo', email: 'g2@example.com', password: 'clave123', role: Role.GESTOR_AMBIENTAL });
+    await service.setActive(inactivo.id, false);
 
-    const service = new UsersService();
-    const result = await service.findGestores('token-validador');
-
-    expect(result).toEqual([mixedDomainUsers[0]]);
-  });
-
-  it('findGestores filtra a solo GESTOR_AMBIENTAL sin importar el rol de quien llama (ADMIN)', async () => {
-    const mixedDomainUsers = [
-      { ...mockUser, id: 'amb-1', role: 'GESTOR_AMBIENTAL' },
-      { ...mockUser, id: 'ivc-1', role: 'GESTOR_IVC' },
-      { ...mockUser, id: 'ep-1', role: 'GESTOR_ESPACIO_PUBLICO' },
-      { ...mockUser, id: 'pyba-1', role: 'GESTOR_PYBA' },
-      { ...mockUser, id: 'amb-2', role: 'GESTOR_AMBIENTAL' },
-    ];
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mixedDomainUsers,
-    });
-    global.fetch = fetchMock as any;
-
-    const service = new UsersService();
-    const result = await service.findGestores('token-admin');
-
-    expect(result).toEqual([mixedDomainUsers[0], mixedDomainUsers[4]]);
-    expect(result.every((u) => u.role === 'GESTOR_AMBIENTAL')).toBe(true);
+    const result = await service.findGestores();
+    expect(result.map((u) => u.email)).toEqual(['g1@example.com']);
   });
 });

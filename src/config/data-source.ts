@@ -5,6 +5,7 @@ import { PuntoResiduo } from '../puntos/entities/punto-residuo.entity';
 import { Proceso } from '../procesos/entities/proceso.entity';
 import { PuntoAsignacion } from '../asignaciones/entities/punto-asignacion.entity';
 import { RutaSemanal } from '../rutas-semanales/entities/ruta-semanal.entity';
+import { UserEntity } from '../users/entities/user.entity';
 
 // DataSource para la CLI de TypeORM (generar/correr/revertir migraciones).
 // Separado del useFactory de app.module.ts (que usa autoLoadEntities): la
@@ -20,7 +21,7 @@ export const AppDataSource = new DataSource({
   password: env.DB_PASSWORD,
   database: env.DB_DATABASE,
   synchronize: false,
-  entities: [PuntoResiduo, Proceso, PuntoAsignacion, RutaSemanal],
+  entities: [PuntoResiduo, Proceso, PuntoAsignacion, RutaSemanal, UserEntity],
   migrations: [__dirname + '/../migrations/*.{ts,js}'],
   logging: true,
 });

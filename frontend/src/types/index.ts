@@ -1,16 +1,6 @@
-export type Role =
-  | 'ADMIN'
-  | 'GESTOR_IVC'
-  | 'GESTOR_ESPACIO_PUBLICO'
-  | 'GESTOR_AMBIENTAL'
-  | 'GESTOR_PYBA'
-  | 'VALIDADOR_IVC'
-  | 'VALIDADOR_ESPACIO_PUBLICO'
-  | 'VALIDADOR_AMBIENTAL'
-  | 'VALIDADOR_PYBA'
-  | 'VALIDADOR_DEPORTES'
-  | 'TUTOR'
-  | 'ESTUDIANTE';
+// Solo 3 roles en este módulo (ver src/common/enums/role.enum.ts en el
+// backend) — los demás roles del hub multi-dominio no aplican acá.
+export type Role = 'ADMIN' | 'GESTOR_AMBIENTAL' | 'VALIDADOR_AMBIENTAL';
 
 export type ActivityStatus =
   | 'BORRADOR'

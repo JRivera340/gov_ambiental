@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
+import { LoginPage } from './pages/LoginPage';
 import { GestorAmbientalDashboard } from './pages/gestor-ambiental/GestorAmbientalDashboard';
 import { CreateActivity } from './pages/CreateActivity';
 import { EditActivity } from './pages/EditActivity';
@@ -8,44 +9,23 @@ import { ValidadorDashboard } from './pages/validador/ValidadorDashboard';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import { ValidadorActivityDetailPage } from './pages/validador/ValidadorActivityDetailPage';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
-import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminActivityDetailPage } from './pages/admin/AdminActivityDetailPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 
-// No hay página de login en este repo — la sesión llega desde bogotaneidapp
-// vía /handoff (PLAN-MAESTRO.md HITO 0). Para probar sin pasar por el hub,
-// generá un token con `npm run token:test` en el backend y guardalo
-// manualmente: sessionStorage.setItem('gov_auth_token', '<token>').
+// Login propio (rama de donación / entregable UAESP) — el módulo se
+// autentica con su propia tabla de usuarios (POST /auth/login), sin
+// depender de ningún otro sistema. Reemplaza el mecanismo de /handoff.
 function RutaProtegida({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (!isAuthenticated) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700 }}>No hay sesión activa</h1>
-        <p style={{ color: '#666', marginTop: 8 }}>
-          Este módulo todavía no tiene su propio login — la sesión se comparte desde bogotaneidapp.
-          Para desarrollo local, generá un token con <code>npm run token:test</code> en el backend
-          y guardalo en <code>sessionStorage</code> con la clave <code>gov_auth_token</code>.
-        </p>
-      </div>
-    );
-  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function RutaAdmin({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const role = useAuthStore((s) => s.user?.role);
-  if (!isAuthenticated) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700 }}>No hay sesión activa</h1>
-        <p style={{ color: '#666', marginTop: 8 }}>
-          Este módulo todavía no tiene su propio login — la sesión se comparte desde bogotaneidapp.
-        </p>
-      </div>
-    );
-  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (role !== 'ADMIN') {
     return (
       <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -57,10 +37,21 @@ function RutaAdmin({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RaizInicial() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const role = useAuthStore((s) => s.user?.role);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const destino = role === 'ADMIN' ? '/admin'
+    : role === 'VALIDADOR_AMBIENTAL' ? '/validador/residuos'
+    : '/gestor-ambiental/dashboard';
+  return <Navigate to={destino} replace />;
+}
+
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/gestor-ambiental/dashboard" replace />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<RaizInicial />} />
 
       <Route
         path="/gestor-ambiental/dashboard"
@@ -96,8 +87,10 @@ function App() {
         path="/admin/actividad/:id"
         element={<RutaAdmin><AdminActivityDetailPage /></RutaAdmin>}
       />
-
-      <Route path="/handoff" element={<HandoffPage />} />
+      <Route
+        path="/admin/usuarios"
+        element={<RutaAdmin><AdminUsersPage /></RutaAdmin>}
+      />
 
       <Route path="/public/actividad/:id" element={<PublicPuntoPage />} />
     </Routes>

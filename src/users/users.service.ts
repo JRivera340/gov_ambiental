@@ -1,79 +1,88 @@
-import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { getEnv } from '../config/env';
-import { HubUser } from './dto/hub-user.dto';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { UserEntity } from './entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
+export type PublicUser = Omit<UserEntity, 'passwordHash'>;
+
+function toPublic(user: UserEntity): PublicUser {
+  const { passwordHash, ...rest } = user;
+  return rest;
 }
 
-const CACHE_TTL_MS = 60_000;
-// Si el hub no responde, este proxy debe fallar rapido (no colgarse) para que
-// el llamador degrade con un valor por defecto en vez de bloquear la pantalla.
-const HUB_TIMEOUT_MS = 4_000;
-
-// Proxy hacia el hub (gov-espacio-publico): los usuarios no tienen tabla
-// propia en ambiental, se resuelven contra la fuente de verdad. Cache simple
-// en memoria para no pegarle al hub en cada render de una lista de puntos.
+// Tabla propia — este módulo se autentica por sí mismo, sin depender de
+// ningún sistema externo (reemplaza el proxy hacia el hub que tenían
+// test/main/production).
 @Injectable()
 export class UsersService {
-  private readonly userCache = new Map<string, CacheEntry<HubUser>>();
-  private gestoresCache: CacheEntry<HubUser[]> | null = null;
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly repo: Repository<UserEntity>,
+  ) {}
 
-  async findById(id: string, bearerToken: string): Promise<HubUser> {
-    const cached = this.userCache.get(id);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.data;
-    }
-
-    const data = await this.fetchFromHub<HubUser>(`/api/users/${id}`, bearerToken);
-    this.userCache.set(id, { data, expiresAt: Date.now() + CACHE_TTL_MS });
-    return data;
+  // Usado solo por AuthService — es el único punto del código que necesita
+  // passwordHash, por eso no pasa por toPublic().
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    return this.repo.findOne({ where: { email: email.toLowerCase() } });
   }
 
-  // El hub filtra esta lista segun el ROL DE QUIEN LLAMA (a un
-  // GESTOR_AMBIENTAL le devuelve solo ambientales, pero a VALIDADOR_AMBIENTAL
-  // o ADMIN les devuelve los gestores de TODOS los dominios: IVC, espacio
-  // publico, PYBA, deportes). El modulo ambiental no debe recibir esos datos
-  // ni por un instante - el filtrado por dominio se hace SIEMPRE aca, nunca
-  // en el frontend (ver CLAUDE.md).
-  async findGestores(bearerToken: string): Promise<HubUser[]> {
-    if (this.gestoresCache && this.gestoresCache.expiresAt > Date.now()) {
-      return this.gestoresCache.data;
-    }
-
-    const data = await this.fetchFromHub<HubUser[]>('/api/users/gestores/list', bearerToken);
-    const soloAmbiental = data.filter((u) => u.role === Role.GESTOR_AMBIENTAL);
-    this.gestoresCache = { data: soloAmbiental, expiresAt: Date.now() + CACHE_TTL_MS };
-    return soloAmbiental;
+  async findById(id: string): Promise<PublicUser> {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return toPublic(user);
   }
 
-  private async fetchFromHub<T>(path: string, bearerToken: string): Promise<T> {
-    const env = getEnv();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), HUB_TIMEOUT_MS);
+  async findGestores(): Promise<PublicUser[]> {
+    const users = await this.repo.find({
+      where: { role: In([Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN]), active: true },
+      order: { name: 'ASC' },
+    });
+    return users.map(toPublic);
+  }
 
-    let response: Response;
-    try {
-      response = await fetch(`${env.HUB_API_URL}${path}`, {
-        headers: { Authorization: `Bearer ${bearerToken}` },
-        signal: controller.signal,
-      });
-    } catch (e) {
-      // Cubre tanto el abort por timeout como fallas de red (DNS, conexion
-      // rechazada) contra el hub - en ambos casos el hub no respondio a
-      // tiempo, no hay nada mas que reintentar aqui.
-      throw new ServiceUnavailableException('El hub no respondio a tiempo.');
-    } finally {
-      clearTimeout(timeout);
+  async findAll(): Promise<PublicUser[]> {
+    const users = await this.repo.find({ order: { name: 'ASC' } });
+    return users.map(toPublic);
+  }
+
+  async create(data: { name: string; lastname: string; email: string; password: string; role: Role }): Promise<PublicUser> {
+    const existente = await this.findByEmail(data.email);
+    if (existente) throw new ConflictException('Ya existe un usuario con ese correo');
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const user = this.repo.create({
+      name: data.name,
+      lastname: data.lastname,
+      email: data.email.toLowerCase(),
+      passwordHash,
+      role: data.role,
+      active: true,
+    });
+    return toPublic(await this.repo.save(user));
+  }
+
+  async update(id: string, data: { name?: string; lastname?: string; email?: string; role?: Role; password?: string }): Promise<PublicUser> {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (data.email && data.email.toLowerCase() !== user.email) {
+      const existente = await this.findByEmail(data.email);
+      if (existente) throw new ConflictException('Ya existe un usuario con ese correo');
+      user.email = data.email.toLowerCase();
     }
+    if (data.name !== undefined) user.name = data.name;
+    if (data.lastname !== undefined) user.lastname = data.lastname;
+    if (data.role !== undefined) user.role = data.role;
+    if (data.password) user.passwordHash = await bcrypt.hash(data.password, 10);
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new HttpException(body || 'Error al consultar el hub', response.status);
-    }
+    return toPublic(await this.repo.save(user));
+  }
 
-    return response.json() as Promise<T>;
+  async setActive(id: string, active: boolean): Promise<PublicUser> {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    user.active = active;
+    return toPublic(await this.repo.save(user));
   }
 }
