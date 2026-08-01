@@ -11,6 +11,61 @@ services:
       - '5432:5432'
     volumes:
       - ambiental-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-ambiental}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ambiental-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET:?Definí JWT_SECRET en tu .env}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-ambiental}
+      DB_PASSWORD: ${DB_PASSWORD:-ambiental}
+      DB_DATABASE: ${DB_DATABASE:-ambiental}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      UPLOADS_DIR: uploads
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:3001}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+    ports:
+      - '3001:3001'
+    volumes:
+      # Persiste los archivos subidos (fotos/actas) en modo STORAGE_DRIVER=local
+      # entre reinicios del contenedor.
+      - ambiental-uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_AMBIENTAL_API_URL: ${API_PUBLIC_URL:-http://localhost:3001}
+    container_name: ambiental-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '5173:80'
 
 volumes:
   ambiental-db-data:
+  ambiental-uploads:
