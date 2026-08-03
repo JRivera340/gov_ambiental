@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as JSZip from 'jszip';
-// @ts-ignore
-import toGeoJSON from '@mapbox/togeojson';
+// @mapbox/togeojson es CommonJS puro sin export default ({kml, gpx} directo) —
+// un import default (aunque compile) queda con `.default` undefined en
+// tiempo de ejecución. Namespace import evita esa ambigüedad.
+import * as toGeoJSON from '@mapbox/togeojson';
 import { DOMParser } from '@xmldom/xmldom';
 
 export interface SectorFeature {
