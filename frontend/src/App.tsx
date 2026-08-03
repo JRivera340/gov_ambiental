@@ -16,21 +16,22 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 // Login propio (rama de donación / entregable UAESP) — el módulo se
 // autentica con su propia tabla de usuarios (POST /auth/login), sin
 // depender de ningún otro sistema. Reemplaza el mecanismo de /handoff.
-function RutaProtegida({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function RutaAdmin({ children }: { children: React.ReactNode }) {
+//
+// Corregido: antes `RutaProtegida` solo exigía sesión activa, sin revisar
+// el ROL — cualquier usuario autenticado (ej. un ADMIN) podía entrar a
+// `/gestor-ambiental/dashboard` a mano o por el botón "atrás" del navegador
+// (una URL vieja en el historial de la pestaña, de una sesión anterior con
+// otro rol) y el panel del gestor se renderizaba igual, sin bloquear nada.
+// Ahora cada ruta declara explícitamente qué roles puede ver.
+function RutaConRol({ roles, children }: { roles: Array<'ADMIN' | 'GESTOR_AMBIENTAL' | 'VALIDADOR_AMBIENTAL'>; children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const role = useAuthStore((s) => s.user?.role);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (role !== 'ADMIN') {
+  if (!role || !roles.includes(role)) {
     return (
       <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Inter, system-ui, sans-serif' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>Sin permiso</h1>
-        <p style={{ color: '#666', marginTop: 8 }}>Esta vista es solo para el rol ADMIN.</p>
+        <p style={{ color: '#666', marginTop: 8 }}>No tenés acceso a esta pantalla con tu rol actual.</p>
       </div>
     );
   }
@@ -55,41 +56,41 @@ function App() {
 
       <Route
         path="/gestor-ambiental/dashboard"
-        element={<RutaProtegida><GestorAmbientalDashboard /></RutaProtegida>}
+        element={<RutaConRol roles={['GESTOR_AMBIENTAL']}><GestorAmbientalDashboard /></RutaConRol>}
       />
       <Route
         path="/gestor-ambiental/crear-actividad"
-        element={<RutaProtegida><CreateActivity /></RutaProtegida>}
+        element={<RutaConRol roles={['GESTOR_AMBIENTAL']}><CreateActivity /></RutaConRol>}
       />
       <Route
         path="/gestor-ambiental/editar-actividad/:id"
-        element={<RutaProtegida><EditActivity /></RutaProtegida>}
+        element={<RutaConRol roles={['GESTOR_AMBIENTAL', 'VALIDADOR_AMBIENTAL', 'ADMIN']}><EditActivity /></RutaConRol>}
       />
 
       <Route
         path="/validador/dashboard"
-        element={<RutaProtegida><ValidadorDashboard /></RutaProtegida>}
+        element={<RutaConRol roles={['VALIDADOR_AMBIENTAL']}><ValidadorDashboard /></RutaConRol>}
       />
       <Route
         path="/validador/residuos"
-        element={<RutaProtegida><ValidadorMapaDashboard /></RutaProtegida>}
+        element={<RutaConRol roles={['VALIDADOR_AMBIENTAL']}><ValidadorMapaDashboard /></RutaConRol>}
       />
       <Route
         path="/validador/actividad/:id"
-        element={<RutaProtegida><ValidadorActivityDetailPage /></RutaProtegida>}
+        element={<RutaConRol roles={['VALIDADOR_AMBIENTAL']}><ValidadorActivityDetailPage /></RutaConRol>}
       />
 
       <Route
         path="/admin"
-        element={<RutaAdmin><AdminDashboard /></RutaAdmin>}
+        element={<RutaConRol roles={['ADMIN']}><AdminDashboard /></RutaConRol>}
       />
       <Route
         path="/admin/actividad/:id"
-        element={<RutaAdmin><AdminActivityDetailPage /></RutaAdmin>}
+        element={<RutaConRol roles={['ADMIN']}><AdminActivityDetailPage /></RutaConRol>}
       />
       <Route
         path="/admin/usuarios"
-        element={<RutaAdmin><AdminUsersPage /></RutaAdmin>}
+        element={<RutaConRol roles={['ADMIN']}><AdminUsersPage /></RutaConRol>}
       />
 
       <Route path="/public/actividad/:id" element={<PublicPuntoPage />} />

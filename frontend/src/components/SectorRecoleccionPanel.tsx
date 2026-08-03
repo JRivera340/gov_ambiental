@@ -37,7 +37,16 @@ interface Props {
   tipo?: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+// Mismo patrón que services/api.ts — variable correcta es
+// VITE_AMBIENTAL_API_URL (esta usaba VITE_API_BASE_URL, que no existe en
+// ningún .env, así que siempre quedaba vacía y el fetch caía en una ruta
+// relativa: en producción (nginx sirviendo el frontend en un puerto
+// distinto al backend) eso devuelve el index.html de la SPA en vez de
+// pegarle a la API, y el response.json() truena con "Unexpected token '<'").
+const API_BASE = (() => {
+  const envUrl = import.meta.env.VITE_AMBIENTAL_API_URL as string | undefined;
+  return envUrl ? envUrl.replace(/\/$/, '') : '';
+})();
 
 async function fetchAuthJSON(url: string, opts?: RequestInit) {
   const token = authService.getToken();
