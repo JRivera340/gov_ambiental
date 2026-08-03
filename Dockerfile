@@ -13,6 +13,7 @@ COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/src ./src
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
+COPY --from=build /app/boundaries ./boundaries
 COPY package*.json ./
 RUN chmod +x ./docker-entrypoint.sh
 EXPOSE 3001
