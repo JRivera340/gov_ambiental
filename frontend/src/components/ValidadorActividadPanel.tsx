@@ -380,20 +380,20 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
               )}
             </div>
             
-            {/* block + flex: mismo par redundante que trae el hub (flex ya define el
-                display, block queda inerte) — replicado a proposito para paridad exacta */}
-            <a
-              href={`/validador/actividad/${activity.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              // eslint-disable-next-line tailwindcss/no-contradicting-classname
+            {/* Antes era <a target="_blank" rel="noopener noreferrer">: el token de
+                sesión vive en sessionStorage (ver authStore.ts), y rel="noopener" hace
+                que la pestaña nueva arranque con su propio sessionStorage vacío — el
+                validador quedaba expulsado al login apenas entraba. Navegación SPA en
+                la misma pestaña evita el problema (igual que el resto de la app). */}
+            <button
+              onClick={() => navigate(`/validador/actividad/${activity.id}`)}
               className="block w-full text-center py-3 rounded-2xl border-2 border-neutral-100 text-neutral-500 text-xs font-bold uppercase tracking-widest hover:border-neutral-200 hover:bg-neutral-50 transition-all flex items-center justify-center gap-2"
             >
               <span>Ver Detalle Completo</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
               </svg>
-            </a>
+            </button>
           </>
         )}
       </div>
