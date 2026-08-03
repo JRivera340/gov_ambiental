@@ -44,17 +44,17 @@ export const EditActivity: React.FC = () => {
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
 
-  // Adónde vuelve esta vista según quién la abrió — nunca un panel de otro
-  // rol. GESTOR_AMBIENTAL vuelve a su dashboard (como siempre); ADMIN y
-  // VALIDADOR_AMBIENTAL vuelven al detalle del punto que estaban editando.
-  // Siempre con replace:true (corregido 2026-08-03): el detalle (PuntoDetailView)
-  // usa navigate(-1) en su flecha de "volver" — si esta vista apilara una
-  // entrada nueva de detalle en vez de reemplazar la de "editar", ese -1
-  // volvía a caer sobre "editar" en lugar de sobre el panel, generando un
-  // bucle infinito editar↔detalle reportado por un validador.
-  const backTo = role === 'ADMIN' ? `/admin/actividad/${id}`
-    : role === 'VALIDADOR_AMBIENTAL' ? `/validador/actividad/${id}`
-    : '/gestor-ambiental/dashboard';
+  // "Volver" acá es SIEMPRE navigate(-1) (corregido 2026-08-03, segunda
+  // vuelta): esta vista solo se entra vía push desde otra pantalla ya
+  // existente (detalle de admin/validador, o dashboard/detalle del gestor —
+  // ver todos los `navigate('/gestor-ambiental/editar-actividad/...')` del
+  // repo, ninguno es un punto de entrada directo de la app). Un intento
+  // previo (`navigate(backTo, {replace:true})` con backTo calculado por rol)
+  // arreglaba el bucle infinito pero dejaba DOS entradas de detalle apiladas
+  // (la original + la de reemplazo), así que la flecha "volver" del detalle
+  // necesitaba dos clics para salir del punto — reportado como "no me deja
+  // devolverme". navigate(-1) no apila nada nuevo: un solo clic devuelve a
+  // la pantalla real de origen.
 
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,7 +113,7 @@ export const EditActivity: React.FC = () => {
         || (role === 'GESTOR_AMBIENTAL' && (data.status === 'BORRADOR' || data.status === 'RECHAZADA'));
       if (!puedeEditar) {
         setToast({ message: 'No tiene permiso para editar este punto en su estado actual', type: 'error' });
-        setTimeout(() => navigate(backTo, { replace: true }), 2000);
+        setTimeout(() => navigate(-1), 2000);
         return;
       }
       setActivity(data);
@@ -158,7 +158,7 @@ export const EditActivity: React.FC = () => {
       });
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al cargar el punto', type: 'error' });
-      setTimeout(() => navigate(backTo, { replace: true }), 2000);
+      setTimeout(() => navigate(-1), 2000);
     } finally {
       setLoading(false);
     }
@@ -293,7 +293,7 @@ export const EditActivity: React.FC = () => {
       } else {
         setToast({ message: 'Cambios guardados', type: 'success' });
       }
-      setTimeout(() => navigate(backTo, { replace: true }), 1500);
+      setTimeout(() => navigate(-1), 1500);
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al guardar', type: 'error' });
     } finally {
@@ -315,7 +315,7 @@ export const EditActivity: React.FC = () => {
       <header className="bg-white shadow-sm border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <button onClick={() => navigate(backTo, { replace: true })} className="text-neutral-600 mr-4">←</button>
+            <button onClick={() => navigate(-1)} className="text-neutral-600 mr-4">←</button>
             <h1 className="text-xl font-bold text-institutional-black">Corregir Punto</h1>
           </div>
           {activity.status === 'RECHAZADA' && (
