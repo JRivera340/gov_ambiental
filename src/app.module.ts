@@ -9,10 +9,11 @@ import { AsignacionesModule } from './asignaciones/asignaciones.module';
 import { RutasSemanalesModule } from './rutas-semanales/rutas-semanales.module';
 import { SectoresModule } from './sectores/sectores.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
+import { UsersProxyModule } from './users-proxy/users-proxy.module';
 import { typeOrmConfig } from './config/typeorm.config';
 
 @Module({
-  imports: [TypeOrmModule.forRootAsync(typeOrmConfig), AuthModule, PuntosModule, ProcesosModule, AsignacionesModule, RutasSemanalesModule, SectoresModule, CatalogosModule],
+  imports: [TypeOrmModule.forRootAsync(typeOrmConfig), AuthModule, PuntosModule, ProcesosModule, AsignacionesModule, RutasSemanalesModule, SectoresModule, CatalogosModule, UsersProxyModule],
   controllers: [AppController],
   providers: [AppService],
 })
