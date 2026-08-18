@@ -23,6 +23,12 @@ export class RutasSemanalesController {
     return this.rutasService.getArrastrePendiente(req.user.userId);
   }
 
+  @Get('plan')
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  getPlan(@Req() req: any) {
+    return this.rutasService.getPlanSemanal(req.user.userId);
+  }
+
   @Post()
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   crear(@Req() req: any, @Body() body: { paradas: ParadaLite[]; segmentos: unknown[] }) {

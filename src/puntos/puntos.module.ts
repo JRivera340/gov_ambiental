@@ -8,9 +8,10 @@ import { PUNTOS_REPOSITORY } from './puntos.tokens';
 import { AsignacionesModule } from '../asignaciones/asignaciones.module';
 import { ProcesosModule } from '../procesos/procesos.module';
 import { ReporteService } from '../reporte/reporte.service';
+import { VisitasModule } from '../visitas/visitas.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PuntoResiduo]), AsignacionesModule, ProcesosModule],
+  imports: [TypeOrmModule.forFeature([PuntoResiduo]), AsignacionesModule, ProcesosModule, VisitasModule],
   controllers: [PuntosController],
   providers: [
     PuntosService,

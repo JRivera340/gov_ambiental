@@ -8,6 +8,7 @@ import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
+import { VisitasService } from '../visitas/visitas.service';
 
 export type PublicResiduo = Pick<
   ResiduoEntry,
@@ -61,6 +62,7 @@ export class PuntosService {
     @Inject(PUNTOS_REPOSITORY) private readonly repo: PuntosRepository,
     private readonly asignacionesService: AsignacionesService,
     private readonly procesosService: ProcesosService,
+    private readonly visitasService: VisitasService,
   ) {}
 
   async create(userId: string, dto: CreatePuntoDto): Promise<PuntoResiduo> {
@@ -212,8 +214,13 @@ export class PuntosService {
     }
 
     punto.residuos = residuos;
-    punto.ultimoSeguimientoAt = new Date();
-    return this.repo.save(punto);
+    const ahora = new Date();
+    punto.ultimoSeguimientoAt = ahora;
+    const guardado = await this.repo.save(punto);
+    // Registra la visita para el dashboard de desempeño de gestores (ver
+    // visitas.service.ts) — no bloquea la respuesta si falla el insert.
+    await this.visitasService.registrarVisita(id, userId, ahora);
+    return guardado;
   }
 
   async agregarNota(userId: string, email: string, id: string, body: { residuoId: string; texto: string }) {
@@ -223,7 +230,9 @@ export class PuntosService {
     if (!residuo) throw new NotFoundException('Residuo no encontrado');
     const nota = { id: randomUUID(), fecha: new Date().toISOString(), autorId: userId, autorNombre: email, texto: body.texto };
     residuo.notas = [...(residuo.notas || []), nota];
-    return this.repo.save(punto);
+    const guardado = await this.repo.save(punto);
+    await this.visitasService.registrarVisita(id, userId, new Date());
+    return guardado;
   }
 
   async eliminarNota(id: string, body: { residuoId: string; notaId: string }) {

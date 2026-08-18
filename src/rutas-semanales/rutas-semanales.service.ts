@@ -1,12 +1,22 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { RutaSemanal } from './entities/ruta-semanal.entity';
 import type { ParadaLite } from './lib/paradas.types';
 import { limitesSemana, semanaVencida, calcularArrastre } from './lib/ruta-semanal.util';
+import { isoWeekLabel, isoWeekParity, splitAlternado } from './lib/plan-semanal.util';
+import { PuntoResiduo } from '../puntos/entities/punto-residuo.entity';
+import { esPuntoEnEmergencia } from '../puntos/lib/emergencia.util';
+import { AsignacionesService } from '../asignaciones/asignaciones.service';
 
 export type CrearRutaInput = {
   gestorId: string; paradas: ParadaLite[]; segmentos: unknown[]; ahora?: Date;
+};
+
+export type PlanSemanal = {
+  emergencia: string[];
+  regular: string[];
+  semanaISO: string;
 };
 
 @Injectable()
@@ -14,7 +24,35 @@ export class RutasSemanalesService {
   constructor(
     @InjectRepository(RutaSemanal)
     private readonly repo: Repository<RutaSemanal>,
+    @InjectRepository(PuntoResiduo)
+    private readonly puntosRepo: Repository<PuntoResiduo>,
+    private readonly asignacionesService: AsignacionesService,
   ) {}
+
+  // Plan semanal automático del gestor: los puntos en emergencia (≥4 días
+  // sin recoger, ver emergencia.util.ts) siempre entran, sin tope. Del resto
+  // de los puntos asignados, se muestra el 50% que corresponde según la
+  // paridad de la semana ISO (ver plan-semanal.util.ts) — la otra mitad
+  // aparece la semana siguiente, alternando.
+  async getPlanSemanal(gestorId: string, ahora = new Date()): Promise<PlanSemanal> {
+    const asignadosIds = await this.asignacionesService.getPuntosDeGestor(gestorId);
+    if (asignadosIds.length === 0) {
+      return { emergencia: [], regular: [], semanaISO: isoWeekLabel(ahora) };
+    }
+    const puntos = await this.puntosRepo.find({ where: { id: In(asignadosIds) } });
+
+    const emergencia: string[] = [];
+    const regulares: PuntoResiduo[] = [];
+    for (const p of puntos) {
+      if (esPuntoEnEmergencia(p, ahora)) emergencia.push(p.id);
+      else regulares.push(p);
+    }
+    regulares.sort((a, b) => (a.pointNumber ?? 0) - (b.pointNumber ?? 0));
+    const paridad = isoWeekParity(ahora);
+    const regular = splitAlternado(regulares.map((p) => p.id), paridad);
+
+    return { emergencia, regular, semanaISO: isoWeekLabel(ahora) };
+  }
 
   async cerrarSemanasVencidas(ahora = new Date()): Promise<number> {
     const abiertas = await this.repo.find({ where: { estado: 'en_progreso' } });

@@ -4,11 +4,12 @@ import { EstadoPunto } from './entities/punto-residuo.entity';
 
 const asignacionesStub = { asignarACreador: async () => {} };
 const procesosStub = { recalculateStatus: async () => {} };
+const visitasStub = { registrarVisita: async () => {} };
 
 describe('PuntosService', () => {
   const makeService = () => {
     const repo = new InMemoryPuntosRepository();
-    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
+    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any, visitasStub as any), repo };
   };
 
   it('crea un punto con entidad responsable, acompanantes y gestores involucrados', async () => {
@@ -145,7 +146,7 @@ describe('PuntosService', () => {
     const asignado: { puntoId?: string; userId?: string } = {};
     const asignacionesStubLocal = { asignarACreador: async (puntoId: string, userId: string) => { asignado.puntoId = puntoId; asignado.userId = userId; } };
     const procesosStubLocal = { recalculateStatus: async () => {} };
-    const service = new PuntosService(repo, asignacionesStubLocal as any, procesosStubLocal as any);
+    const service = new PuntosService(repo, asignacionesStubLocal as any, procesosStubLocal as any, visitasStub as any);
     const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
     expect(asignado.puntoId).toBe(punto.id);
     expect(asignado.userId).toBe('user-1');
@@ -155,7 +156,7 @@ describe('PuntosService', () => {
 describe('PuntosService — ciclo de vida', () => {
   const makeService = () => {
     const repo = new InMemoryPuntosRepository();
-    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
+    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any, visitasStub as any), repo };
   };
 
   it('send cambia el estado de BORRADOR a ENVIADA', async () => {
@@ -233,7 +234,7 @@ describe('PuntosService — ciclo de vida', () => {
 describe('PuntosService — proyeccion publica', () => {
   const makeService = () => {
     const repo = new InMemoryPuntosRepository();
-    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any), repo };
+    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any, visitasStub as any), repo };
   };
 
   const puntoConDatosInternos = (id: string) => ({

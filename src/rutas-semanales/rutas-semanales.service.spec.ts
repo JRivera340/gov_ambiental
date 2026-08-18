@@ -20,10 +20,13 @@ const makeRepo = () => {
   };
 };
 
+const puntosRepoStub = { find: async () => [] };
+const asignacionesServiceStub = { getPuntosDeGestor: async () => [] };
+
 describe('RutasSemanalesService', () => {
   it('crearRutaSemana crea una ruta nueva en progreso', async () => {
     const repo = makeRepo();
-    const service = new RutasSemanalesService(repo as any);
+    const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
     const ahora = new Date('2026-07-24T15:00:00.000Z');
     const ruta = await service.crearRutaSemana({ gestorId: 'g1', paradas: [], segmentos: [], ahora });
     expect(ruta.estado).toBe('en_progreso');
@@ -32,7 +35,7 @@ describe('RutasSemanalesService', () => {
 
   it('crearRutaSemana en la misma semana recalcula en vez de duplicar', async () => {
     const repo = makeRepo();
-    const service = new RutasSemanalesService(repo as any);
+    const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
     const ahora = new Date('2026-07-24T15:00:00.000Z');
     const primera = await service.crearRutaSemana({ gestorId: 'g1', paradas: [], segmentos: [], ahora });
     const segunda = await service.crearRutaSemana({
@@ -47,14 +50,14 @@ describe('RutasSemanalesService', () => {
 
   it('cancelarRuta rechaza si el que cancela no es el gestor dueno ni admin', async () => {
     const repo = makeRepo();
-    const service = new RutasSemanalesService(repo as any);
+    const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
     const ruta = await service.crearRutaSemana({ gestorId: 'g1', paradas: [], segmentos: [], ahora: new Date() });
     await expect(service.cancelarRuta(ruta.id, 'otro-gestor', false)).rejects.toThrow();
   });
 
   it('cancelarRuta funciona para el gestor dueno', async () => {
     const repo = makeRepo();
-    const service = new RutasSemanalesService(repo as any);
+    const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
     const ruta = await service.crearRutaSemana({ gestorId: 'g1', paradas: [], segmentos: [], ahora: new Date() });
     const cancelada = await service.cancelarRuta(ruta.id, 'g1', false);
     expect(cancelada.estado).toBe('cancelada');

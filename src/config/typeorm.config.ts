@@ -15,6 +15,8 @@ export const typeOrmConfig: TypeOrmModuleAsyncOptions = {
       synchronize: env.NODE_ENV !== 'production',
       autoLoadEntities: true,
       entities: [path.join(__dirname, '..', '**', '*.entity.{ts,js}')],
+      migrations: [path.join(__dirname, '..', 'migrations', '*.{ts,js}')],
+      migrationsRun: false,
       logging: env.NODE_ENV !== 'production',
       retryAttempts: 10,
       retryDelay: 3000,

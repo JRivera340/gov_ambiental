@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { PuntoResiduo } from '../puntos/entities/punto-residuo.entity';
+import { UMBRAL_EMERGENCIA_DIAS } from '../puntos/lib/emergencia.util';
 
 @Injectable()
 export class ReporteService {
@@ -41,7 +42,10 @@ export class ReporteService {
         if (isNaN(daysSince) || daysSince < 0) daysSince = 0;
 
         const idCpt = p.pointNumber ?? 'N/A';
-        const alarma = daysSince >= 3 ? 'Crítico' : daysSince === 2 ? 'Vencido' : 'Normal';
+        // Umbral unificado con el criterio de emergencia del backend (≥4
+        // días, ver src/puntos/lib/emergencia.util.ts) — antes este reporte
+        // usaba ≥3 días, inconsistente con el resto del sistema.
+        const alarma = daysSince >= UMBRAL_EMERGENCIA_DIAS ? 'Crítico' : daysSince >= 2 ? 'Vencido' : 'Normal';
 
         rows.push({
           'ID o número del punto crítico': idCpt,
