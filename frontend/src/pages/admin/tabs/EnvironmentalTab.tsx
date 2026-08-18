@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import { AsignacionPuntosPanel } from './environmental/AsignacionPuntosPanel';
 import { IndicadoresAmbientalPanel } from './environmental/IndicadoresAmbientalPanel';
+import { DesempenoGestoresPanel } from './environmental/DesempenoGestoresPanel';
+import { ObjetivosDiariosTile } from './environmental/ObjetivosDiariosTile';
 import type { LayerVisibility } from '../../../components/MapLayerControl';
 import { MapLayerControl } from '../../../components/MapLayerControl';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
@@ -93,10 +95,15 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
       cambuches: visible, bodegas: visible,
     });
 
-  const ambientalActivities = filteredMapActivities.filter(a => a.operativoCategoria === 'AMBIENTAL');
+  // Todo lo que llega a este repo YA es ambiental (mono-dominio) — filtrar
+  // por operativoCategoria es un filtro del hub que acá siempre da falso
+  // (el campo no existe en este backend) y dejaba esta lista vacía. Bug
+  // real: todo el tab (paneles, KPIs, mapa) mostraba datos vacíos.
+  const ambientalActivities = filteredMapActivities;
 
   const [showAsignacionPuntos, setShowAsignacionPuntos] = useState(false);
   const [showIndicadores, setShowIndicadores] = useState(false);
+  const [showDesempeno, setShowDesempeno] = useState(false);
 
   return (
     <div className="flex flex-col gap-3 h-auto lg:h-[calc(100vh-100px)] overflow-y-auto lg:overflow-hidden overflow-x-hidden p-1 lg:p-0">
@@ -114,6 +121,12 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
           className="text-[9px] px-2 py-1 rounded border shadow-sm font-bold flex items-center gap-1 bg-white border-[#16a34a] text-[#16a34a] hover:bg-[#16a34a]/5"
         >
           {showIndicadores ? 'Ocultar Indicadores' : 'Indicadores'}
+        </button>
+        <button
+          onClick={() => setShowDesempeno(v => !v)}
+          className="text-[9px] px-2 py-1 rounded border shadow-sm font-bold flex items-center gap-1 bg-white border-[#9333ea] text-[#9333ea] hover:bg-[#9333ea]/5"
+        >
+          {showDesempeno ? 'Ocultar Desempeño' : 'Desempeño'}
         </button>
       </div>
 
@@ -134,6 +147,17 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
           <IndicadoresAmbientalPanel actividades={ambientalActivities} />
         </div>
       )}
+
+      {showDesempeno && (
+        <div className="flex-shrink-0">
+          <DesempenoGestoresPanel />
+        </div>
+      )}
+
+      {/* ── Objetivos semanales (vista resumen, ver plan de la tarea) ── */}
+      <div className="flex-shrink-0">
+        <ObjetivosDiariosTile />
+      </div>
 
       {/* ── TOP ROW: Métricas principales ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-shrink-0">

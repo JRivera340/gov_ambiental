@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getPuntosModoCompleta, getPuntosModoEmergencia, getPuntosModoSinVisita, getPuntosPorModo } from './rutaModos';
+import { getPuntosModoCompleta, getPuntosModoEmergencia, getPuntosModoSinVisita, getPuntosModoAutomatico, getPuntosPorModo } from './rutaModos';
 import type { ParadaRuta } from './ruta.types';
 
 function parada(overrides: Partial<ParadaRuta>): ParadaRuta {
@@ -36,11 +36,24 @@ describe('getPuntosModoSinVisita', () => {
   });
 });
 
+describe('getPuntosModoAutomatico', () => {
+  it('filtra por los ids que devolvio el backend, no recalcula nada', () => {
+    const puntos = [parada({ puntoId: 'a' }), parada({ puntoId: 'b' }), parada({ puntoId: 'c' })];
+    expect(getPuntosModoAutomatico(puntos, new Set(['a', 'c'])).map(p => p.puntoId)).toEqual(['a', 'c']);
+  });
+
+  it('set vacio no incluye nada', () => {
+    const puntos = [parada({ puntoId: 'a' })];
+    expect(getPuntosModoAutomatico(puntos, new Set())).toEqual([]);
+  });
+});
+
 describe('getPuntosPorModo', () => {
   it('despacha al selector correcto segun el modo', () => {
     const puntos = [parada({ puntoId: 'a', visitado: false, diasVencido: 5, diasSinSeguimiento: 8 })];
     expect(getPuntosPorModo('completa', puntos)).toHaveLength(1);
     expect(getPuntosPorModo('emergencia', puntos)).toHaveLength(1);
     expect(getPuntosPorModo('sin_visita', puntos)).toHaveLength(1);
+    expect(getPuntosPorModo('automatico', puntos, new Set(['a']))).toHaveLength(1);
   });
 });

@@ -5,16 +5,17 @@ import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { BarrioCoberturaBars } from './BarrioCoberturaBars';
+import { PlanSemanalCard } from './PlanSemanalCard';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 
 export const PerfilGestorView: React.FC = () => {
   const { user, activities, setViewMode, openActivity } = useGestorAmbientalCtx();
 
-  const acumulacion = useMemo(
-    () => activities.filter(a => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION'),
-    [activities]
-  );
+  // Mono-subtipo: toda actividad de este repo ya es punto de acumulación —
+  // operativoSubtipo no existe en este backend. Bug real: filtrar por él
+  // dejaba las estadísticas del perfil siempre en cero.
+  const acumulacion = activities;
 
   // "Visitado por mí" = hice seguimiento real en el punto: marqué un residuo
   // recogido o identifiqué uno nuevo (revisadoPorUserId es de la revisión
@@ -145,6 +146,8 @@ export const PerfilGestorView: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           {/* Columna principal — mapa + actividad reciente */}
           <div className="flex flex-col gap-6 w-full md:col-span-2">
+            <PlanSemanalCard activities={acumulacion} onVerPunto={openActivity} />
+
             <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-neutral-100">
                 <h3 className="text-xs font-black text-neutral-900">Mapa de puntos visitados</h3>

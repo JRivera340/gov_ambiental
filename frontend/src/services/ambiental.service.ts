@@ -24,6 +24,25 @@ export interface RutaSemanalDTO {
   updatedAt?: string;
 }
 
+export interface PlanSemanalDTO {
+  emergencia: string[];
+  regular: string[];
+  semanaISO: string;
+}
+export interface DesempenoGestorDTO {
+  gestorId: string;
+  asignados: number;
+  planificadosEstaSemana: number;
+  visitados: number;
+  pct: number;
+}
+export interface ResumenDesempenoDTO {
+  semanaISO: string;
+  gestores: DesempenoGestorDTO[];
+  targetTotal: number;
+  actualTotal: number;
+}
+
 export const ambientalService = {
   async getMisPuntos(): Promise<string[]> {
     const { data } = await api.get<string[]>('/asignaciones/mine');
@@ -56,5 +75,13 @@ export const ambientalService = {
   async getArrastre(): Promise<string[]> {
     const { data } = await api.get<string[]>('/rutas-semanales/arrastre/mine');
     return Array.isArray(data) ? data : [];
+  },
+  async getPlanSemanal(): Promise<PlanSemanalDTO> {
+    const { data } = await api.get<PlanSemanalDTO>('/rutas-semanales/plan');
+    return data;
+  },
+  async getDesempeno(gestorId?: string): Promise<ResumenDesempenoDTO> {
+    const { data } = await api.get<ResumenDesempenoDTO>('/visitas/desempeno', { params: gestorId ? { gestorId } : undefined });
+    return data;
   },
 };
