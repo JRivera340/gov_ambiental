@@ -1,25 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { activityService } from '../../services/activity.service';
 import type { Activity } from '../../types';
 import { AsignacionPuntosPanel } from './tabs/environmental/AsignacionPuntosPanel';
 import { IndicadoresAmbientalPanel } from './tabs/environmental/IndicadoresAmbientalPanel';
 import { DesempenoGestoresPanel } from './tabs/environmental/DesempenoGestoresPanel';
 import { ObjetivosDiariosTile } from './tabs/environmental/ObjetivosDiariosTile';
+import { EnvironmentalTab } from './tabs/EnvironmentalTab';
+import { computeAmbientalInsights } from './utils/adminHelpers';
+import type { LayerVisibility } from '../../components/MapLayerControl';
 
 type Seccion = 'asignacion' | 'indicadores' | 'desempeno';
 
-// Panel de administración de este módulo. Deliberadamente NO reusa
-// EnvironmentalTab.tsx completo — ese componente viene del hub y trae
-// bastante deuda propia de allá (campos operativoCategoria/operativoData
-// que no existen en este backend, referencias a ~8 archivos KMZ de capas
-// que no están en este repo, un link a una ruta /admin/actividad del hub).
-// Portar eso es trabajo aparte; acá se arma un panel propio con los
-// paneles que sí son autocontenidos y ya funcionan contra este backend.
+const LAYERS_INICIALES: LayerVisibility = {
+  barrios: true, carrera7: false, colegios: false, cestas: false,
+  falloSanVictorino: false, propiedadHorizontal: false, upz: false,
+  cambuches: false, bodegas: false,
+};
+
 export const AdminDashboard: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [seccion, setSeccion] = useState<Seccion>('asignacion');
+
+  const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>(LAYERS_INICIALES);
+  const [tipoResiduoFilter, setTipoResiduoFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [emergencyFilter, setEmergencyFilter] = useState(false);
+  const [listSearchNumber, setListSearchNumber] = useState('');
+  const [, setPointsSidebarOpen] = useState(false);
+  const [, setSelectedActivity] = useState<Activity | null>(null);
+  const [, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -35,6 +46,18 @@ export const AdminDashboard: React.FC = () => {
     barrio: a.barrio,
     pointNumber: a.pointNumber,
   }));
+
+  // Filtros del mapa (estado/emergencia/búsqueda por número) — el filtro por
+  // tipo de residuo colorea el marcador (ver getCategoryIcon), no oculta
+  // puntos, igual que en el hub.
+  const filteredMapActivities = useMemo(() => {
+    return activities.filter((a) => {
+      if (statusFilter && a.status !== statusFilter) return false;
+      return true;
+    });
+  }, [activities, statusFilter]);
+
+  const ambientalInsightsData = useMemo(() => computeAmbientalInsights(activities), [activities]);
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col gap-3 p-3 md:p-6">
@@ -75,6 +98,26 @@ export const AdminDashboard: React.FC = () => {
           {seccion === 'asignacion' && <AsignacionPuntosPanel actividades={actividadesParaAsignacion} />}
           {seccion === 'indicadores' && <IndicadoresAmbientalPanel actividades={activities} />}
           {seccion === 'desempeno' && <DesempenoGestoresPanel />}
+
+          <EnvironmentalTab
+            filteredMapActivities={filteredMapActivities}
+            getGlobalActivityIndex={(id) => filteredMapActivities.find((a) => a.id === id)?.pointNumber}
+            layerVisibility={layerVisibility}
+            setLayerVisibility={setLayerVisibility}
+            tipoResiduoFilter={tipoResiduoFilter}
+            setTipoResiduoFilter={setTipoResiduoFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            emergencyFilter={emergencyFilter}
+            setEmergencyFilter={setEmergencyFilter}
+            listSearchNumber={listSearchNumber}
+            setListSearchNumber={setListSearchNumber}
+            setPointsSidebarOpen={setPointsSidebarOpen}
+            ambientalInsightsData={ambientalInsightsData}
+            globalSubtipo=""
+            setSelectedActivity={setSelectedActivity}
+            setShowDetailModal={setShowDetailModal}
+          />
         </>
       )}
     </div>

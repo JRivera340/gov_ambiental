@@ -54,58 +54,50 @@ export const findTechnicalResidueKey = (value: string): string => {
   return technicalResidueKeys[0];
 };
 
-/** Retorna el array de residuos de una actividad, normalizando el formato legado */
+/**
+ * Retorna el array de residuos de una actividad. `residuos` es columna propia
+ * de PuntoResiduo (jsonb) en este backend — no un sub-campo de operativoData
+ * (ese campo nunca existió acá, es del hub). Mismo criterio que
+ * gestor-ambiental/lib/residuos.ts::getResiduos, duplicado acá para no
+ * introducir un import cruzado entre árboles de página.
+ */
 export function getResiduos(activity: Activity): any[] {
-  const opData = activity.operativoData as any;
-  if (opData?.residuos && Array.isArray(opData.residuos) && opData.residuos.length > 0) {
-    return opData.residuos.map((r: any) => ({
-      ...r,
-      dateTime: r.dateTime || activity.dateTime || activity.createdAt,
-    }));
-  }
-  if (opData?.tipoResiduo) {
-    return [
-      {
-        id: 'legacy-0',
-        tipoResiduo: opData.tipoResiduo,
-        dateTime: activity.dateTime || activity.createdAt,
-        recogido: false,
-      },
-    ];
-  }
-  return [];
+  const residuos = (activity as any).residuos;
+  if (!Array.isArray(residuos)) return [];
+  return residuos.map((r: any) => ({
+    ...r,
+    dateTime: r.dateTime || activity.dateTime || (activity as any).createdAt,
+  }));
 }
 
 // ── Lógica de puntos críticos ──────────────────────────────
 
-/** Retorna el tier de criticidad de un punto (0 = normal, 1 = vencido, 2 = crítico) */
+// Umbral unificado con el backend (src/puntos/lib/emergencia.util.ts): un
+// punto está vencido/crítico a partir de 4 días sin recoger. Antes esta
+// función usaba operativoSubtipo (campo del hub, siempre undefined acá) y
+// umbrales de 2/3 días — nunca marcaba nada como emergencia.
+const UMBRAL_EMERGENCIA_DIAS = 4;
+
+/** Retorna el tier de criticidad de un punto (0 = normal, 2 = crítico/vencido) */
 export function getPuntoCriticoTier(activity: Activity): 0 | 1 | 2 {
-  if (activity.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return 0;
   const residuos = getResiduos(activity);
-  let maxDays = 0;
   let hasPending = false;
 
-  residuos.forEach(r => {
+  for (const r of residuos) {
     if (!r.recogido && r.status !== 'Recogido') {
-      hasPending = true;
       const days = differenceInDays(new Date(), new Date(r.dateTime));
-      if (days > maxDays) maxDays = days;
+      if (days >= UMBRAL_EMERGENCIA_DIAS) return 2;
+      hasPending = true;
     }
-  });
-
-  if (!hasPending) return 0;
-  if (maxDays >= 3) return 2;
-  if (maxDays >= 2) return 1;
-  return 0;
+  }
+  return hasPending ? 1 : 0;
 }
 
 export function isPuntoEmergencia(activity: Activity): boolean {
-  return getPuntoCriticoTier(activity) > 0;
+  return getPuntoCriticoTier(activity) === 2;
 }
 
 export function isPuntoRecogido(activity: Activity): boolean {
-  if ((activity.status as any) === 'Recogido') return true;
-  if (activity.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
   const residuos = getResiduos(activity);
   if (residuos.length === 0) return false;
   return residuos.every(r => r.recogido || r.status === 'Recogido');
@@ -219,31 +211,24 @@ export const getCategoryIcon = (
   isSectorAmbiental?: boolean,
   number?: number,
 ): DivIcon => {
-  const catUpper = (a.operativoCategoria || '').toUpperCase();
-  let color = markerColors[catUpper] || markerColors.DEFAULT;
+  // Mono-dominio: todo lo que llega a este backend ya es AMBIENTAL / punto
+  // de acumulación — no hay operativoCategoria/operativoSubtipo que leer.
+  let color = markerColors.AMBIENTAL;
   const tier = getPuntoCriticoTier(a);
 
   if (isSectorAmbiental && tier > 0) {
     color = tier === 2 ? '#DC2626' : '#EAB308';
-  } else if (isCobertura && catUpper === 'AMBIENTAL') {
+  } else if (isCobertura) {
     color = '#10B981';
   }
 
-  if (a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && selectedTipoResiduo) {
-    const data = a.operativoData as any;
+  if (selectedTipoResiduo) {
     const filterLabel = getResiduoLabel(selectedTipoResiduo);
-    const matchesLegacy =
-      data?.tipoResiduo && getResiduoLabel(data.tipoResiduo) === filterLabel;
-    const matchesArray =
-      Array.isArray(data?.residuos) &&
-      data.residuos.some((r: any) => getResiduoLabel(r.tipoResiduo) === filterLabel);
-
-    if (matchesLegacy || matchesArray) {
-      color = tipoResiduoColors[selectedTipoResiduo] || color;
-    }
+    const matches = getResiduos(a).some((r: any) => getResiduoLabel(r.tipoResiduo) === filterLabel);
+    if (matches) color = tipoResiduoColors[selectedTipoResiduo] || color;
   }
 
-  return createMarkerIcon(color, a.operativoCategoria, a.operativoSubtipo, number);
+  return createMarkerIcon(color, 'AMBIENTAL', 'AMBIENTAL_PUNTOS_ACUMULACION', number);
 };
 
 // ── Ubicaciones de actividad ──────────────────────────────
@@ -318,4 +303,66 @@ export const getLastDayOfMonth = (): string => {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 };
+
+// ── Insights del sector ambiental (para EnvironmentalTab) ──
+
+export interface AmbientalInsightsData {
+  totalIdentified: number;
+  totalCollected: number;
+  totalAct: number;
+  totalPub: number;
+  totalVal: number;
+  totalRech: number;
+  avgCollectionTimes: Record<string, number | undefined>;
+  totalArea: Record<string, number>;
+}
+
+/** Calcula los KPIs que muestra EnvironmentalTab a partir de los puntos crudos. */
+export function computeAmbientalInsights(activities: Activity[]): AmbientalInsightsData {
+  let totalIdentified = 0;
+  let totalCollected = 0;
+  let totalPub = 0;
+  let totalVal = 0;
+  let totalRech = 0;
+  const timesByKey: Record<string, number[]> = {};
+  const areaByKey: Record<string, number> = {};
+
+  for (const a of activities) {
+    if (a.status === 'PUBLICADA') totalPub++;
+    else if (a.status === 'ENVIADA') totalVal++;
+    else if (a.status === 'RECHAZADA') totalRech++;
+
+    for (const r of getResiduos(a)) {
+      totalIdentified++;
+      if (r.recogido) totalCollected++;
+
+      const key = r.tipoResiduo || 'SIN_TIPO';
+      if (typeof r.areaLinealMetros === 'number') {
+        areaByKey[key] = (areaByKey[key] || 0) + r.areaLinealMetros;
+      }
+      if (r.recogido && r.fechaRecogida && r.dateTime) {
+        const dias = (new Date(r.fechaRecogida).getTime() - new Date(r.dateTime).getTime()) / 86400000;
+        if (isFinite(dias) && dias >= 0) {
+          (timesByKey[key] ??= []).push(dias);
+        }
+      }
+    }
+  }
+
+  const avgCollectionTimes: Record<string, number | undefined> = {};
+  for (const [key, arr] of Object.entries(timesByKey)) {
+    avgCollectionTimes[key] = Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10;
+  }
+
+  return {
+    totalIdentified,
+    totalCollected,
+    totalAct: activities.length,
+    totalPub,
+    totalVal,
+    totalRech,
+    avgCollectionTimes,
+    totalArea: areaByKey,
+  };
+}
 

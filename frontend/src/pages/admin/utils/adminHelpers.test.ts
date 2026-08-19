@@ -44,36 +44,28 @@ describe('findTechnicalResidueKey', () => {
 });
 
 describe('getResiduos', () => {
-  it('devuelve el array de residuos cuando existe', () => {
-    const a: any = { operativoData: { residuos: [{ id: '1', recogido: true }] } };
+  it('devuelve el array de residuos cuando existe (columna propia, no operativoData)', () => {
+    const a: any = { residuos: [{ id: '1', recogido: true }] };
     expect(getResiduos(a)).toHaveLength(1);
   });
-  it('reconstruye el formato legacy plano', () => {
-    const a: any = { operativoData: { tipoResiduo: 'RESIDUOS_ORDINARIOS' }, dateTime: daysAgo(1), createdAt: daysAgo(2) };
-    const r = getResiduos(a);
-    expect(r).toHaveLength(1);
-    expect(r[0].id).toBe('legacy-0');
-    expect(r[0].recogido).toBe(false);
-  });
   it('devuelve [] cuando no hay residuos', () => {
-    expect(getResiduos({ operativoData: {} } as any)).toEqual([]);
+    expect(getResiduos({ residuos: [] } as any)).toEqual([]);
+    expect(getResiduos({} as any)).toEqual([]);
   });
 });
 
-describe('criticidad de puntos', () => {
-  const punto = (residuos: any[]): any => ({
-    operativoSubtipo: 'AMBIENTAL_PUNTOS_ACUMULACION',
-    operativoData: { residuos },
-  });
+describe('criticidad de puntos (umbral unificado con el backend: 4 dias)', () => {
+  const punto = (residuos: any[]): any => ({ residuos });
 
   it('tier 2 (crítico) con pendiente de 5 días', () => {
     const a = punto([{ id: '1', recogido: false, dateTime: daysAgo(5) }]);
     expect(getPuntoCriticoTier(a)).toBe(2);
     expect(isPuntoEmergencia(a)).toBe(true);
   });
-  it('tier 1 con pendiente de 2 días', () => {
+  it('tier 1 (pendiente pero no vencido) con 2 días', () => {
     const a = punto([{ id: '1', recogido: false, dateTime: daysAgo(2) }]);
     expect(getPuntoCriticoTier(a)).toBe(1);
+    expect(isPuntoEmergencia(a)).toBe(false);
   });
   it('tier 0 y recogido si todos los residuos están recogidos', () => {
     const a = punto([{ id: '1', recogido: true, dateTime: daysAgo(5) }]);
@@ -81,8 +73,8 @@ describe('criticidad de puntos', () => {
     expect(isPuntoEmergencia(a)).toBe(false);
     expect(isPuntoRecogido(a)).toBe(true);
   });
-  it('una actividad no-acumulación nunca es emergencia', () => {
-    expect(isPuntoEmergencia({ operativoSubtipo: 'AMBIENTAL' } as any)).toBe(false);
+  it('sin residuos no es emergencia', () => {
+    expect(isPuntoEmergencia(punto([]))).toBe(false);
   });
 });
 
