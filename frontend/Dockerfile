@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+# cache-bust: Railway a veces reusa un snapshot de build viejo pese a un
+# commit nuevo — tocar esta capa fuerza una compilacion real.
 RUN npm run build
 
 FROM nginx:alpine
