@@ -27,9 +27,8 @@ export const AdminDashboard: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Colapsado por defecto — igual que el panel viejo del hub: son consultas
-  // pesadas (todos los gestores con todos sus puntos) que no hace falta ver
-  // siempre abiertas, solo cuando el admin las pide.
+  // Colapsado por defecto — son consultas pesadas (todos los gestores con
+  // todos sus puntos), no hace falta verlas siempre abiertas.
   const [seccion, setSeccion] = useState<Seccion>('none');
 
   const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>(LAYERS_INICIALES);
@@ -69,72 +68,63 @@ export const AdminDashboard: React.FC = () => {
   const ambientalInsightsData = useMemo(() => computeAmbientalInsights(activities), [activities]);
 
   return (
-    <div className="h-screen flex flex-col bg-neutral-50 overflow-hidden">
-      {/* ── Cabecera fija ── */}
-      <div className="shrink-0 flex flex-col gap-2 p-3 md:p-4 pb-2 border-b border-neutral-100 bg-white">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h1 className="text-base font-black text-neutral-900">Panel de Administración — Sector Ambiental</h1>
-          <div className="flex gap-2">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setSeccion((s) => (s === tab.key ? 'none' : tab.key))}
-                aria-pressed={seccion === tab.key}
-                className="text-[9px] px-2 py-1 rounded border shadow-sm font-bold transition-colors"
-                style={seccion === tab.key
-                  ? { background: tab.color, borderColor: tab.color, color: 'white' }
-                  : { background: 'white', borderColor: tab.color, color: tab.color }}
-              >
-                {seccion === tab.key ? `Ocultar ${tab.label}` : tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="min-h-screen bg-neutral-50">
+      {/* ── Barra superior ── */}
+      <div className="sticky top-0 z-10 flex items-center justify-between flex-wrap gap-2 p-3 md:px-6 md:py-3 border-b border-neutral-100 bg-white/95 backdrop-blur-sm">
+        <h1 className="text-base font-black text-neutral-900">Panel de Administración — Sector Ambiental</h1>
+        <div className="flex gap-2">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setSeccion((s) => (s === tab.key ? 'none' : tab.key))}
+              aria-pressed={seccion === tab.key}
+              className="text-[9px] px-2 py-1 rounded border shadow-sm font-bold transition-colors"
+              style={seccion === tab.key
+                ? { background: tab.color, borderColor: tab.color, color: 'white' }
+                : { background: 'white', borderColor: tab.color, color: tab.color }}
+            >
+              {seccion === tab.key ? `Ocultar ${tab.label}` : tab.label}
+            </button>
+          ))}
         </div>
-        <ObjetivosDiariosTile />
       </div>
 
-      {/* ── Contenido: los paneles pesados scrollean su propia seccion, el
-          mapa/KPIs de EnvironmentalTab ocupan el resto del alto disponible
-          sin depender del scroll de la pagina. ── */}
-      <div className="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4 overflow-hidden">
+      {/* ── Contenido: flujo normal de página, sin scroll anidado. ── */}
+      <div className="flex flex-col gap-3 p-3 md:p-6">
+        <ObjetivosDiariosTile />
+
         {error && (
-          <div className="shrink-0 p-3 bg-red-50 border border-red-100 rounded-lg text-[11px] text-red-700 font-bold">
+          <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-[11px] text-red-700 font-bold">
             {error}
           </div>
         )}
 
-        {seccion !== 'none' && (
-          <div className="shrink-0 max-h-[45vh] overflow-y-auto">
-            {seccion === 'asignacion' && <AsignacionPuntosPanel actividades={actividadesParaAsignacion} />}
-            {seccion === 'indicadores' && <IndicadoresAmbientalPanel actividades={activities} />}
-            {seccion === 'desempeno' && <DesempenoGestoresPanel />}
-          </div>
-        )}
+        {seccion === 'asignacion' && <AsignacionPuntosPanel actividades={actividadesParaAsignacion} />}
+        {seccion === 'indicadores' && <IndicadoresAmbientalPanel actividades={activities} />}
+        {seccion === 'desempeno' && <DesempenoGestoresPanel />}
 
         {loading ? (
           <p className="text-[11px] text-neutral-400">Cargando…</p>
         ) : (
-          <div className="flex-1 min-h-0">
-            <EnvironmentalTab
-              filteredMapActivities={filteredMapActivities}
-              getGlobalActivityIndex={(id) => filteredMapActivities.find((a) => a.id === id)?.pointNumber}
-              layerVisibility={layerVisibility}
-              setLayerVisibility={setLayerVisibility}
-              tipoResiduoFilter={tipoResiduoFilter}
-              setTipoResiduoFilter={setTipoResiduoFilter}
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              emergencyFilter={emergencyFilter}
-              setEmergencyFilter={setEmergencyFilter}
-              listSearchNumber={listSearchNumber}
-              setListSearchNumber={setListSearchNumber}
-              setPointsSidebarOpen={setPointsSidebarOpen}
-              ambientalInsightsData={ambientalInsightsData}
-              globalSubtipo=""
-              setSelectedActivity={setSelectedActivity}
-              setShowDetailModal={setShowDetailModal}
-            />
-          </div>
+          <EnvironmentalTab
+            filteredMapActivities={filteredMapActivities}
+            getGlobalActivityIndex={(id) => filteredMapActivities.find((a) => a.id === id)?.pointNumber}
+            layerVisibility={layerVisibility}
+            setLayerVisibility={setLayerVisibility}
+            tipoResiduoFilter={tipoResiduoFilter}
+            setTipoResiduoFilter={setTipoResiduoFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            emergencyFilter={emergencyFilter}
+            setEmergencyFilter={setEmergencyFilter}
+            listSearchNumber={listSearchNumber}
+            setListSearchNumber={setListSearchNumber}
+            setPointsSidebarOpen={setPointsSidebarOpen}
+            ambientalInsightsData={ambientalInsightsData}
+            globalSubtipo=""
+            setSelectedActivity={setSelectedActivity}
+            setShowDetailModal={setShowDetailModal}
+          />
         )}
       </div>
     </div>
