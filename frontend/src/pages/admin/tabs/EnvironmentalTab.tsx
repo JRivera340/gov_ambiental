@@ -106,7 +106,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
   const [showDesempeno, setShowDesempeno] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 h-auto lg:h-[calc(100vh-100px)] overflow-y-auto lg:overflow-hidden overflow-x-hidden p-1 lg:p-0">
+    <div className="flex flex-col gap-3 h-full overflow-y-auto lg:overflow-hidden overflow-x-hidden p-1 lg:p-0">
 
       {/* ── Barra de acciones ── */}
       <div className="flex justify-end gap-2 flex-shrink-0">
