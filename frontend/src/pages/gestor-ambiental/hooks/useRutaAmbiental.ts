@@ -77,10 +77,11 @@ export function useRutaAmbiental(
     // asignados primero (antes de ordenar), para no perder puntos por un corte
     // global; y se incluyen los ya recogidos (resto) para que el gestor pueda
     // recorrer todos sus puntos, no solo los vencidos/pendientes.
+    // Mono-subtipo: todo lo que llega a este backend ya es punto de
+    // acumulación — operativoSubtipo es un campo del hub que no existe acá.
+    // Chequearlo siempre daba false y dejaba la ruta completa vacía.
     const asignados = new Set(puntosAsignados);
-    const acumulacion = activities.filter(
-      a => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && asignados.has(a.id)
-    );
+    const acumulacion = activities.filter(a => asignados.has(a.id));
     const tienePendiente = (a: Activity) => getResiduos(a).some(r => !r.recogido);
     const vencidos = acumulacion.filter(a => isPuntoEmergencia(a));
     const pendientes = acumulacion.filter(a => !isPuntoEmergencia(a) && tienePendiente(a));
@@ -102,7 +103,9 @@ export function useRutaAmbiental(
       const maxDias = residuos.length > 0
         ? Math.max(...residuos.map(r => differenceInDays(new Date(), new Date(r.dateTime))))
         : 0;
-      const ultimoSeguimientoAt = (a as any).operativoData?.ultimoSeguimientoAt as string | undefined;
+      // Columna propia de PuntoResiduo en este backend, no un sub-campo de
+      // operativoData (ese campo es del hub, no existe acá).
+      const ultimoSeguimientoAt = (a as any).ultimoSeguimientoAt as string | undefined;
       const ahora = new Date();
       return {
         numeroGlobal: idx + 1,

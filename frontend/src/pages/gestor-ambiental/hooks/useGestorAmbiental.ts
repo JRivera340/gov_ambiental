@@ -170,13 +170,15 @@ export function useGestorAmbiental() {
   };
 
   // ── Filtered activities ──
-  const puntoCriticoActivities = useMemo(() => {
-    return activities.filter((a: Activity) => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION');
-  }, [activities]);
-
-  const ambientalActivities = useMemo(() => {
-    return activities.filter((a: Activity) => a.operativoSubtipo === 'AMBIENTAL');
-  }, [activities]);
+  // Mono-subtipo: todo lo que llega a este backend ya es punto de
+  // acumulación (operativoSubtipo/operativoCategoria son campos del hub que
+  // no existen acá — chequearlos siempre daba false y rompía en cascada
+  // "Mis puntos"/"Todos", los filtros de tipo/estado, y el sidebar de
+  // "Lista de Residuos"). No hay un segundo subtipo "genérico" visible
+  // todavía desde el frontend (el backend sí lo soporta via tipoOperativo,
+  // pero este repo no expone ese campo en Activity).
+  const puntoCriticoActivities = activities;
+  const ambientalActivities = useMemo(() => [] as Activity[], []);
 
   const filteredActivities = useMemo(() => {
     let base = genFilterSubtipo === 'AMBIENTAL' ? ambientalActivities
@@ -192,14 +194,13 @@ export function useGestorAmbiental() {
     }
     if (mapaEstadoRecoleccionFilter !== 'ALL') {
       base = base.filter((a: Activity) => {
-        if (a.operativoCategoria !== 'AMBIENTAL' && a.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return true;
         const recog = isPuntoRecogido(a);
         return mapaEstadoRecoleccionFilter === 'RECOGIDOS' ? recog : !recog;
       });
     }
 
     return base.filter((a: Activity) => {
-      if (genFilterTipo && a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION') {
+      if (genFilterTipo) {
         const residuos = getResiduos(a);
         const hasType = residuos.some(r => String(r.tipoResiduo).toUpperCase() === genFilterTipo);
         if (!hasType) return false;
@@ -220,7 +221,7 @@ export function useGestorAmbiental() {
 
   const mapActivitiesFinal = useMemo(() => {
     return filteredActivitiesWithIndex.filter(item => {
-      if (soloMios && item.activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && !puntosAsignadosSet.has(item.activity.id)) {
+      if (soloMios && !puntosAsignadosSet.has(item.activity.id)) {
         return false;
       }
       if (listSearchNumber) {
@@ -237,11 +238,12 @@ export function useGestorAmbiental() {
       if (sidebarTab === 'rechazadas') {
         return a.status === 'RECHAZADA' && a.createdByUserId === user?.id;
       }
-      return sidebarTab === 'ambiental'
-        ? a.operativoSubtipo === 'AMBIENTAL'
-        : a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION';
+      // Sin un segundo subtipo "genérico" visible desde el frontend (ver
+      // comentario en puntoCriticoActivities), la pestaña "ambiental" del
+      // sidebar no tiene nada que mostrar todavía.
+      return sidebarTab !== 'ambiental';
     }).filter(({ activity: a }) => {
-      if (soloMios && a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && !puntosAsignadosSet.has(a.id)) {
+      if (soloMios && !puntosAsignadosSet.has(a.id)) {
         return false;
       }
       return true;

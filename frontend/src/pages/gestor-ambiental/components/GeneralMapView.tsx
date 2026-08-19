@@ -490,7 +490,12 @@ export const GeneralMapView: React.FC = () => {
                       {mapActivitiesFinal
                         .filter(({ activity: a }) => a.lat && a.lng)
                         .map(({ activity: a, displayIdx }) => {
-                          const isPuntoCritico = a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION';
+                          // Mono-subtipo: todo lo que llega a este backend ya
+                          // es punto de acumulación — operativoSubtipo es un
+                          // campo del hub que no existe acá. Chequearlo
+                          // siempre daba false y forzaba el ícono genérico
+                          // (hoja verde) en vez del de residuos.
+                          const isPuntoCritico = true;
                           const hasEmergency = isPuntoCritico && isPuntoEmergencia(a);
                           const faded = focusIds !== null && isPuntoCritico && !focusIds.has(a.id);
 

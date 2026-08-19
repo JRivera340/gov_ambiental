@@ -87,7 +87,10 @@ export const ActivitySidebar: React.FC<ActivitySidebarProps> = ({
           </div>
         ) : (
           sidebarActivitiesWithIndex.map(({ activity, displayIdx }) => {
-            const isPuntoCritico = activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION';
+            // Mono-subtipo: todo lo que llega a este backend ya es punto de
+            // acumulación — operativoSubtipo es un campo del hub que no
+            // existe acá.
+            const isPuntoCritico = true;
             const residuos = isPuntoCritico ? getResiduos(activity) : [];
             const recogidos = residuos.filter(r => r.recogido).length;
             const accentColor = isPuntoCritico ? 'green' : 'blue';

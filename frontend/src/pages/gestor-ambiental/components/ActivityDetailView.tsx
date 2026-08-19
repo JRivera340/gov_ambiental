@@ -10,7 +10,7 @@ import { tipoResiduoLabels } from '../lib/constants';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 import { getPuntoSurveyAnswers } from '../lib/puntoInfo';
 import { getUltimaActualizacion } from '../lib/ultimaActualizacion';
-import { createPuntoCriticoIcon, createAmbientalIcon } from '../lib/icons';
+import { createPuntoCriticoIcon } from '../lib/icons';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useAuthStore } from '../../../store/authStore';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
@@ -59,8 +59,9 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
   const { puntosAsignados } = useGestorAmbientalCtx();
   // El punto lo puede actualizar el gestor al que esta asignado (jurisdiccion
   // por punto) o el admin.
+  // Mono-subtipo: todo lo que llega a este backend ya es punto de
+  // acumulación — operativoSubtipo es un campo del hub que no existe acá.
   const puedeActualizar =
-    activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' &&
     !!user &&
     (puntosAsignados.includes(activity.id) || user.role === 'ADMIN');
 
@@ -119,7 +120,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
           </div>
           <h1 className="text-2xl md:text-3xl font-black text-neutral-900 leading-tight flex items-center gap-2">
             {displayIdx ? <span className="text-xl md:text-2xl font-bold text-neutral-400 bg-neutral-100 px-2 rounded">#{displayIdx}</span> : null}
-            <span>{activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' ? 'Punto de Residuos' : 'Actividad Ambiental'} · {activity.barrio}</span>
+            <span>Punto de Residuos · {activity.barrio}</span>
           </h1>
           <p className="text-sm text-neutral-500 mt-1">{activity.results || 'Sin descripción adicional.'}</p>
         </div>
@@ -150,8 +151,9 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
           </div>
         )}
 
-        {/* Información del formulario del punto de acumulación */}
-        {activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' && (
+        {/* Información del formulario del punto de acumulación — mono-
+            subtipo, siempre aplica en este backend. */}
+        {(
           <div className="mb-6 bg-neutral-50 rounded-2xl p-5 border border-neutral-200">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wider">Información del Punto</h3>
@@ -335,7 +337,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
               weight={2.5}
               visible={layerVisibility.bodegas}
             />
-            <Marker position={[activity.lat, activity.lng]} icon={activity.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' ? createPuntoCriticoIcon(isPuntoEmergencia(activity) ? '#EAB308' : '#16A34A', activity.pointNumber) : createAmbientalIcon(activity.pointNumber)} />
+            <Marker position={[activity.lat, activity.lng]} icon={createPuntoCriticoIcon(isPuntoEmergencia(activity) ? '#EAB308' : '#16A34A', activity.pointNumber)} />
             <InvalidateMap />
           </MapContainer>
         </div>
