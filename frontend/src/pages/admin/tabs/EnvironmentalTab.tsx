@@ -102,7 +102,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
   const ambientalActivities = filteredMapActivities;
 
   return (
-    <div className="flex flex-col gap-3 h-auto lg:h-[calc(100vh-160px)] overflow-y-auto lg:overflow-hidden overflow-x-hidden p-1 lg:p-0">
+    <div className="flex flex-col gap-3 h-full overflow-y-auto lg:overflow-hidden overflow-x-hidden p-1 lg:p-0">
 
       {/* ── TOP ROW: Métricas principales ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-shrink-0">
