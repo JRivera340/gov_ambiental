@@ -1,14 +1,14 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import type { Activity } from '../../../../types';
 import {
   tiempoMedioRecoleccionDias, coberturaPct, puntosVencidos, residuosPorTipo, puntosReincidentes,
 } from '../../../gestor-ambiental/lib/indicadoresAmbiental.lib';
 
 export const IndicadoresAmbientalPanel: React.FC<{ actividades: Activity[] }> = ({ actividades }) => {
-  const puntos = useMemo(
-    () => actividades.filter(a => a.operativoSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION'),
-    [actividades],
-  );
+  // Mono-subtipo: toda actividad de este repo ya es punto de acumulación —
+  // operativoSubtipo no existe en este backend. Filtrar por él dejaba este
+  // panel siempre en "sin datos suficientes".
+  const puntos = actividades;
   const tiempo = tiempoMedioRecoleccionDias(puntos);
   const cobertura = coberturaPct(puntos);
   const vencidos = puntosVencidos(puntos).length;

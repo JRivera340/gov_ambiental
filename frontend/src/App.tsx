@@ -7,6 +7,7 @@ import { EditActivity } from './pages/EditActivity';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
 
 // No hay página de login en este repo — la sesión llega desde bogotaneidapp
 // (fase 5: cookie compartida entre subdominios). Mientras tanto, para probar
@@ -59,6 +60,11 @@ function App() {
       <Route path="/public/actividad/:id" element={<PublicPuntoPage />} />
 
       <Route path="/handoff" element={<HandoffPage />} />
+
+      <Route
+        path="/admin"
+        element={<RutaProtegida><AdminDashboard /></RutaProtegida>}
+      />
     </Routes>
   );
 }

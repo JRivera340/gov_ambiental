@@ -7,6 +7,7 @@ import type { User } from '../types';
 const RUTA_POR_ROL: Partial<Record<string, string>> = {
   GESTOR_AMBIENTAL: '/gestor-ambiental/dashboard',
   VALIDADOR_AMBIENTAL: '/validador/residuos',
+  ADMIN: '/admin',
 };
 
 // Pantalla de destino del handoff. Lee el JWT del fragmento de URL (nunca
