@@ -35,7 +35,6 @@ export function useActividadesCalor({
   const actividadesEnCalor = useMemo(() => {
     const result: Array<{ activity: Activity; residuo: ResiduoEntry; daysPending: number }> = [];
     activities.forEach(a => {
-      if (a.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return;
       const residuos = getResiduos(a);
       residuos.forEach(r => {
         if (!r.recogido) {
@@ -72,7 +71,6 @@ export function useActividadesCalor({
     setIsMarkingOrdinarios(true);
     try {
       const targetActivities = activities.filter(a => {
-        if (a.operativoSubtipo !== 'AMBIENTAL_PUNTOS_ACUMULACION') return false;
         const matchingSectors = activitySectorMap.get(a.id);
         if (!matchingSectors || !matchingSectors.some(id => targetSectorIds.has(id))) return false;
 

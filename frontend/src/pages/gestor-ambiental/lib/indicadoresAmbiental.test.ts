@@ -3,10 +3,9 @@ import {
   tiempoMedioRecoleccionDias, coberturaPct, residuosPorTipo, puntosReincidentes, eventosDesdePuntos, puntosVencidos,
 } from './indicadoresAmbiental.lib';
 
-const punto = (id: string, barrio: string, residuos: any[], lat = 4.6, lng = -74.07, operativoSubtipo = 'AMBIENTAL'): any => ({
+const punto = (id: string, barrio: string, residuos: any[], lat = 4.6, lng = -74.07): any => ({
   id, barrio, lat, lng, dateTime: '2026-07-01T00:00:00Z',
-  operativoData: { residuos },
-  operativoSubtipo,
+  residuos,
 });
 const r = (tipo: string, recogido: boolean, dateTime?: string, fechaRecogida?: string) =>
   ({ id: Math.random().toString(), tipoResiduo: tipo, recogido, dateTime, fechaRecogida });
@@ -71,8 +70,8 @@ describe('eventosDesdePuntos', () => {
 describe('puntosVencidos', () => {
   it('filtra puntos con todos residuos recogido (no hay emergencia)', () => {
     const ps = [
-      punto('a', 'X', [r('ORD', true), r('ESC', true)], 4.6, -74.07, 'AMBIENTAL_PUNTOS_ACUMULACION'),
-      punto('b', 'Y', [r('ORD', true)], 4.6, -74.07, 'AMBIENTAL_PUNTOS_ACUMULACION'),
+      punto('a', 'X', [r('ORD', true), r('ESC', true)]),
+      punto('b', 'Y', [r('ORD', true)]),
     ];
     const out = puntosVencidos(ps);
     expect(out).toEqual([]);

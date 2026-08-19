@@ -17,19 +17,27 @@ import { startOfMonthStr as gSOM, endOfMonthStr as gEOM } from '../../utils/date
 const gYearStart = () => `${new Date().getFullYear()}-01-01`;
 const gYearEnd = () => `${new Date().getFullYear()}-12-31`;
 
+// `residuos` es columna propia de PuntoResiduo en este backend, no un
+// sub-campo de operativoData (ese campo es del hub, no existe acá).
 function getResiduos(activity: Activity): any[] {
-  const opData = (activity.operativoData as any) || {};
-  if (Array.isArray(opData.residuos) && opData.residuos.length > 0) return opData.residuos;
-  if (opData.tipoResiduo) return [{ tipoResiduo: opData.tipoResiduo, recogido: false }];
-  return [];
+  const residuos = (activity as any).residuos;
+  return Array.isArray(residuos) ? residuos : [];
+}
+
+// Este backend valida por PUNTO (status ENVIADA→APROBADA/RECHAZADA), no
+// por residuo individual — no existe un campo "aprobado" a nivel de
+// residuo. Se deriva la aprobación del residuo del estado del punto que lo
+// contiene, en vez de leer un campo que siempre es undefined.
+function puntoValidado(activity: Activity): boolean {
+  return activity.status === 'APROBADA' || activity.status === 'PUBLICADA';
 }
 
 function countPendientes(activity: Activity): number {
-  return getResiduos(activity).filter(r => !(r as any).aprobado).length;
+  return puntoValidado(activity) ? 0 : getResiduos(activity).length;
 }
 
 function countAprobados(activity: Activity): number {
-  return getResiduos(activity).filter(r => (r as any).aprobado).length;
+  return puntoValidado(activity) ? getResiduos(activity).length : 0;
 }
 
 function createMarkerIcon(color: string, pulse: boolean, number?: number): DivIcon {
@@ -151,14 +159,8 @@ export const ValidadorMapaDashboard: React.FC = () => {
         showD: false
       };
     } else {
-      const validados = filtered.reduce((acc, a) => {
-        const res = getResiduos(a);
-        return acc + res.filter((r: any) => r.aprobado).length;
-      }, 0);
-      const pendientes = filtered.reduce((acc, a) => {
-        const res = getResiduos(a);
-        return acc + res.filter((r: any) => !r.aprobado).length;
-      }, 0);
+      const validados = filtered.reduce((acc, a) => acc + countAprobados(a), 0);
+      const pendientes = filtered.reduce((acc, a) => acc + countPendientes(a), 0);
       const totalResiduos = filtered.reduce((acc, a) => acc + getResiduos(a).length, 0);
       return {
         countA: filtered.length, labelA: 'Total Puntos',

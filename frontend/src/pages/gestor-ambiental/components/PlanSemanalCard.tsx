@@ -17,6 +17,7 @@ export const PlanSemanalCard: React.FC<Props> = ({ activities, onVerPunto }) => 
   const [plan, setPlan] = useState<{ emergencia: string[]; regular: string[]; semanaISO: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [visitados, setVisitados] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -24,6 +25,9 @@ export const PlanSemanalCard: React.FC<Props> = ({ activities, onVerPunto }) => 
       .then((data) => { if (!cancelado) setPlan(data); })
       .catch(() => { if (!cancelado) setError(true); })
       .finally(() => { if (!cancelado) setLoading(false); });
+    ambientalService.getMiDesempeno()
+      .then((data) => { if (!cancelado) setVisitados(data.gestores[0]?.visitados ?? 0); })
+      .catch(() => { /* barra de progreso es un plus, no bloquea el resto de la card */ });
     return () => { cancelado = true; };
   }, []);
 
@@ -65,6 +69,23 @@ export const PlanSemanalCard: React.FC<Props> = ({ activities, onVerPunto }) => 
           </span>
         </div>
       </div>
+
+      {visitados !== null && total > 0 && (
+        <div className="px-4 pt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-neutral-500">Progreso de la semana</span>
+            <span className="text-[10px] font-black text-neutral-700">
+              {Math.min(visitados, total)} de {total}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-neutral-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${Math.min(100, Math.round((visitados / total) * 100))}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {total === 0 ? (
         <p className="text-[11px] text-neutral-400 p-4">Sin puntos planificados esta semana.</p>

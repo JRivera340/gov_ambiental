@@ -84,4 +84,8 @@ export const ambientalService = {
     const { data } = await api.get<ResumenDesempenoDTO>('/visitas/desempeno', { params: gestorId ? { gestorId } : undefined });
     return data;
   },
+  async getMiDesempeno(): Promise<ResumenDesempenoDTO> {
+    const { data } = await api.get<ResumenDesempenoDTO>('/visitas/mine');
+    return data;
+  },
 };

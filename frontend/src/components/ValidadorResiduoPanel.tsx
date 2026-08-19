@@ -24,26 +24,13 @@ interface Props {
   onUpdated: (activity: Activity) => void;
 }
 
+// `residuos` es columna propia de PuntoResiduo (jsonb) en este backend, no
+// un sub-campo de operativoData (ese campo es del hub, no existe acá). El
+// campo "aprobado" que se usa en este panel SÍ persiste bien — el jsonb no
+// tiene schema fijo, PATCH /puntos/:id/aprobar-residuo lo guarda tal cual.
 function getResiduosFromActivity(activity: Activity): ResiduoEntry[] {
-  const opData = (activity.operativoData as any) || {};
-  if (Array.isArray(opData.residuos) && opData.residuos.length > 0) {
-    return opData.residuos;
-  }
-  if (opData.tipoResiduo) {
-    return [{
-      id: 'legacy-0',
-      tipoResiduo: opData.tipoResiduo,
-      quienDispuso: opData.quienDispuso || '',
-      percibeOlores: opData.percibeOlores ?? false,
-      percibeVectores: opData.percibeVectores ?? false,
-      areaLinealMetros: opData.areaLinealMetros || 0,
-      observaciones: opData.observaciones || '',
-      dateTime: activity.dateTime || activity.createdAt,
-      photos: activity.photos || [],
-      recogido: false,
-    }];
-  }
-  return [];
+  const residuos = (activity as any).residuos;
+  return Array.isArray(residuos) ? residuos : [];
 }
 
 const TIPO_LABELS: Record<string, string> = Object.fromEntries(

@@ -83,15 +83,11 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showActionsDropdown]);
 
+  // `residuos` es columna propia de PuntoResiduo en este backend, no un
+  // sub-campo de operativoData (ese campo es del hub, no existe acá).
   const residuos = useMemo(() => {
-    const opData = (activity.operativoData as any) || {};
-    if (Array.isArray(opData.residuos)) return opData.residuos;
-    if (opData.tipoResiduo) return [{ 
-      tipoResiduo: opData.tipoResiduo, 
-      areaLinealMetros: opData.areaLinealMetros || 0,
-      photos: activity.photos || []
-    }];
-    return [];
+    const r = (activity as any).residuos;
+    return Array.isArray(r) ? r : [];
   }, [activity]);
 
   // Fotos que no pertenecen a ningún residuo específico
@@ -145,10 +141,11 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
   };
 
   const handleEdit = () => {
-    const editPath = activity.operativoCategoria === 'AMBIENTAL' 
-      ? `/gestor-ambiental/editar-actividad/${activity.id}`
-      : `/gestor/editar-actividad/${activity.id}`;
-    navigate(editPath);
+    // Mono-dominio: la única ruta de edición en este repo es la de
+    // ambiental — operativoCategoria es un campo del hub, no existe acá
+    // (chequearlo siempre daba false y mandaba a una ruta /gestor/... que
+    // no existe en este frontend).
+    navigate(`/gestor-ambiental/editar-actividad/${activity.id}`);
   };
 
   return (
@@ -271,12 +268,12 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
           </div>
         )}
 
-        {/* Observations */}
-        {(activity.operativoData as any)?.observaciones && (
+        {/* Observations — columna propia del formulario fijo, no operativoData */}
+        {(activity as any).observaciones && (
           <div className="px-6 py-5">
             <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Observaciones Técnicas</h3>
             <p className="text-sm text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-2xl border border-neutral-100 italic">
-              "{ (activity.operativoData as any).observaciones }"
+              "{ (activity as any).observaciones }"
             </p>
           </div>
         )}
