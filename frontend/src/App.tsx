@@ -65,6 +65,11 @@ function App() {
         path="/admin"
         element={<RutaProtegida><AdminDashboard /></RutaProtegida>}
       />
+
+      {/* Cualquier ruta sin match (ej: un navigate() a una ruta que ya no
+          existe, o un bundle viejo en cache del navegador apuntando a algo
+          removido) manda al inicio en vez de dejar la pantalla en blanco. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
