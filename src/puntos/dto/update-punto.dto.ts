@@ -47,4 +47,7 @@ export class UpdatePuntoDto {
   @IsOptional()
   @IsArray()
   gestoresInvolucradosIds?: string[];
+
+  @IsOptional()
+  datosFormulario?: Record<string, unknown>;
 }

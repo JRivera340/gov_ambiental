@@ -324,13 +324,26 @@ export const ValidadorActividadPanel: React.FC<Props> = ({ activity, onClose, on
                     </svg>
                   </button>
 
-                  {/* Dropdown Menu — sin "Editar": el backend solo permite
-                      editar al gestor creador (PATCH /puntos/:id es
-                      @Roles(GESTOR_AMBIENTAL)), un validador siempre
-                      recibía 403/redirect al intentarlo. Para pedir
-                      correcciones, usar Rechazar con notas. */}
+                  {/* Editar: el backend ya deja a GESTOR/VALIDADOR/ADMIN
+                      corregir un punto (paridad con el acoplado, que
+                      siempre lo permitió para los tres roles). */}
                   {showActionsDropdown && (
                     <div className="absolute bottom-full left-0 w-full mb-3 bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 z-[600]">
+                      <button
+                        onClick={() => { navigate(`/gestor-ambiental/editar-actividad/${activity.id}`); setShowActionsDropdown(false); }}
+                        className="w-full px-6 py-4 text-left text-xs font-bold text-neutral-600 hover:bg-neutral-50 flex items-center gap-3 transition-colors border-b border-neutral-50"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                          </svg>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="uppercase tracking-widest text-[10px]">Editar</span>
+                          <span className="text-[10px] opacity-50 font-medium normal-case text-neutral-400">Modificar datos del reporte</span>
+                        </div>
+                      </button>
+
                       <button
                         onClick={() => { setShowValidationFlow('APPROVE'); setShowActionsDropdown(false); }}
                         className="w-full px-6 py-4 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-neutral-50"

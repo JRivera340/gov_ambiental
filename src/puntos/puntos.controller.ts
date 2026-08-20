@@ -66,16 +66,21 @@ export class PuntosController {
     return this.puntosService.findOne(id);
   }
 
+  // El acoplado (hub) siempre dejó editar a GESTOR/VALIDADOR/ADMIN — acá
+  // solo se había habilitado GESTOR + ADMIN, dejando al validador sin poder
+  // corregir nada (paridad rota con el módulo viejo).
   @Patch(':id')
-  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
   update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdatePuntoDto) {
-    return this.puntosService.update(id, req.user.userId, dto, req.user.role === Role.ADMIN);
+    const puedeCualquiera = req.user.role === Role.ADMIN || req.user.role === Role.VALIDADOR_AMBIENTAL;
+    return this.puntosService.update(id, req.user.userId, dto, puedeCualquiera);
   }
 
   @Post(':id/send')
-  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  @Roles(Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL, Role.ADMIN)
   send(@Req() req: any, @Param('id') id: string) {
-    return this.puntosService.send(id, req.user.userId, req.user.role === Role.ADMIN);
+    const puedeCualquiera = req.user.role === Role.ADMIN || req.user.role === Role.VALIDADOR_AMBIENTAL;
+    return this.puntosService.send(id, req.user.userId, puedeCualquiera);
   }
 
   // Solo ADMIN — borrado real de un punto (y su asignación). No existía

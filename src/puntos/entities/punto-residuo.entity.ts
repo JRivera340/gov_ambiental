@@ -138,6 +138,17 @@ export class PuntoResiduo {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   residuos!: ResiduoEntry[];
 
+  // Respuestas de la encuesta dinámica "Puntos de Acumulación de Residuos"
+  // (frecuenciaAcumulacion, tipoZona, tipoSuelo, camarasPunto,
+  // identificacionGenerador, tipoGenerador, metodoIdentificacion, etc — ~26
+  // preguntas a nivel de punto, keyed por el `name` estable de la pregunta,
+  // no por el id/UUID que cambia si se edita la encuesta en gov_encuestas).
+  // El formulario de creación las capturaba pero nunca se guardaban en
+  // ningún lado — se llenaban y se perdían. JSONB porque el set de
+  // preguntas lo define una encuesta externa, no un esquema fijo acá.
+  @Column({ type: 'jsonb', nullable: true })
+  datosFormulario?: Record<string, unknown>;
+
   @Column({ type: 'timestamptz', nullable: true })
   ultimoSeguimientoAt?: Date;
 

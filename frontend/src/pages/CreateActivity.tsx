@@ -549,6 +549,26 @@ export const CreateActivity: React.FC = () => {
           .filter((id): id is string => !!id),
       ));
 
+      // El resto de las preguntas del punto (frecuenciaAcumulacion, tipoZona,
+      // camarasPunto, identificacionGenerador, etc — todo lo que no se
+      // extrajo arriba a un campo propio ni pertenece al sub-form de
+      // residuo) se llenaban en el formulario y se perdían: nunca se
+      // mandaban al backend. Ahora van en datosFormulario, keyed por el
+      // `name` estable de la pregunta (ver punto-residuo.entity.ts).
+      const NOMBRES_YA_EXTRAIDOS = new Set([
+        ...PUNTOS_RESIDUO_SURVEY_NAMES,
+        'fecha_operativo', 'ubicacion_mapa', 'barrio_detectado',
+        'descripcion_general', 'entidad_responsable', 'entidades_acompanantes',
+      ]);
+      const datosFormulario: Record<string, unknown> = {};
+      surveySchema.questions.forEach((q) => {
+        if (q.type === 'SECTION_HEADER' || !q.name || NOMBRES_YA_EXTRAIDOS.has(q.name)) return;
+        const v = operativoDataValues[q.id];
+        if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
+          datosFormulario[q.name] = v;
+        }
+      });
+
       const dto: any = {
         dateTime: new Date(dateTimeVal).toISOString(),
         lat: locationVal.lat,
@@ -561,6 +581,7 @@ export const CreateActivity: React.FC = () => {
         entidadesAcompanantes: entidadesAcompanantesVal,
         ...(gestoresInvolucradosIds.length > 0 ? { gestoresInvolucradosIds } : {}),
         ...(esPuntosAcumulacion ? { residuos } : {}),
+        ...(Object.keys(datosFormulario).length > 0 ? { datosFormulario } : {}),
       };
       if (processId) dto.processId = processId;
 

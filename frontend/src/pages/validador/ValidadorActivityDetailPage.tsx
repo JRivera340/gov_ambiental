@@ -4,6 +4,8 @@ import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { Icon } from 'leaflet';
 import { activityService } from '../../services/activity.service';
 import { usersService } from '../../services/users.service';
+import { surveyService, type SurveySchema } from '../../services/survey.service';
+import { CATEGORIA_ENCUESTAS_NAME } from '../../config/areasCatalog';
 import { useFileUrl } from '../../hooks/useFileUrl';
 import { useAuthStore } from '../../store/authStore';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -61,10 +63,14 @@ export const ValidadorActivityDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'ADMIN';
+  // El acoplado siempre dejó editar a validador (y a admin) — Eliminar
+  // se queda solo para admin, eso sí es explícitamente distinto.
+  const puedeEditar = isAdmin || user?.role === 'VALIDADOR_AMBIENTAL';
   const [activity, setActivity] = useState<Activity | null>(null);
   const [creator, setCreator] = useState<User | null>(null);
   const [validador, setValidador] = useState<User | null>(null);
   const [gestores, setGestores] = useState<User[]>([]);
+  const [surveySchema, setSurveySchema] = useState<SurveySchema | null>(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState('');
   const [showFlow, setShowFlow] = useState<'APPROVE' | 'REJECT' | null>(null);
@@ -91,6 +97,31 @@ export const ValidadorActivityDetailPage: React.FC = () => {
 
   useEffect(() => { load(); }, [id]);
   useEffect(() => { usersService.getGestores().then(setGestores).catch(() => setGestores([])); }, []);
+  useEffect(() => { surveyService.getSurvey(CATEGORIA_ENCUESTAS_NAME, 'AMBIENTAL_PUNTOS_ACUMULACION').then(setSurveySchema).catch(() => setSurveySchema(null)); }, []);
+
+  // Preguntas del formulario original a nivel de punto (frecuencia de
+  // acumulación, tipo de zona, identificación del generador, etc), keyed
+  // por name igual que se guardaron en datosFormulario. Antes se llenaban y
+  // se perdían: no había ninguna columna que las guardara.
+  const NOMBRES_YA_EXTRAIDOS = new Set([
+    'quienDispuso', 'tipoResiduo', 'percibeOlores', 'percibeVectores', 'areaLinealMetros', 'fotos_evidencia',
+    'fecha_operativo', 'ubicacion_mapa', 'barrio_detectado', 'descripcion_general', 'entidad_responsable', 'entidades_acompanantes',
+  ]);
+  const datosFormularioMostrables = useMemo(() => {
+    if (!surveySchema || !activity) return [];
+    const datos = (activity as any).datosFormulario || {};
+    return surveySchema.questions
+      .filter((q) => q.type !== 'SECTION_HEADER' && q.name && !NOMBRES_YA_EXTRAIDOS.has(q.name) && datos[q.name] !== undefined)
+      .map((q) => {
+        const raw = datos[q.name!];
+        const format = (v: any) => {
+          const opt = q.options?.find((o) => o.value === v);
+          return opt ? opt.label : String(v);
+        };
+        const value = Array.isArray(raw) ? raw.map(format).join(', ') : format(raw);
+        return { key: q.id, label: q.label, value };
+      });
+  }, [surveySchema, activity]);
 
   const residuos: ResiduoEntry[] = useMemo(() => {
     const r = (activity as any)?.residuos;
@@ -193,7 +224,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     );
   }
 
-  const soloLectura = !isAdmin && activity.status !== 'ENVIADA';
+  const soloLectura = !puedeEditar && activity.status !== 'ENVIADA';
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-16">
@@ -218,7 +249,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
         </div>
       </header>
 
-      <main className={`max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5 ${(activity.status === 'ENVIADA' || isAdmin) ? 'pb-32' : ''}`}>
+      <main className={`max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5 ${(activity.status === 'ENVIADA' || puedeEditar) ? 'pb-32' : ''}`}>
         {/* Información Básica + Datos Operativo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5 flex flex-col gap-4">
@@ -268,6 +299,20 @@ export const ValidadorActivityDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Más datos del punto — preguntas del formulario original que se
+            llenaban al crear y se perdían: no había columna que las
+            guardara. Ver punto-residuo.entity.ts::datosFormulario. */}
+        {datosFormularioMostrables.length > 0 && (
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5">
+            <h2 className="text-sm font-black text-neutral-900 mb-3">Más Datos del Punto</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {datosFormularioMostrables.map((d) => (
+                <Campo key={d.key} label={d.label}>{d.value}</Campo>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Residuos Recogidos */}
         <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5">
@@ -376,7 +421,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
       {/* Barra de acciones flotante — Aprobar/Rechazar (validador) y
           Editar/Enviar/Eliminar (admin) se quedan visibles siempre, sin
           tener que scrollear hasta el final de una página larga. */}
-      {(activity.status === 'ENVIADA' || isAdmin) && (
+      {(activity.status === 'ENVIADA' || puedeEditar) && (
         <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-neutral-200 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-3">
             {activity.status === 'ENVIADA' && (
@@ -428,12 +473,11 @@ export const ValidadorActivityDetailPage: React.FC = () => {
             </>
             )}
 
-            {/* Acciones de administración — Editar sirve en cualquier
-                estado (el admin puede corregir hasta un punto ya
-                publicado); Enviar a Validación solo tiene sentido en
-                BORRADOR/RECHAZADA (mismo límite que el gestor creador);
-                Eliminar no tiene restricción de estado. */}
-            {isAdmin && (
+            {/* Editar (admin y validador — el acoplado siempre lo permitió
+                para ambos) sirve en cualquier estado; Enviar a Validación
+                solo tiene sentido en BORRADOR/RECHAZADA; Eliminar es
+                exclusivo de admin, sin restricción de estado. */}
+            {puedeEditar && (
               <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
@@ -450,13 +494,15 @@ export const ValidadorActivityDetailPage: React.FC = () => {
                     Enviar a Validación
                   </button>
                 )}
-                <button
-                  disabled={processing}
-                  onClick={handleDelete}
-                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-neutral-900 hover:bg-red-700 disabled:opacity-50"
-                >
-                  Eliminar
-                </button>
+                {isAdmin && (
+                  <button
+                    disabled={processing}
+                    onClick={handleDelete}
+                    className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-neutral-900 hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Eliminar
+                  </button>
+                )}
               </div>
             )}
           </div>

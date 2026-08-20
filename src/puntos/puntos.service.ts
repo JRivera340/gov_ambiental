@@ -91,6 +91,7 @@ export class PuntosService {
       isGroupOperativo: dto.isGroupOperativo || (dto.gestoresInvolucradosIds?.length ?? 0) > 0,
       gestoresInvolucradosIds: dto.gestoresInvolucradosIds || [],
       processId: dto.processId,
+      datosFormulario: dto.datosFormulario,
       pointNumber: maxActual + 1,
       residuos,
     } as Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>);
@@ -129,6 +130,12 @@ export class PuntosService {
     if (dto.gestoresInvolucradosIds !== undefined) {
       punto.gestoresInvolucradosIds = dto.gestoresInvolucradosIds;
       punto.isGroupOperativo = dto.gestoresInvolucradosIds.length > 0;
+    }
+    if (dto.datosFormulario !== undefined) {
+      // Merge, no reemplazo — el form de edición puede reenviar solo un
+      // subconjunto de preguntas (p. ej. si la encuesta cambió desde la
+      // creación) sin borrar respuestas viejas que ya no se muestran.
+      punto.datosFormulario = { ...(punto.datosFormulario || {}), ...dto.datosFormulario };
     }
     if (dto.residuos !== undefined) {
       punto.residuos = dto.residuos.map((r: any) => ({

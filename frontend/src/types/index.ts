@@ -261,6 +261,12 @@ export interface Activity {
   // Este backend guarda `residuos` como columna propia de nivel superior
   // (no anidada en `operativoData` como en el monolito).
   residuos?: ResiduoEntry[];
+
+  // Respuestas de la encuesta dinámica a nivel de punto (frecuenciaAcumulacion,
+  // tipoZona, camarasPunto, identificacionGenerador, etc), keyed por el
+  // `name` de la pregunta en gov_encuestas_publico. Columna propia
+  // (datosFormulario), no anidada en operativoData.
+  datosFormulario?: Record<string, unknown>;
 }
 
 export interface Process {

@@ -13,11 +13,24 @@ import { Toast } from '../components/Toast';
 import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
 import { ActaUpload } from '../components/ActaUpload';
+import { SurveyFieldInput } from '../components/create-activity/SurveyFieldInput';
+import { surveyService, type SurveySchema } from '../services/survey.service';
+import { CATEGORIA_ENCUESTAS_NAME } from '../config/areasCatalog';
 import type { Activity, Catalogs, ResiduoEntry, User } from '../types';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
 import { ACTORES_INDISCIPLINA } from '../types/ambientalCampos';
 import { loadSantaFeBoundaries, isPointInBoundaries, isPointInCandelaria, findBarrioByPoint } from '../utils/boundaryValidation';
 import type { GeoJSON } from 'geojson';
+
+// Nombres de preguntas de la encuesta que ya se editan por su propio campo
+// (o pertenecen al sub-form de residuo) — no se repiten en "Más datos del
+// punto". Mismo set que CreateActivity.tsx usa para armar datosFormulario.
+const PUNTOS_RESIDUO_SURVEY_NAMES = ['quienDispuso', 'tipoResiduo', 'percibeOlores', 'percibeVectores', 'areaLinealMetros', 'fotos_evidencia'];
+const NOMBRES_YA_EXTRAIDOS = new Set([
+  ...PUNTOS_RESIDUO_SURVEY_NAMES,
+  'fecha_operativo', 'ubicacion_mapa', 'barrio_detectado',
+  'descripcion_general', 'entidad_responsable', 'entidades_acompanantes',
+]);
 
 // Reescrito (no es un recorte línea por línea del `EditActivity` genérico del
 // monolito — ese maneja IVC/Espacio Público/PYBA con campos legacy que no
@@ -44,7 +57,11 @@ function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => v
 export const EditActivity: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const isAdmin = useAuthStore((s) => s.user?.role) === 'ADMIN';
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdmin = role === 'ADMIN';
+  // El acoplado siempre dejó editar a validador (y a admin) en cualquier
+  // estado — "Guardar y Aprobar" sigue siendo solo de admin más abajo.
+  const puedeEditarCualquiera = isAdmin || role === 'VALIDADOR_AMBIENTAL';
 
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,20 +87,36 @@ export const EditActivity: React.FC = () => {
   const [gestoresInvolucradosIds, setGestoresInvolucradosIds] = useState<string[]>([]);
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
   const [gestores, setGestores] = useState<User[]>([]);
+  const [surveySchema, setSurveySchema] = useState<SurveySchema | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, any>>({});
 
   useEffect(() => {
     loadData();
     loadSantaFeBoundaries().then(setBoundaries);
     catalogService.getAll().then(setCatalogs).catch(() => setCatalogs(null));
     usersService.getGestores().then(setGestores).catch(() => setGestores([]));
+    surveyService.getSurvey(CATEGORIA_ENCUESTAS_NAME, 'AMBIENTAL_PUNTOS_ACUMULACION').then(setSurveySchema).catch(() => setSurveySchema(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Precarga formValues (keyed por id de pregunta, igual que CreateActivity)
+  // a partir de datosFormulario (keyed por name, estable) apenas se conocen
+  // ambos: la actividad y el schema de la encuesta.
+  useEffect(() => {
+    if (!activity || !surveySchema) return;
+    const datos = (activity as any).datosFormulario || {};
+    const initial: Record<string, any> = {};
+    surveySchema.questions.forEach((q) => {
+      if (q.name && datos[q.name] !== undefined) initial[q.id] = datos[q.name];
+    });
+    setFormValues(initial);
+  }, [activity, surveySchema]);
 
   const loadData = async () => {
     if (!id) return;
     try {
       const data = await activityService.getById(id);
-      if (!isAdmin && data.status !== 'BORRADOR' && data.status !== 'RECHAZADA') {
+      if (!puedeEditarCualquiera && data.status !== 'BORRADOR' && data.status !== 'RECHAZADA') {
         setToast({ message: 'Solo se puede editar un punto en borrador o rechazado', type: 'error' });
         setTimeout(() => navigate(-1), 2000);
         return;
@@ -132,11 +165,20 @@ export const EditActivity: React.FC = () => {
     }
     setSaving(true);
     try {
+      const datosFormulario: Record<string, unknown> = {};
+      surveySchema?.questions.forEach((q) => {
+        if (q.type === 'SECTION_HEADER' || !q.name || NOMBRES_YA_EXTRAIDOS.has(q.name)) return;
+        const v = formValues[q.id];
+        if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
+          datosFormulario[q.name] = v;
+        }
+      });
       await activityService.update(activity.id, {
         lat, lng, barrio, photos, actaPdfUrl, residuos,
         entidadResponsable, entidadesAcompanantes, gestoresInvolucradosIds,
         dateTime: dateTime ? new Date(dateTime).toISOString() : undefined,
         results,
+        ...(Object.keys(datosFormulario).length > 0 ? { datosFormulario } : {}),
       } as any);
       if (mode === 'send') {
         await activityService.send(activity.id);
@@ -233,6 +275,34 @@ export const EditActivity: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* Preguntas de la encuesta del formulario original (frecuencia de
+            acumulación, tipo de zona, identificación del generador, etc) —
+            se llenaban al crear el punto y se perdían: no había forma de
+            verlas ni corregirlas acá. */}
+        {surveySchema && surveySchema.questions.some((q) => q.type !== 'SECTION_HEADER' && q.name && !NOMBRES_YA_EXTRAIDOS.has(q.name)) && (
+          <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100 space-y-6">
+            <h2 className="text-lg font-bold text-primary">Más Datos del Punto</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {surveySchema.questions.map((q) => {
+                if (q.type === 'SECTION_HEADER' || !q.name || NOMBRES_YA_EXTRAIDOS.has(q.name)) return null;
+                const fullWidth = ['LOCATION', 'FILE', 'TEXTAREA', 'MULTISELECT'].includes(q.type);
+                return (
+                  <div key={q.id} className={fullWidth ? 'col-span-full space-y-2' : 'col-span-1 space-y-2'}>
+                    <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
+                      {q.label} {q.required && <span className="text-red-500">*</span>}
+                    </label>
+                    <SurveyFieldInput
+                      question={q}
+                      value={formValues[q.id]}
+                      onChange={(qid, v) => setFormValues((p) => ({ ...p, [qid]: v }))}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100 space-y-6">
           <h2 className="text-lg font-bold text-primary">Entidades y Gestores</h2>
