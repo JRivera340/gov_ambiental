@@ -54,6 +54,8 @@ export const EditActivity: React.FC = () => {
   const [lat, setLat] = useState<number>(4.6097);
   const [lng, setLng] = useState<number>(-74.0817);
   const [barrio, setBarrio] = useState('');
+  const [dateTime, setDateTime] = useState('');
+  const [results, setResults] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [actaPdfUrl, setActaPdfUrl] = useState('');
   const [boundaries, setBoundaries] = useState<GeoJSON | null>(null);
@@ -90,6 +92,8 @@ export const EditActivity: React.FC = () => {
       setLat(data.lat);
       setLng(data.lng);
       setBarrio(data.barrio);
+      setDateTime(data.dateTime ? new Date(data.dateTime).toISOString().slice(0, 16) : '');
+      setResults((data as any).results || '');
       setPhotos(data.photos || []);
       setActaPdfUrl(data.actaPdfUrl || '');
       setResiduos(data.residuos || []);
@@ -131,6 +135,8 @@ export const EditActivity: React.FC = () => {
       await activityService.update(activity.id, {
         lat, lng, barrio, photos, actaPdfUrl, residuos,
         entidadResponsable, entidadesAcompanantes, gestoresInvolucradosIds,
+        dateTime: dateTime ? new Date(dateTime).toISOString() : undefined,
+        results,
       } as any);
       if (mode === 'send') {
         await activityService.send(activity.id);
@@ -185,9 +191,25 @@ export const EditActivity: React.FC = () => {
               <MapClickHandler onClick={handleMapClick} />
             </MapContainer>
           </div>
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center">
-            <span className="text-[10px] text-emerald-600 uppercase font-bold block">Barrio</span>
-            <span className="text-sm font-bold text-emerald-800">{barrio || 'Toca el mapa para detectar el barrio'}</span>
+          <div>
+            <label className="block text-sm font-semibold text-neutral-700 mb-2">Barrio</label>
+            <input
+              type="text"
+              value={barrio}
+              onChange={(e) => setBarrio(e.target.value)}
+              placeholder="Tocá el mapa para detectarlo, o escribilo directamente"
+              className="input-field"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-neutral-700 mb-2">Fecha y Hora</label>
+            <input
+              type="datetime-local"
+              value={dateTime}
+              onChange={(e) => setDateTime(e.target.value)}
+              className="input-field"
+            />
           </div>
 
           <div>
@@ -198,6 +220,17 @@ export const EditActivity: React.FC = () => {
           <div>
             <label className="block text-sm font-semibold text-neutral-700 mb-2">Acta (opcional)</label>
             <ActaUpload onUploadSuccess={setActaPdfUrl} existingUrl={actaPdfUrl} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-neutral-700 mb-2">Descripción General</label>
+            <textarea
+              rows={3}
+              value={results}
+              onChange={(e) => setResults(e.target.value)}
+              placeholder="Descripción general del punto..."
+              className="input-field resize-none"
+            />
           </div>
         </div>
 
