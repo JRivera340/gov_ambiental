@@ -6,6 +6,7 @@ import { CreateActivity } from './pages/CreateActivity';
 import { EditActivity } from './pages/EditActivity';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import { ValidadorPanelDashboard } from './pages/validador/ValidadorPanelDashboard';
+import { ValidadorActivityDetailPage } from './pages/validador/ValidadorActivityDetailPage';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -67,6 +68,10 @@ function App() {
       <Route
         path="/validador/residuos"
         element={<RutaProtegida><ValidadorMapaDashboard /></RutaProtegida>}
+      />
+      <Route
+        path="/validador/actividad/:id"
+        element={<RutaProtegida><ValidadorActivityDetailPage /></RutaProtegida>}
       />
 
       <Route path="/public/actividad/:id" element={<PublicPuntoPage />} />

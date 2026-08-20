@@ -167,7 +167,12 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               <p className="text-[10px] text-emerald-800 font-bold leading-tight">Monitoreo <span className="underline">Activo</span></p>
             </div>
             <p className="text-[10px] text-neutral-500 leading-snug">
-              Se estan monitoreando <span className="font-bold text-neutral-800">{ambientalInsightsData.totalIdentified} puntos</span> con umbral de proximidad de <span className="font-bold text-primary">30 metros</span>.
+              {/* Antes decía "puntos" pero totalIdentified cuenta residuos
+                  identificados (uno o más por punto) — corregido para que
+                  el número mostrado corresponda a la etiqueta. También se
+                  quitó "umbral de proximidad de 30 metros": no hay ninguna
+                  lógica de clustering geoespacial real detrás de ese dato. */}
+              Se estan monitoreando <span className="font-bold text-neutral-800">{ambientalInsightsData.totalIdentified} residuos identificados</span> en {ambientalInsightsData.totalAct} puntos.
             </p>
             <div className="bg-neutral-50 p-2 rounded-lg border border-neutral-100 italic text-center">
               <p className="text-[9px] text-neutral-400 font-medium">Sistema funcionando correctamente</p>
@@ -273,7 +278,11 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                     icon={getCategoryIcon(a, tipoResiduoFilter, false, true, displayIdx)}
                     activity={a}
                     index={displayIdx}
-                    onActivityClick={activity => window.open(`/public/actividad/${activity.id}`, '_blank')}
+                    // El admin necesita ver info real y poder aprobar/rechazar
+                    // si el punto está pendiente — la consulta pública
+                    // (/public/actividad) es de solo lectura para ciudadanos,
+                    // sin esos botones ni estilos del panel interno.
+                    onActivityClick={activity => window.open(`/validador/actividad/${activity.id}`, '_blank')}
                   />
                 );
               })}

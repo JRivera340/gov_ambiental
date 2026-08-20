@@ -115,7 +115,9 @@ export const ValidadorPanelDashboard: React.FC = () => {
                 {(user?.name || 'V')[0].toUpperCase()}
               </div>
               <div>
-                <p className="text-white text-xs font-bold leading-tight">{user?.name} {user?.lastname}</p>
+                {user?.name && (
+                  <p className="text-white text-xs font-bold leading-tight">{user.name} {user.lastname}</p>
+                )}
                 <p className="text-white/60 text-[10px] leading-tight">{user?.email}</p>
               </div>
             </div>
@@ -267,7 +269,7 @@ export const ValidadorPanelDashboard: React.FC = () => {
               {pageItems.map((a) => (
                 <button
                   key={a.id}
-                  onClick={() => setSelected(a)}
+                  onClick={() => navigate(`/validador/actividad/${a.id}`)}
                   className="flex items-center justify-between gap-3 py-3.5 text-left hover:bg-red-50/40 rounded-xl px-3 -mx-3 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
