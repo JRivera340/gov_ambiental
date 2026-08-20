@@ -12,7 +12,6 @@ import { BarriosLayer } from '../components/BarriosLayer';
 import { Toast } from '../components/Toast';
 import { Loading } from '../components/Loading';
 import { PhotosUpload } from '../components/PhotosUpload';
-import { ActaUpload } from '../components/ActaUpload';
 import { SurveyFieldInput } from '../components/create-activity/SurveyFieldInput';
 import { surveyService, type SurveySchema } from '../services/survey.service';
 import { CATEGORIA_ENCUESTAS_NAME } from '../config/areasCatalog';
@@ -254,26 +253,6 @@ export const EditActivity: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-neutral-700 mb-2">Fotos del punto</label>
-            <PhotosUpload onUploadSuccess={setPhotos} existingUrls={photos} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-neutral-700 mb-2">Acta (opcional)</label>
-            <ActaUpload onUploadSuccess={setActaPdfUrl} existingUrl={actaPdfUrl} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-neutral-700 mb-2">Descripción General</label>
-            <textarea
-              rows={3}
-              value={results}
-              onChange={(e) => setResults(e.target.value)}
-              placeholder="Descripción general del punto..."
-              className="input-field resize-none"
-            />
-          </div>
         </div>
 
         {/* Preguntas de la encuesta del formulario original (frecuencia de
@@ -315,39 +294,6 @@ export const EditActivity: React.FC = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-neutral-700 mb-2">Entidades acompañantes</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {(catalogs?.entidades || []).map((e) => (
-                <label key={e} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer ${entidadesAcompanantes.includes(e) ? 'border-primary bg-primary/5' : 'border-neutral-200'}`}>
-                  <input
-                    type="checkbox"
-                    checked={entidadesAcompanantes.includes(e)}
-                    onChange={() => setEntidadesAcompanantes((prev) => prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e])}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm">{e}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-neutral-700 mb-2">Gestores acompañantes</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {gestores.map((g) => (
-                <label key={g.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer ${gestoresInvolucradosIds.includes(g.id) ? 'border-primary bg-primary/5' : 'border-neutral-200'}`}>
-                  <input
-                    type="checkbox"
-                    checked={gestoresInvolucradosIds.includes(g.id)}
-                    onChange={() => setGestoresInvolucradosIds((prev) => prev.includes(g.id) ? prev.filter((x) => x !== g.id) : [...prev, g.id])}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm">{g.name} {g.lastname}</span>
-                </label>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="bg-white rounded-3xl p-8 shadow-xl shadow-neutral-200/50 border border-neutral-100">
