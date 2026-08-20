@@ -21,6 +21,16 @@ export const envSchema = z.object({
   DB_USERNAME: z.string(),
   DB_PASSWORD: z.string(),
   DB_DATABASE: z.string(),
+
+  // Cloudflare R2 (fotos/actas de puntos) — mismo bucket que el hub
+  // (gov-espacio-publico-files), compartido a propósito: las fotos migradas
+  // desde el hub ya apuntan a keys de este bucket, y así no hay que
+  // reescribir URLs viejas al reconciliar datos legacy.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET_NAME: z.string().optional(),
+  R2_PUBLIC_URL: z.string().optional(),
 });
 
 export type EnvVars = z.infer<typeof envSchema>;
