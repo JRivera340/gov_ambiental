@@ -8,14 +8,25 @@ import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { HUB_URL } from './config/hub';
 
 // No hay página de login en este repo — la sesión llega desde bogotaneidapp
-// (fase 5: cookie compartida entre subdominios). Mientras tanto, para probar
-// en local, generá un token con `npm run token:test` en el backend y
-// guardalo manualmente: sessionStorage.setItem('gov_auth_token', '<token>').
+// vía /handoff. Sin sesión (logout, token vencido, entrada directa sin
+// pasar por el hub) mandamos de vuelta al login real del hub — en local
+// (sin VITE_AMBIENTAL_API_URL, o sea corriendo contra el proxy de Vite) no
+// hay hub al que volver, así que ahí sí mostramos las instrucciones de dev.
+const esEntornoDesplegado = Boolean(import.meta.env.VITE_AMBIENTAL_API_URL);
+
 function RutaProtegida({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  React.useEffect(() => {
+    if (!isAuthenticated && esEntornoDesplegado) {
+      window.location.replace(`${HUB_URL}/login`);
+    }
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) {
+    if (esEntornoDesplegado) return null; // redirigiendo al login del hub
     return (
       <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Inter, system-ui, sans-serif' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>No hay sesión activa</h1>

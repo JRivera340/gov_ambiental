@@ -19,6 +19,7 @@ import { GestorAmbientalProvider } from './context/GestorAmbientalContext';
 import { AppShell } from '../../components/shell/AppShell';
 import { BottomSheet, type BottomSheetState } from '../../components/shell/BottomSheet';
 import { AMBIENTAL_NAV_ITEMS, AMBIENTAL_SECONDARY_ACTIONS, getActiveNavKey, type NavKey } from './lib/navConfig';
+import { HUB_URL } from '../../config/hub';
 
 // ════════════════════════════════════════════════════════════════
 // GestorAmbientalDashboard — orquestador liviano.
@@ -103,7 +104,7 @@ export const GestorAmbientalDashboard: React.FC = () => {
 
   const secondaryActionHandlers: Record<typeof AMBIENTAL_SECONDARY_ACTIONS[number]['key'], () => void> = {
     'perfil': () => setActiveNavKey('perfil'),
-    'volver-panel': () => navigate('/'),
+    'volver-panel': () => { window.location.href = HUB_URL; },
     'logout': handleLogout,
   };
   const secondaryActions = AMBIENTAL_SECONDARY_ACTIONS.map((a) => ({
