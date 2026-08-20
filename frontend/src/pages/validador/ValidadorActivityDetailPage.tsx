@@ -205,7 +205,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+      <main className={`max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5 ${(activity.status === 'ENVIADA' || isAdmin) ? 'pb-32' : ''}`}>
         {/* Información Básica + Datos Operativo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5 flex flex-col gap-4">
@@ -358,9 +358,16 @@ export const ValidadorActivityDetailPage: React.FC = () => {
           </div>
         )}
 
-        {/* Acciones de Validación */}
-        {activity.status === 'ENVIADA' && (
-          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5">
+      </main>
+
+      {/* Barra de acciones flotante — Aprobar/Rechazar (validador) y
+          Editar/Enviar/Eliminar (admin) se quedan visibles siempre, sin
+          tener que scrollear hasta el final de una página larga. */}
+      {(activity.status === 'ENVIADA' || isAdmin) && (
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-neutral-200 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-3">
+            {activity.status === 'ENVIADA' && (
+            <>
             {showFlow ? (
               <div className="flex flex-col gap-3">
                 <h3 className={`text-xs font-black uppercase tracking-widest ${showFlow === 'APPROVE' ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -405,41 +412,43 @@ export const ValidadorActivityDetailPage: React.FC = () => {
                 </button>
               </div>
             )}
-          </div>
-        )}
+            </>
+            )}
 
-        {/* Acciones de administración — editar/enviar solo en BORRADOR o
-            RECHAZADA (mismo límite que el backend aplica al gestor
-            creador); eliminar no tiene restricción de estado. */}
-        {isAdmin && (
-          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5 flex flex-wrap gap-3">
-            {(activity.status === 'BORRADOR' || activity.status === 'RECHAZADA') && (
-              <>
-                <button
-                  onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
-                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
-                >
-                  Editar
-                </button>
+            {/* Acciones de administración — editar/enviar solo en BORRADOR
+                o RECHAZADA (mismo límite que el backend aplica al gestor
+                creador); eliminar no tiene restricción de estado. */}
+            {isAdmin && (
+              <div className="flex flex-wrap gap-3">
+                {(activity.status === 'BORRADOR' || activity.status === 'RECHAZADA') && (
+                  <>
+                    <button
+                      onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
+                      className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      disabled={processing}
+                      onClick={handleSend}
+                      className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Enviar a Validación
+                    </button>
+                  </>
+                )}
                 <button
                   disabled={processing}
-                  onClick={handleSend}
-                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  onClick={handleDelete}
+                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-neutral-900 hover:bg-red-700 disabled:opacity-50"
                 >
-                  Enviar a Validación
+                  Eliminar
                 </button>
-              </>
+              </div>
             )}
-            <button
-              disabled={processing}
-              onClick={handleDelete}
-              className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-neutral-900 hover:bg-red-700 disabled:opacity-50"
-            >
-              Eliminar
-            </button>
           </div>
-        )}
-      </main>
+        </div>
+      )}
 
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-3 rounded-xl shadow-xl border z-50 text-xs font-bold ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
