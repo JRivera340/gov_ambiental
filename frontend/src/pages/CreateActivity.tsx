@@ -568,7 +568,7 @@ export const CreateActivity: React.FC = () => {
       await activityService.send(created.id);
 
       setToast({ message: 'Punto registrado y enviado a validación con éxito', type: 'success' });
-      setTimeout(() => navigate('/dashboard'), 1500);
+      setTimeout(() => navigate('/gestor-ambiental/dashboard'), 1500);
     } catch (error: any) {
       setToast({ message: error.response?.data?.message || 'Error al guardar', type: 'error' });
     } finally {
@@ -583,7 +583,7 @@ export const CreateActivity: React.FC = () => {
       <header className="bg-white shadow-sm border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <button onClick={() => navigate('/dashboard')} className="text-neutral-600 mr-4">←</button>
+            <button onClick={() => navigate('/gestor-ambiental/dashboard')} className="text-neutral-600 mr-4">←</button>
             <h1 className="text-xl font-bold text-institutional-black">Registrar Punto</h1>
           </div>
           <span className="badge badge-primary">Ambiental</span>
