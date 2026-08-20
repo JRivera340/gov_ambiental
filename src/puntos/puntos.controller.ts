@@ -67,15 +67,23 @@ export class PuntosController {
   }
 
   @Patch(':id')
-  @Roles(Role.GESTOR_AMBIENTAL)
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdatePuntoDto) {
-    return this.puntosService.update(id, req.user.userId, dto);
+    return this.puntosService.update(id, req.user.userId, dto, req.user.role === Role.ADMIN);
   }
 
   @Post(':id/send')
-  @Roles(Role.GESTOR_AMBIENTAL)
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   send(@Req() req: any, @Param('id') id: string) {
-    return this.puntosService.send(id, req.user.userId);
+    return this.puntosService.send(id, req.user.userId, req.user.role === Role.ADMIN);
+  }
+
+  // Solo ADMIN — borrado real de un punto (y su asignación). No existía
+  // ningún endpoint de borrado individual en este backend.
+  @Delete(':id')
+  @Roles(Role.ADMIN)
+  remove(@Param('id') id: string) {
+    return this.puntosService.remove(id);
   }
 
   @Post(':id/approve')

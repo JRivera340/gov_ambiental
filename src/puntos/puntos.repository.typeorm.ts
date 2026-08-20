@@ -52,4 +52,12 @@ export class TypeOrmPuntosRepository implements PuntosRepository {
     if (ids.length === 0) return;
     await this.repo.delete(ids);
   }
+
+  async getMaxPointNumber(): Promise<number> {
+    const row = await this.repo
+      .createQueryBuilder('p')
+      .select('MAX(p.pointNumber)', 'max')
+      .getRawOne<{ max: number | null }>();
+    return row?.max ?? 0;
+  }
 }

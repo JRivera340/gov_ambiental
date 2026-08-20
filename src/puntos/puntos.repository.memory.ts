@@ -52,4 +52,12 @@ export class InMemoryPuntosRepository implements PuntosRepository {
   async deleteMany(ids: string[]): Promise<void> {
     for (const id of ids) this.puntos.delete(id);
   }
+
+  async getMaxPointNumber(): Promise<number> {
+    let max = 0;
+    for (const p of this.puntos.values()) {
+      if (typeof p.pointNumber === 'number' && p.pointNumber > max) max = p.pointNumber;
+    }
+    return max;
+  }
 }

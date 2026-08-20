@@ -42,4 +42,10 @@ export class AsignacionesService {
     if (existente) return;
     await this.repo.save(this.repo.create({ puntoResiduoId, gestorId: creatorId, updatedByUserId: null }));
   }
+
+  // Usado al eliminar un punto (PuntosService.remove) — sin esto quedaba una
+  // fila huérfana en punto_asignacion apuntando a un id que ya no existe.
+  async eliminarDePunto(puntoResiduoId: string): Promise<void> {
+    await this.repo.delete({ puntoResiduoId });
+  }
 }

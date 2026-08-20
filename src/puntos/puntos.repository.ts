@@ -9,4 +9,5 @@ export interface PuntosRepository {
   findAll(filters?: { desde?: string; hasta?: string }): Promise<PuntoResiduo[]>;
   save(punto: PuntoResiduo): Promise<PuntoResiduo>;
   deleteMany(ids: string[]): Promise<void>;
+  getMaxPointNumber(): Promise<number>;
 }

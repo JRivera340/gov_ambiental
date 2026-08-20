@@ -95,4 +95,9 @@ export const activityService = {
     const { data } = await api.delete<Activity>(`/puntos/${puntoId}/residuo-nota`, { data: { residuoId, notaId } });
     return normalizeActivity(data);
   },
+
+  // ADMIN: eliminar un punto por completo (y su asignación).
+  async remove(id: string): Promise<void> {
+    await api.delete(`/puntos/${id}`);
+  },
 };

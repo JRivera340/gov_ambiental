@@ -72,6 +72,10 @@ export class PuntosService {
       recogido: false,
       createdByUserId: userId,
     }));
+    // Numeración secuencial — nunca se implementó en este backend (los
+    // únicos puntos con pointNumber eran los migrados del hub, que ya lo
+    // traían). Cualquier punto creado acá quedaba con "#—" para siempre.
+    const maxActual = await this.repo.getMaxPointNumber();
     const punto = await this.repo.create({
       createdByUserId: userId,
       status: EstadoPunto.BORRADOR,
@@ -87,6 +91,7 @@ export class PuntosService {
       isGroupOperativo: dto.isGroupOperativo || (dto.gestoresInvolucradosIds?.length ?? 0) > 0,
       gestoresInvolucradosIds: dto.gestoresInvolucradosIds || [],
       processId: dto.processId,
+      pointNumber: maxActual + 1,
       residuos,
     } as Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>);
     await this.asignacionesService.asignarACreador(punto.id, userId);
@@ -97,13 +102,14 @@ export class PuntosService {
     return this.repo.findByCreator(userId);
   }
 
-  // Solo el creador puede editar, y solo mientras el punto no esté publicado
-  // (BORRADOR o RECHAZADA — para corregir y reenviar). Una vez ENVIADA o
-  // PUBLICADA, los cambios pasan por seguimiento/aprobar-residuo, no por acá.
-  async update(id: string, userId: string, dto: UpdatePuntoDto): Promise<PuntoResiduo> {
+  // Solo el creador puede editar (o un ADMIN, que puede corregir cualquier
+  // punto), y solo mientras no esté publicado (BORRADOR o RECHAZADA — para
+  // corregir y reenviar). Una vez ENVIADA o PUBLICADA, los cambios pasan por
+  // seguimiento/aprobar-residuo, no por acá.
+  async update(id: string, userId: string, dto: UpdatePuntoDto, isAdmin = false): Promise<PuntoResiduo> {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
-    if (punto.createdByUserId !== userId) throw new ForbiddenException('Solo el creador puede editar el punto');
+    if (punto.createdByUserId !== userId && !isAdmin) throw new ForbiddenException('Solo el creador puede editar el punto');
     if (punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
       throw new BadRequestException('Solo se puede editar un punto en borrador o rechazado');
     }
@@ -132,12 +138,22 @@ export class PuntosService {
     return this.repo.save(punto);
   }
 
-  async send(id: string, userId: string) {
+  async send(id: string, userId: string, isAdmin = false) {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
-    if (punto.createdByUserId !== userId) throw new ForbiddenException('Solo el creador puede enviar el punto');
+    if (punto.createdByUserId !== userId && !isAdmin) throw new ForbiddenException('Solo el creador puede enviar el punto');
     punto.status = EstadoPunto.ENVIADA;
     return this.repo.save(punto);
+  }
+
+  // Solo ADMIN — borrado real, sin restricción de estado. Elimina también la
+  // asignación asociada para no dejar una fila huérfana apuntando a un punto
+  // que ya no existe.
+  async remove(id: string): Promise<void> {
+    const punto = await this.repo.findById(id);
+    if (!punto) throw new NotFoundException('Punto no encontrado');
+    await this.asignacionesService.eliminarDePunto(id);
+    await this.repo.deleteMany([id]);
   }
 
   async approve(id: string, validatorUserId: string) {

@@ -1,15 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import { Icon } from 'leaflet';
 import { activityService } from '../../services/activity.service';
 import { usersService } from '../../services/users.service';
 import { useFileUrl } from '../../hooks/useFileUrl';
+import { useAuthStore } from '../../store/authStore';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Loading } from '../../components/Loading';
 import type { Activity, ResiduoEntry, User } from '../../types';
 import { RESIDUO_TIPOS } from '../../types/residuoTipos';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Leaflet resuelve sus iconos por defecto vía rutas relativas del CSS que
+// Vite no empaqueta — sin esto el marcador queda invisible (mismo fix que
+// ya usan CreateActivity.tsx y EditActivity.tsx).
+const defaultIcon = new Icon({
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
 // Página completa de detalle de actividad para el validador — replica el
 // look del "Detalle de Actividad" del módulo acoplado (ver
@@ -44,6 +59,8 @@ const Campo: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 export const ValidadorActivityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
   const [activity, setActivity] = useState<Activity | null>(null);
   const [creator, setCreator] = useState<User | null>(null);
   const [validador, setValidador] = useState<User | null>(null);
@@ -125,6 +142,34 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     }
   };
 
+  const handleSend = async () => {
+    if (!activity) return;
+    setProcessing(true);
+    try {
+      const updated = await activityService.send(activity.id);
+      setActivity(updated);
+      showToast('Punto enviado a validación', 'success');
+    } catch (e: any) {
+      showToast(`Error: ${e?.response?.data?.message || e?.message || 'No se pudo enviar'}`, 'error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!activity) return;
+    if (!window.confirm(`¿Eliminar el punto #${activity.pointNumber ?? '—'} de forma permanente? Esta acción no se puede deshacer.`)) return;
+    setProcessing(true);
+    try {
+      await activityService.remove(activity.id);
+      showToast('Punto eliminado', 'success');
+      setTimeout(() => navigate('/validador/dashboard'), 1000);
+    } catch (e: any) {
+      showToast(`Error: ${e?.response?.data?.message || e?.message || 'No se pudo eliminar'}`, 'error');
+      setProcessing(false);
+    }
+  };
+
   if (loading) return <Loading />;
   if (!activity) {
     return (
@@ -134,7 +179,8 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     );
   }
 
-  const soloLectura = activity.status !== 'ENVIADA';
+  const editable = isAdmin && (activity.status === 'BORRADOR' || activity.status === 'RECHAZADA');
+  const soloLectura = !editable && activity.status !== 'ENVIADA';
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-16">
@@ -228,7 +274,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-[11px] mb-3">
                     <div><p className="text-neutral-400 font-bold uppercase">Fecha de Recolección</p><p className="font-bold text-neutral-700">{r.fechaRecogida ? format(new Date(r.fechaRecogida), "d 'de' MMMM, yyyy", { locale: es }) : '—'}</p></div>
-                    <div><p className="text-neutral-400 font-bold uppercase">Recogido por</p><p className="font-bold text-neutral-700">{r.recogidoByNombre || '—'}</p></div>
+                    <div className="min-w-0"><p className="text-neutral-400 font-bold uppercase">Recogido por</p><p className="font-bold text-neutral-700 break-words">{r.recogidoByNombre || '—'}</p></div>
                   </div>
                   {r.createdByNombre && <p className="text-[10px] text-neutral-500 mb-3">Registrado por: <span className="font-bold text-neutral-700">{r.createdByNombre}</span></p>}
                   <div className="grid grid-cols-2 gap-3">
@@ -293,7 +339,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
           <div className="h-64 rounded-xl overflow-hidden border border-neutral-100">
             <MapContainer center={[activity.lat, activity.lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
-              <Marker position={[activity.lat, activity.lng]} />
+              <Marker position={[activity.lat, activity.lng]} icon={defaultIcon} />
             </MapContainer>
           </div>
         </div>
@@ -359,6 +405,38 @@ export const ValidadorActivityDetailPage: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Acciones de administración — editar/enviar solo en BORRADOR o
+            RECHAZADA (mismo límite que el backend aplica al gestor
+            creador); eliminar no tiene restricción de estado. */}
+        {isAdmin && (
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5 flex flex-wrap gap-3">
+            {(activity.status === 'BORRADOR' || activity.status === 'RECHAZADA') && (
+              <>
+                <button
+                  onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
+                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                >
+                  Editar
+                </button>
+                <button
+                  disabled={processing}
+                  onClick={handleSend}
+                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Enviar a Validación
+                </button>
+              </>
+            )}
+            <button
+              disabled={processing}
+              onClick={handleDelete}
+              className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-neutral-900 hover:bg-red-700 disabled:opacity-50"
+            >
+              Eliminar
+            </button>
           </div>
         )}
       </main>
