@@ -179,8 +179,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     );
   }
 
-  const editable = isAdmin && (activity.status === 'BORRADOR' || activity.status === 'RECHAZADA');
-  const soloLectura = !editable && activity.status !== 'ENVIADA';
+  const soloLectura = !isAdmin && activity.status !== 'ENVIADA';
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-16">
@@ -415,27 +414,27 @@ export const ValidadorActivityDetailPage: React.FC = () => {
             </>
             )}
 
-            {/* Acciones de administración — editar/enviar solo en BORRADOR
-                o RECHAZADA (mismo límite que el backend aplica al gestor
-                creador); eliminar no tiene restricción de estado. */}
+            {/* Acciones de administración — Editar sirve en cualquier
+                estado (el admin puede corregir hasta un punto ya
+                publicado); Enviar a Validación solo tiene sentido en
+                BORRADOR/RECHAZADA (mismo límite que el gestor creador);
+                Eliminar no tiene restricción de estado. */}
             {isAdmin && (
               <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
+                  className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                >
+                  Editar
+                </button>
                 {(activity.status === 'BORRADOR' || activity.status === 'RECHAZADA') && (
-                  <>
-                    <button
-                      onClick={() => navigate(`/gestor-ambiental/editar-actividad/${activity.id}`)}
-                      className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      disabled={processing}
-                      onClick={handleSend}
-                      className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      Enviar a Validación
-                    </button>
-                  </>
+                  <button
+                    disabled={processing}
+                    onClick={handleSend}
+                    className="flex-1 min-w-[140px] py-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Enviar a Validación
+                  </button>
                 )}
                 <button
                   disabled={processing}

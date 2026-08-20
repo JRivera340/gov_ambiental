@@ -6,6 +6,7 @@ import { Icon } from 'leaflet';
 import { activityService } from '../services/activity.service';
 import { catalogService } from '../services/catalog.service';
 import { usersService } from '../services/users.service';
+import { useAuthStore } from '../store/authStore';
 import { BoundaryLayer } from '../components/BoundaryLayer';
 import { BarriosLayer } from '../components/BarriosLayer';
 import { Toast } from '../components/Toast';
@@ -42,6 +43,7 @@ function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => v
 export const EditActivity: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const isAdmin = useAuthStore((s) => s.user?.role) === 'ADMIN';
 
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,7 @@ export const EditActivity: React.FC = () => {
     if (!id) return;
     try {
       const data = await activityService.getById(id);
-      if (data.status !== 'BORRADOR' && data.status !== 'RECHAZADA') {
+      if (!isAdmin && data.status !== 'BORRADOR' && data.status !== 'RECHAZADA') {
         setToast({ message: 'Solo se puede editar un punto en borrador o rechazado', type: 'error' });
         setTimeout(() => navigate(-1), 2000);
         return;

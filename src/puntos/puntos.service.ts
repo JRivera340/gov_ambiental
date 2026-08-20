@@ -110,7 +110,10 @@ export class PuntosService {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
     if (punto.createdByUserId !== userId && !isAdmin) throw new ForbiddenException('Solo el creador puede editar el punto');
-    if (punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
+    // El límite de estado (solo BORRADOR/RECHAZADA) es para el gestor
+    // creador, que edita antes de reenviar. Un ADMIN puede corregir un
+    // punto en cualquier estado, incluido ya publicado.
+    if (!isAdmin && punto.status !== EstadoPunto.BORRADOR && punto.status !== EstadoPunto.RECHAZADA) {
       throw new BadRequestException('Solo se puede editar un punto en borrador o rechazado');
     }
 
