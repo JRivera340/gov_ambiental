@@ -44,4 +44,8 @@ export class CreatePuntoDto {
   @IsOptional()
   @IsArray()
   gestoresInvolucradosIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  processId?: string;
 }

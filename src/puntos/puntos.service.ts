@@ -86,6 +86,7 @@ export class PuntosService {
       entidadesAcompanantes: dto.entidadesAcompanantes || [],
       isGroupOperativo: dto.isGroupOperativo || (dto.gestoresInvolucradosIds?.length ?? 0) > 0,
       gestoresInvolucradosIds: dto.gestoresInvolucradosIds || [],
+      processId: dto.processId,
       residuos,
     } as Omit<PuntoResiduo, 'id' | 'createdAt' | 'updatedAt'>);
     await this.asignacionesService.asignarACreador(punto.id, userId);
