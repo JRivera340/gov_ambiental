@@ -156,6 +156,20 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     }
   };
 
+  // El admin entra a esta página desde el mapa del panel admin vía
+  // window.open (pestaña nueva) — mandarlo siempre a /validador/dashboard
+  // después de eliminar lo dejaba en una página que no tiene nada que ver
+  // con desde dónde vino. Si la pestaña la abrió el propio script, cerrarla
+  // es lo correcto; si no (entrada directa por URL), cae al panel admin.
+  const volverSegunOrigen = () => {
+    if (isAdmin) {
+      window.close();
+      setTimeout(() => navigate('/admin'), 200);
+    } else {
+      navigate('/validador/dashboard');
+    }
+  };
+
   const handleDelete = async () => {
     if (!activity) return;
     if (!window.confirm(`¿Eliminar el punto #${activity.pointNumber ?? '—'} de forma permanente? Esta acción no se puede deshacer.`)) return;
@@ -163,7 +177,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     try {
       await activityService.remove(activity.id);
       showToast('Punto eliminado', 'success');
-      setTimeout(() => navigate('/validador/dashboard'), 1000);
+      setTimeout(volverSegunOrigen, 1000);
     } catch (e: any) {
       showToast(`Error: ${e?.response?.data?.message || e?.message || 'No se pudo eliminar'}`, 'error');
       setProcessing(false);
@@ -187,7 +201,7 @@ export const ValidadorActivityDetailPage: React.FC = () => {
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/validador/dashboard')} className="text-neutral-400 hover:text-neutral-600 transition-colors">
+            <button onClick={volverSegunOrigen} className="text-neutral-400 hover:text-neutral-600 transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>

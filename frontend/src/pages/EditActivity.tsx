@@ -15,6 +15,7 @@ import { PhotosUpload } from '../components/PhotosUpload';
 import { ActaUpload } from '../components/ActaUpload';
 import type { Activity, Catalogs, ResiduoEntry, User } from '../types';
 import { RESIDUO_TIPOS } from '../types/residuoTipos';
+import { ACTORES_INDISCIPLINA } from '../types/ambientalCampos';
 import { loadSantaFeBoundaries, isPointInBoundaries, isPointInCandelaria, findBarrioByPoint } from '../utils/boundaryValidation';
 import type { GeoJSON } from 'geojson';
 
@@ -119,7 +120,7 @@ export const EditActivity: React.FC = () => {
     if (barrioName) setBarrio(barrioName);
   };
 
-  const save = async (thenSend: boolean) => {
+  const save = async (mode: 'none' | 'send' | 'approve') => {
     if (!activity) return;
     if (residuos.length === 0) {
       setToast({ message: 'Debe haber al menos un residuo', type: 'error' });
@@ -131,9 +132,12 @@ export const EditActivity: React.FC = () => {
         lat, lng, barrio, photos, actaPdfUrl, residuos,
         entidadResponsable, entidadesAcompanantes, gestoresInvolucradosIds,
       } as any);
-      if (thenSend) {
+      if (mode === 'send') {
         await activityService.send(activity.id);
         setToast({ message: 'Punto corregido y reenviado a validación', type: 'success' });
+      } else if (mode === 'approve') {
+        await activityService.approve(activity.id);
+        setToast({ message: 'Punto corregido y aprobado', type: 'success' });
       } else {
         setToast({ message: 'Cambios guardados', type: 'success' });
       }
@@ -295,6 +299,73 @@ export const EditActivity: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Quién dispuso los residuos? *</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { value: 'COMUNIDAD', label: 'Comunidad' },
+                    { value: 'ESTABLECIMIENTOS_COMERCIALES', label: 'Establecimientos comerciales' },
+                    { value: 'VOLQUETAS', label: 'Volquetas' },
+                    { value: 'HABITANTES_DE_CALLE', label: 'Habitantes de calle' },
+                    { value: 'OTROS_NO_SE_CONOCE', label: 'Otros, no se conoce' },
+                  ].map(opt => (
+                    <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${nuevoResiduoValues.quienDispuso === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200'}`}>
+                      <input type="radio" checked={nuevoResiduoValues.quienDispuso === opt.value} onChange={() => setNuevoResiduoValues((p: any) => ({ ...p, quienDispuso: opt.value }))} className="accent-primary" />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Actores que generan indisciplina</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {ACTORES_INDISCIPLINA.map(opt => {
+                    const seleccionados: string[] = Array.isArray(nuevoResiduoValues.actoresIndisciplina) ? nuevoResiduoValues.actoresIndisciplina : [];
+                    const checked = seleccionados.includes(opt.value);
+                    return (
+                      <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${checked ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200'}`}>
+                        <input type="checkbox" checked={checked} onChange={() => setNuevoResiduoValues((p: any) => {
+                          const prevSel: string[] = Array.isArray(p.actoresIndisciplina) ? p.actoresIndisciplina : [];
+                          const next = checked ? prevSel.filter((v: string) => v !== opt.value) : [...prevSel, opt.value];
+                          return { ...p, actoresIndisciplina: next };
+                        })} className="accent-primary" />
+                        <span className="text-sm">{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Fecha y Hora de Detección *</label>
+                <input type="datetime-local" value={nuevoResiduoValues.dateTime ? nuevoResiduoValues.dateTime.slice(0, 16) : ''} onChange={e => setNuevoResiduoValues((p: any) => ({ ...p, dateTime: new Date(e.target.value).toISOString() }))} className="input-field" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Se perciben olores? *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map(opt => (
+                    <label key={String(opt.value)} className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer ${nuevoResiduoValues.percibeOlores === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200'}`}>
+                      <input type="radio" checked={nuevoResiduoValues.percibeOlores === opt.value} onChange={() => setNuevoResiduoValues((p: any) => ({ ...p, percibeOlores: opt.value }))} className="accent-primary" />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">¿Se perciben vectores? (Roedores, Palomas, Insectos, Perros, Gatos) *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map(opt => (
+                    <label key={String(opt.value)} className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer ${nuevoResiduoValues.percibeVectores === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-neutral-200'}`}>
+                      <input type="radio" checked={nuevoResiduoValues.percibeVectores === opt.value} onChange={() => setNuevoResiduoValues((p: any) => ({ ...p, percibeVectores: opt.value }))} className="accent-primary" />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold text-neutral-700 mb-2">Área lineal estimada (metros) *</label>
                 <input type="number" min="0" step="0.01" value={nuevoResiduoValues.areaLinealMetros ?? ''} onChange={e => setNuevoResiduoValues((p: any) => ({ ...p, areaLinealMetros: e.target.value ? parseFloat(e.target.value) : undefined }))} className="input-field" />
               </div>
@@ -312,6 +383,9 @@ export const EditActivity: React.FC = () => {
               <div className="flex justify-end">
                 <button type="button" onClick={() => {
                   if (!nuevoResiduoValues.tipoResiduo) { setToast({ message: 'Seleccione el tipo de residuo', type: 'error' }); return; }
+                  if (!nuevoResiduoValues.quienDispuso) { setToast({ message: 'Seleccione quién dispuso los residuos', type: 'error' }); return; }
+                  if (nuevoResiduoValues.percibeOlores === undefined) { setToast({ message: 'Indique si se perciben olores', type: 'error' }); return; }
+                  if (nuevoResiduoValues.percibeVectores === undefined) { setToast({ message: 'Indique si se perciben vectores', type: 'error' }); return; }
                   if (nuevoResiduoValues.areaLinealMetros === undefined) { setToast({ message: 'Ingrese el área estimada', type: 'error' }); return; }
 
                   if (editingResiduoId) {
@@ -341,13 +415,18 @@ export const EditActivity: React.FC = () => {
           )}
         </div>
 
-        <div className="flex gap-4">
-          <button onClick={() => save(false)} disabled={saving} className="btn-secondary flex-1 py-4">
+        <div className="flex flex-wrap gap-4">
+          <button onClick={() => save('none')} disabled={saving} className="btn-secondary flex-1 min-w-[160px] py-4">
             {saving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
-          <button onClick={() => save(true)} disabled={saving} className="btn-primary flex-1 py-4">
+          <button onClick={() => save('send')} disabled={saving} className="btn-primary flex-1 min-w-[160px] py-4">
             {saving ? 'Guardando...' : 'Guardar y Reenviar a Validación'}
           </button>
+          {isAdmin && (
+            <button onClick={() => save('approve')} disabled={saving} className="flex-1 min-w-[160px] py-4 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              {saving ? 'Guardando...' : 'Guardar y Aprobar'}
+            </button>
+          )}
         </div>
       </main>
 
