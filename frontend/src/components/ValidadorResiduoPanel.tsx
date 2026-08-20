@@ -150,20 +150,6 @@ export const ValidadorResiduoPanel: React.FC<Props> = ({ activity, onClose, onUp
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <button 
-              onClick={async () => {
-                try {
-                  const res = await fetch(`/api/debug-sync/${activity.id}`);
-                  const data = await res.json();
-                  alert(`DB RAW DATA:\n\n${JSON.stringify(data.data?.residuos, null, 2)}`);
-                } catch (e: any) {
-                  alert(`Error diagnóstico: ${e.message}`);
-                }
-              }}
-              className="text-[9px] font-bold bg-black/20 hover:bg-black/40 px-2 py-1 rounded uppercase tracking-tighter transition-colors"
-            >
-              🔍 Diagnóstico DB
-            </button>
           </div>
         </div>
 

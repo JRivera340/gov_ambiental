@@ -59,4 +59,23 @@ describe('UsersProxyController', () => {
       new HttpException('No se pudo contactar al hub de usuarios', 502),
     );
   });
+
+  it('getUserById reenvia al hub con el id en la ruta', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 'u1', name: 'Ana' }),
+    });
+    global.fetch = mockFetch as any;
+
+    const controller = new UsersProxyController();
+    const req = { headers: { authorization: 'Bearer token-123' } };
+    const result = await controller.getUserById('u1', req as any);
+
+    expect(result).toEqual({ id: 'u1', name: 'Ana' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/users/u1'),
+      { headers: { Authorization: 'Bearer token-123' } },
+    );
+  });
 });

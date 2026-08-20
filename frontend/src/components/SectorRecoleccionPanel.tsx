@@ -37,7 +37,11 @@ interface Props {
   tipo?: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+// VITE_AMBIENTAL_API_URL es la misma variable que usa services/api.ts —
+// VITE_API_BASE_URL nunca se define en este build, quedaba siempre vacío y
+// las llamadas de acá le pegaban al propio frontend (nginx) en vez del
+// backend.
+const API_BASE = import.meta.env.VITE_AMBIENTAL_API_URL || '';
 
 async function fetchAuthJSON(url: string, opts?: RequestInit) {
   const token = authService.getToken();
@@ -112,7 +116,7 @@ export const SectorRecoleccionPanel: React.FC<Props> = ({
       if (sectorBarrio) params.append('sectorBarrio', sectorBarrio);
 
       const result = await fetchAuthJSON(
-        `/api/sorver/sectores/puntos?${params.toString()}`,
+        `/api/sectores/puntos?${params.toString()}`,
       );
       setData(result);
     } catch (e: any) {
@@ -130,7 +134,7 @@ export const SectorRecoleccionPanel: React.FC<Props> = ({
   const handleMarcarRecogido = async () => {
     setMarking(true);
     try {
-      const result = await fetchAuthJSON('/api/sorver/sectores/marcar-recogido-masivo', {
+      const result = await fetchAuthJSON('/api/sectores/marcar-recogido-masivo', {
         method: 'PATCH',
         body: JSON.stringify({
           sectorId: sector.id,
