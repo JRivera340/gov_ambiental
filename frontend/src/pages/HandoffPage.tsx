@@ -6,7 +6,7 @@ import type { User } from '../types';
 // Ruta de aterrizaje por rol tras el handoff.
 const RUTA_POR_ROL: Partial<Record<string, string>> = {
   GESTOR_AMBIENTAL: '/gestor-ambiental/dashboard',
-  VALIDADOR_AMBIENTAL: '/validador/residuos',
+  VALIDADOR_AMBIENTAL: '/validador/dashboard',
   ADMIN: '/admin',
 };
 

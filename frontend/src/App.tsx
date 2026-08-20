@@ -5,6 +5,7 @@ import { GestorAmbientalDashboard } from './pages/gestor-ambiental/GestorAmbient
 import { CreateActivity } from './pages/CreateActivity';
 import { EditActivity } from './pages/EditActivity';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
+import { ValidadorPanelDashboard } from './pages/validador/ValidadorPanelDashboard';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -61,7 +62,7 @@ function App() {
 
       <Route
         path="/validador/dashboard"
-        element={<Navigate to="/validador/residuos" replace />}
+        element={<RutaProtegida><ValidadorPanelDashboard /></RutaProtegida>}
       />
       <Route
         path="/validador/residuos"
