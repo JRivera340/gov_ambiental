@@ -1,6 +1,5 @@
 import 'dotenv/config';
-import { DataSource } from 'typeorm';
-import { getEnv } from '../src/config/env';
+import { crearDataSource, describirDestino } from './lib/backfill-datasource';
 import { PuntoResiduo } from '../src/puntos/entities/punto-residuo.entity';
 import { BarriosService } from '../src/catalogos/barrios.service';
 
@@ -13,18 +12,10 @@ import { BarriosService } from '../src/catalogos/barrios.service';
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  const env = getEnv();
 
-  const dataSource = new DataSource({
-    type: 'postgres',
-    host: env.DB_HOST,
-    port: env.DB_PORT,
-    username: env.DB_USERNAME,
-    password: env.DB_PASSWORD,
-    database: env.DB_DATABASE,
-    synchronize: false,
-    entities: [PuntoResiduo],
-  });
+  const dataSource = crearDataSource([PuntoResiduo]);
+  console.log(`[BARRIOS] Base de datos: ${describirDestino()}`);
+  console.log(`[BARRIOS] Modo: ${apply ? 'APLICAR (escribe)' : 'dry-run (no escribe)'}`);
 
   await dataSource.initialize();
   const repo = dataSource.getRepository(PuntoResiduo);

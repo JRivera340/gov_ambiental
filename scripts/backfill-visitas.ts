@@ -1,6 +1,5 @@
 import 'dotenv/config';
-import { DataSource } from 'typeorm';
-import { getEnv } from '../src/config/env';
+import { crearDataSource, describirDestino } from './lib/backfill-datasource';
 import { PuntoResiduo } from '../src/puntos/entities/punto-residuo.entity';
 import { VisitaPunto } from '../src/visitas/entities/visita-punto.entity';
 import { PuntoAsignacion } from '../src/asignaciones/entities/punto-asignacion.entity';
@@ -31,17 +30,9 @@ async function main() {
   const soloGestor = flag('gestor');
   const desde = flag('desde') ? new Date(`${flag('desde')}T00:00:00.000Z`) : null;
 
-  const env = getEnv();
-  const dataSource = new DataSource({
-    type: 'postgres',
-    host: env.DB_HOST,
-    port: env.DB_PORT,
-    username: env.DB_USERNAME,
-    password: env.DB_PASSWORD,
-    database: env.DB_DATABASE,
-    synchronize: false,
-    entities: [PuntoResiduo, VisitaPunto, PuntoAsignacion],
-  });
+  const dataSource = crearDataSource([PuntoResiduo, VisitaPunto, PuntoAsignacion]);
+  console.log(`[VISITAS] Base de datos: ${describirDestino()}`);
+  console.log(`[VISITAS] Modo: ${apply ? 'APLICAR (escribe)' : 'dry-run (no escribe)'}`);
 
   await dataSource.initialize();
   const puntosRepo = dataSource.getRepository(PuntoResiduo);
