@@ -10,22 +10,36 @@ import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 
 export const PerfilGestorView: React.FC = () => {
-  const { user, activities, setViewMode, openActivity } = useGestorAmbientalCtx();
+  const { user, activities, setViewMode, openActivity, plan, puntosAsignados } = useGestorAmbientalCtx();
 
   // Mono-subtipo: toda actividad de este repo ya es punto de acumulación —
   // operativoSubtipo no existe en este backend. Bug real: filtrar por él
   // dejaba las estadísticas del perfil siempre en cero.
   const acumulacion = activities;
 
-  // "Visitado por mí" = hice seguimiento real en el punto: marqué un residuo
-  // recogido o identifiqué uno nuevo (revisadoPorUserId es de la revisión
-  // Fase 2, un flujo distinto que casi nunca se usa en Ambiental).
-  const visitados = useMemo(
-    () => acumulacion.filter(a =>
-      getResiduos(a).some(r => r.recogidoByUserId === user?.id || r.createdByUserId === user?.id)
-    ),
-    [acumulacion, user]
+  // Los puntos de los que este gestor es responsable. Antes varias métricas
+  // usaban `createdByUserId` (quién registró el punto) o el total del sistema,
+  // así que un gestor que recibió puntos por reasignación veía ceros y el
+  // porcentaje se dividía sobre todos los puntos de la localidad.
+  const misPuntos = useMemo(() => {
+    const asignados = new Set(puntosAsignados);
+    return acumulacion.filter(a => asignados.has(a.id));
+  }, [acumulacion, puntosAsignados]);
+
+  // "Visitado" lo decide el backend con la regla real (recogido / residuo
+  // nuevo / nota, hechos por este gestor). Antes se derivaba en el cliente de
+  // la autoría de los residuos, que ignoraba las notas por completo.
+  const visitadosIds = useMemo(
+    () => new Set((plan?.semanas ?? []).flatMap(s => s.visitados)),
+    [plan]
   );
+
+  const visitados = useMemo(
+    () => misPuntos.filter(a => visitadosIds.has(a.id)),
+    [misPuntos, visitadosIds]
+  );
+
+  const semanaEnCurso = plan?.semanas[0] ?? null;
 
   const stats = useMemo(() => {
     let identificados = 0;
@@ -38,30 +52,35 @@ export const PerfilGestorView: React.FC = () => {
     return { identificados, recogidos };
   }, [visitados]);
 
-  const cobertura = acumulacion.length > 0
-    ? Math.round((visitados.length / acumulacion.length) * 100)
+  // Sobre los puntos asignados, no sobre todos los del sistema (con el
+  // denominador viejo el número era siempre ridículamente bajo).
+  const cobertura = misPuntos.length > 0
+    ? Math.round((visitados.length / misPuntos.length) * 100)
     : 0;
 
   const barriosSinVisitar = useMemo(() => {
-    const visitadosIds = new Set(visitados.map(a => a.id));
-    const sinVisitar = acumulacion.filter(a => !visitadosIds.has(a.id));
+    const sinVisitar = misPuntos.filter(a => !visitadosIds.has(a.id));
     const counts: Record<string, number> = {};
     sinVisitar.forEach(a => { counts[a.barrio] = (counts[a.barrio] ?? 0) + 1; });
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([barrio, count]) => ({ barrio, count }));
-  }, [acumulacion, visitados]);
+  }, [misPuntos, visitadosIds]);
 
   const maxBarrioCount = barriosSinVisitar[0]?.count ?? 1;
 
-  // Actividad reciente: último residuo tocado por mí en cada punto (recogido
-  // o identificado), no la revisión Fase 2 (flujo eliminado, ya no se usa).
+  // Actividad reciente: último toque mío en cada punto. Incluye las notas —
+  // son una de las tres acciones que cuentan como visita y antes quedaban
+  // fuera de esta lista.
   const timeline = useMemo(() => {
     const eventos = visitados.map(a => {
       const residuosMios = getResiduos(a).filter(r => r.recogidoByUserId === user?.id || r.createdByUserId === user?.id);
-      const fechas = residuosMios
-        .map(r => r.fechaRecogida || r.dateTime)
+      const fechasNotas = getResiduos(a)
+        .flatMap(r => (r.notas ?? []))
+        .filter(n => n.autorId === user?.id)
+        .map(n => n.fecha);
+      const fechas = [...residuosMios.map(r => r.fechaRecogida || r.dateTime), ...fechasNotas]
         .filter((f): f is string => !!f)
         .sort((x, y) => new Date(y).getTime() - new Date(x).getTime());
       return {
@@ -76,22 +95,24 @@ export const PerfilGestorView: React.FC = () => {
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [visitados, user]);
 
-  // Puntos visitados en los últimos 7 días — subconjunto de `visitados`
-  // (histórico completo). Se van agregando a medida que pasa la semana.
+  // Visitados de la semana en curso según el backend (semana ISO real de
+  // lunes a domingo), no una ventana de 7 días rodantes como antes.
   const visitadosSemanaIds = useMemo(
-    () => new Set(timeline.map(e => e.activity.id)),
-    [timeline]
+    () => new Set(semanaEnCurso?.visitados ?? []),
+    [semanaEnCurso]
   );
 
+  // "A tu cargo" = asignados, no creados por vos: un gestor que recibió puntos
+  // por reasignación veía esta lista vacía.
   const criticos = useMemo(() =>
-    acumulacion
-      .filter(a => isPuntoEmergencia(a) && a.createdByUserId === user?.id)
+    misPuntos
+      .filter(a => isPuntoEmergencia(a))
       .sort((a, b) => {
         const dA = Math.max(0, ...getResiduos(a).filter(r => !r.recogido).map(r => differenceInDays(new Date(), new Date(r.dateTime))));
         const dB = Math.max(0, ...getResiduos(b).filter(r => !r.recogido).map(r => differenceInDays(new Date(), new Date(r.dateTime))));
         return dB - dA;
       }),
-    [acumulacion, user]
+    [misPuntos]
   );
 
   const mapCenter: [number, number] =
@@ -129,12 +150,14 @@ export const PerfilGestorView: React.FC = () => {
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-4 border border-neutral-100">
             <p className="text-[10px] text-neutral-500 font-medium mb-1">Puntos visitados esta semana</p>
             <p className="text-xl font-black" style={{ color: '#2563eb' }}>{visitadosSemanaIds.size}</p>
-            <p className="text-[10px] text-neutral-400 mt-0.5">de {visitados.length} históricos</p>
+            <p className="text-[10px] text-neutral-400 mt-0.5">
+              de {semanaEnCurso?.planificados.length ?? 0} planificados · {semanaEnCurso?.etiqueta ?? ''}
+            </p>
           </div>
           {[
             { label: 'Residuos recogidos', value: stats.recogidos, color: '#16a34a' },
             { label: 'Residuos identificados', value: stats.identificados, color: '#f97316' },
-            { label: '% Cobertura', value: `${cobertura}%`, color: '#7c3aed' },
+            { label: '% de mis puntos visitados', value: `${cobertura}%`, color: '#7c3aed' },
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-4 border border-neutral-100">
               <p className="text-[10px] text-neutral-500 font-medium mb-1">{label}</p>

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PuntosRepository } from './puntos.repository';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
 import { EstadoPunto, PuntoResiduo, ResiduoEntry } from './entities/punto-residuo.entity';
@@ -9,6 +9,7 @@ import { SeguimientoDto } from './dto/seguimiento.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
 import { VisitasService } from '../visitas/visitas.service';
+import { BarriosService } from '../catalogos/barrios.service';
 
 export type PublicResiduo = Pick<
   ResiduoEntry,
@@ -58,11 +59,14 @@ export function toPublicPunto(punto: PuntoResiduo): PublicPunto {
 
 @Injectable()
 export class PuntosService {
+  private readonly logger = new Logger(PuntosService.name);
+
   constructor(
     @Inject(PUNTOS_REPOSITORY) private readonly repo: PuntosRepository,
     private readonly asignacionesService: AsignacionesService,
     private readonly procesosService: ProcesosService,
     private readonly visitasService: VisitasService,
+    private readonly barriosService: BarriosService,
   ) {}
 
   async create(userId: string, dto: CreatePuntoDto): Promise<PuntoResiduo> {
@@ -82,7 +86,11 @@ export class PuntosService {
       dateTime: dto.dateTime ? new Date(dto.dateTime) : new Date(),
       lat: dto.lat,
       lng: dto.lng,
-      barrio: dto.barrio,
+      // El barrio lo decide el servidor: si el cliente no manda uno del
+      // catalogo (le fallo la deteccion en el mapa, mando vacio), se deriva
+      // de la coordenada. Se registraron puntos sin barrio justamente por
+      // depender de que el navegador lograra cargar el KML.
+      barrio: this.barriosService.resolver(dto.barrio, dto.lat, dto.lng),
       photos: dto.photos || [],
       actaPdfUrl: dto.actaPdfUrl,
       results: dto.results,
@@ -118,9 +126,16 @@ export class PuntosService {
       throw new BadRequestException('Solo se puede editar un punto en borrador o rechazado');
     }
 
+    const moviendoUbicacion = dto.lat !== undefined || dto.lng !== undefined;
     if (dto.lat !== undefined) punto.lat = dto.lat;
     if (dto.lng !== undefined) punto.lng = dto.lng;
     if (dto.barrio !== undefined) punto.barrio = dto.barrio;
+    // Igual que en create(): el servidor tiene la ultima palabra. Se recalcula
+    // si tocaron el barrio o la ubicacion, o si el punto venia sin barrio
+    // valido (los que quedaron rotos cuando faltaba el KML).
+    if (moviendoUbicacion || dto.barrio !== undefined || !this.barriosService.esBarrioValido(punto.barrio)) {
+      punto.barrio = this.barriosService.resolver(punto.barrio, punto.lat, punto.lng) || punto.barrio;
+    }
     if (dto.dateTime !== undefined) punto.dateTime = new Date(dto.dateTime);
     if (dto.photos !== undefined) punto.photos = dto.photos;
     if (dto.actaPdfUrl !== undefined) punto.actaPdfUrl = dto.actaPdfUrl;
@@ -163,6 +178,7 @@ export class PuntosService {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
     await this.asignacionesService.eliminarDePunto(id);
+    await this.visitasService.eliminarDePunto(id);
     await this.repo.deleteMany([id]);
   }
 
@@ -244,10 +260,19 @@ export class PuntosService {
     const ahora = new Date();
     punto.ultimoSeguimientoAt = ahora;
     const guardado = await this.repo.save(punto);
-    // Registra la visita para el dashboard de desempeño de gestores (ver
-    // visitas.service.ts) — no bloquea la respuesta si falla el insert.
-    await this.visitasService.registrarVisita(id, userId, ahora);
+    await this.registrarVisitaSinRomper(id, userId, ahora);
     return guardado;
+  }
+
+  // Registra la visita para el desempeño de gestores (ver visitas.service.ts).
+  // El seguimiento ya se guardó: si el insert de la visita falla, se loguea
+  // pero no se le devuelve un error al gestor por algo que ya quedó grabado.
+  private async registrarVisitaSinRomper(puntoId: string, userId: string, fecha: Date): Promise<void> {
+    try {
+      await this.visitasService.registrarVisita(puntoId, userId, fecha);
+    } catch (e) {
+      this.logger.error(`No se pudo registrar la visita al punto ${puntoId} del gestor ${userId}`, e as Error);
+    }
   }
 
   async agregarNota(userId: string, email: string, id: string, body: { residuoId: string; texto: string }) {
@@ -255,10 +280,15 @@ export class PuntosService {
     if (!punto) throw new NotFoundException('Punto no encontrado');
     const residuo = punto.residuos.find((r) => r.id === body.residuoId);
     if (!residuo) throw new NotFoundException('Residuo no encontrado');
-    const nota = { id: randomUUID(), fecha: new Date().toISOString(), autorId: userId, autorNombre: email, texto: body.texto };
+    const ahora = new Date();
+    const nota = { id: randomUUID(), fecha: ahora.toISOString(), autorId: userId, autorNombre: email, texto: body.texto };
     residuo.notas = [...(residuo.notas || []), nota];
+    // Dejar una nota es seguimiento igual que marcar recogido o agregar un
+    // residuo: antes no tocaba este campo, así que la nota contaba como visita
+    // en el backend pero el punto seguía figurando sin visitar en la ruta.
+    punto.ultimoSeguimientoAt = ahora;
     const guardado = await this.repo.save(punto);
-    await this.visitasService.registrarVisita(id, userId, new Date());
+    await this.registrarVisitaSinRomper(id, userId, ahora);
     return guardado;
   }
 

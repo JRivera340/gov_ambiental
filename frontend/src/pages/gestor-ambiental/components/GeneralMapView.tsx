@@ -15,7 +15,7 @@ import { AMBIENTAL_COLOR, tipoResiduoLabels } from '../lib/constants';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 import { createPuntoCriticoIcon, createAmbientalIcon } from '../lib/icons';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
-import { coberturaPct, puntosVencidos } from '../lib/indicadoresAmbiental.lib';
+import { pctPuntosSinPendientes, puntosVencidos } from '../lib/indicadoresAmbiental.lib';
 import { openDirections } from '../lib/geo';
 import { FiltrosDrawer } from './FiltrosDrawer';
 
@@ -63,7 +63,7 @@ export const GeneralMapView: React.FC = () => {
 
   const kpisMios = useMemo(() => ({
     vencidos: puntosVencidos(misPuntos).length,
-    cobertura: coberturaPct(misPuntos),
+    sinPendientes: pctPuntosSinPendientes(misPuntos),
   }), [misPuntos]);
 
   // Al tocar el KPI "vencidos" se resaltan esos puntos en el mapa
@@ -105,8 +105,8 @@ export const GeneralMapView: React.FC = () => {
                             <span className="text-neutral-400 font-bold normal-case tracking-normal">Puntos vencidos</span>
                           </button>
                           <span className="w-px h-3 bg-neutral-200" />
-                          <span className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-700" title="Cobertura de recolección">
-                            {kpisMios.cobertura}%
+                          <span className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-700" title="Puntos sin residuos pendientes">
+                            {kpisMios.sinPendientes}%
                             <span className="text-neutral-400 font-bold normal-case tracking-normal">cob.</span>
                           </span>
                         </div>

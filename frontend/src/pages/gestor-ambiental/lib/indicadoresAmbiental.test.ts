@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  tiempoMedioRecoleccionDias, coberturaPct, residuosPorTipo, puntosReincidentes, eventosDesdePuntos, puntosVencidos,
+  tiempoMedioRecoleccionDias, pctPuntosSinPendientes, residuosPorTipo, puntosReincidentes, eventosDesdePuntos, puntosVencidos,
 } from './indicadoresAmbiental.lib';
 
 const punto = (id: string, barrio: string, residuos: any[], lat = 4.6, lng = -74.07): any => ({
@@ -23,13 +23,13 @@ describe('tiempoMedioRecoleccionDias', () => {
   });
 });
 
-describe('coberturaPct', () => {
+describe('pctPuntosSinPendientes', () => {
   it('% de puntos con todo recogido sobre los que tienen residuos', () => {
     const ps = [
       punto('a', 'X', [r('ORD', true)]),           // atendido
       punto('b', 'X', [r('ORD', true), r('ORD', false)]), // pendiente
     ];
-    expect(coberturaPct(ps)).toBe(50);
+    expect(pctPuntosSinPendientes(ps)).toBe(50);
   });
 });
 

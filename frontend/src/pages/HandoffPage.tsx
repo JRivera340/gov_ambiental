@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { irAlLoginDelHub } from '../config/hub';
 import type { User } from '../types';
 
 // Ruta de aterrizaje por rol tras el handoff.
@@ -98,7 +99,19 @@ export const HandoffPage: React.FC = () => {
     return (
       <div style={{ padding: 40, fontFamily: 'Inter, system-ui, sans-serif' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>No se pudo iniciar sesión</h1>
-        <p style={{ color: '#666', marginTop: 8 }}>El enlace de acceso no es válido o expiró. Volvé a intentar desde el panel de administración del hub.</p>
+        <p style={{ color: '#666', marginTop: 8 }}>El enlace de acceso no es válido o expiró. Iniciá sesión de nuevo para entrar al módulo.</p>
+        {/* Sin este botón la pantalla era un callejón sin salida: el usuario
+            no tenía forma de llegar al login desde acá. */}
+        <button
+          onClick={irAlLoginDelHub}
+          style={{
+            marginTop: 20, padding: '10px 18px', background: '#dc2626', color: 'white',
+            border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Ir al inicio de sesión
+        </button>
       </div>
     );
   }

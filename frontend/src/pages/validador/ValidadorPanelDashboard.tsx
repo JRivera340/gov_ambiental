@@ -8,7 +8,7 @@ import { Loading } from '../../components/Loading';
 import type { Activity, User } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { HUB_URL } from '../../config/hub';
+import { cerrarSesion } from '../../lib/cerrarSesion';
 
 // Panel de listado del validador — reconstruido para calzar con el look del
 // panel de validación que existía en el módulo acoplado (2 KPIs grandes +
@@ -24,7 +24,6 @@ const PAGE_SIZE = 15;
 export const ValidadorPanelDashboard: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [gestores, setGestores] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,8 +94,7 @@ export const ValidadorPanelDashboard: React.FC = () => {
   const changeTab = (tab: 'pending' | 'history') => { setActiveTab(tab); setPage(1); };
 
   const handleLogout = () => {
-    logout();
-    window.location.href = HUB_URL;
+    cerrarSesion();
   };
 
   if (loading) return <Loading />;

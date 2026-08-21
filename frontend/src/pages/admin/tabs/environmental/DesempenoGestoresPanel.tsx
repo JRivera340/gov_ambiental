@@ -1,4 +1,4 @@
-// DesempenoGestoresPanel.tsx — visitas por gestor + % de cumplimiento semanal
+// DesempenoGestoresPanel.tsx — cumplimiento por gestor en las dos semanas del ciclo
 import React, { useCallback, useEffect, useState } from 'react';
 import { ambientalService, type DesempenoGestorDTO } from '../../../../services/ambiental.service';
 import { usersService } from '../../../../services/users.service';
@@ -12,7 +12,6 @@ function pctColor(pct: number): string {
 export const DesempenoGestoresPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [semanaISO, setSemanaISO] = useState('');
   const [gestores, setGestores] = useState<DesempenoGestorDTO[]>([]);
   const [nombrePorId, setNombrePorId] = useState<Record<string, string>>({});
   const [filtro, setFiltro] = useState<string>('');
@@ -22,7 +21,6 @@ export const DesempenoGestoresPanel: React.FC = () => {
     setError(null);
     try {
       const resumen = await ambientalService.getDesempeno(filtro || undefined);
-      setSemanaISO(resumen.semanaISO);
       setGestores(resumen.gestores);
     } catch (e) {
       setError('No se pudo cargar el desempeño de gestores. Intenta de nuevo.');
@@ -59,7 +57,9 @@ export const DesempenoGestoresPanel: React.FC = () => {
       <div className="flex items-center justify-between border-b border-neutral-100 pb-2 flex-wrap gap-2">
         <div>
           <h3 className="text-[11px] font-bold text-neutral-700 uppercase tracking-widest">Desempeño de Gestores</h3>
-          <p className="text-[9px] text-neutral-400 mt-0.5">Semana {semanaISO} · % de puntos planificados que ya se visitaron</p>
+          <p className="text-[9px] text-neutral-400 mt-0.5">
+            Ciclo de dos semanas · % de los puntos de cada semana que ya se visitaron
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -88,24 +88,37 @@ export const DesempenoGestoresPanel: React.FC = () => {
       )}
 
       {gestores.length === 0 ? (
-        <p className="text-[9px] text-neutral-400 italic p-2">Sin gestores con puntos planificados esta semana.</p>
+        <p className="text-[9px] text-neutral-400 italic p-2">Sin gestores con puntos asignados.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {gestores.map((g) => (
             <div key={g.gestorId} className="rounded-2xl border border-neutral-100 shadow-sm bg-white p-3 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-neutral-800">{nombreDe(g.gestorId)}</span>
-                <span className="text-[10px] font-black" style={{ color: pctColor(g.pct) }}>{g.pct}%</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${g.pct}%`, background: pctColor(g.pct) }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[9px] text-neutral-500">
-                <span>{g.visitados} de {g.planificadosEstaSemana} planificados</span>
-                <span>{g.asignados} asignados total</span>
+              <span className="text-[10px] font-bold text-neutral-800">{nombreDe(g.gestorId)}</span>
+
+              {/* Una fila por semana del ciclo: así una visita a un punto de la
+                  semana siguiente se ve como avance de esa semana, en vez de
+                  perderse como pasaba con el plan de una sola mitad. */}
+              {g.semanas.map((s) => (
+                <div key={s.inicioISO} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold text-neutral-600 truncate">
+                      {s.etiqueta}
+                      <span className="text-neutral-400 font-medium"> · {s.esActual ? 'en curso' : 'siguiente'}</span>
+                    </span>
+                    <span className="text-[10px] font-black shrink-0" style={{ color: pctColor(s.pct) }}>{s.pct}%</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: pctColor(s.pct) }} />
+                  </div>
+                  <span className="text-[9px] text-neutral-500">{s.visitados} de {s.planificados} planificados</span>
+                </div>
+              ))}
+
+              <div className="flex items-center justify-between text-[9px] text-neutral-500 border-t border-neutral-100 pt-1.5">
+                <span>{g.asignados} asignados en total</span>
+                {g.visitasFueraDePlan > 0 && (
+                  <span className="text-neutral-400">+{g.visitasFueraDePlan} fuera de plan</span>
+                )}
               </div>
             </div>
           ))}

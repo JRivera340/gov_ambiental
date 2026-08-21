@@ -10,7 +10,7 @@ import { ValidadorActivityDetailPage } from './pages/validador/ValidadorActivity
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { HUB_URL } from './config/hub';
+import { irAlLoginDelHub } from './config/hub';
 
 // No hay página de login en este repo — la sesión llega desde bogotaneidapp
 // vía /handoff. Sin sesión (logout, token vencido, entrada directa sin
@@ -22,8 +22,12 @@ const esEntornoDesplegado = Boolean(import.meta.env.VITE_AMBIENTAL_API_URL);
 function RutaProtegida({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   React.useEffect(() => {
+    // Va al login pidiendo cierre de sesión también en el hub. Si solo se
+    // mandara a `/login`, el hub veía su sesión viva, saltaba el formulario y
+    // rebotaba al dashboard legacy, que reenvía el token al handoff y vuelve
+    // acá — un ciclo que termina en la pantalla de error del handoff.
     if (!isAuthenticated && esEntornoDesplegado) {
-      window.location.replace(`${HUB_URL}/login`);
+      irAlLoginDelHub();
     }
   }, [isAuthenticated]);
 

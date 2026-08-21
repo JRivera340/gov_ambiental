@@ -14,6 +14,8 @@
     "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
     "token:test": "ts-node -r tsconfig-paths/register scripts/mint-test-token.ts",
     "migrate:legacy": "ts-node -r tsconfig-paths/register scripts/migrate-from-legacy.ts",
+    "backfill:barrios": "ts-node -r tsconfig-paths/register scripts/backfill-barrios.ts",
+    "backfill:visitas": "ts-node -r tsconfig-paths/register scripts/backfill-visitas.ts",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d src/config/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:run": "npm run typeorm -- migration:run",

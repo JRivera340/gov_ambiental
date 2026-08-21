@@ -1,29 +1,14 @@
-const BOGOTA_OFFSET_MS = 5 * 3600000;
 const DAY_MS = 86400000;
 
-function limitesSemanaBogota(ahora: Date): { inicio: number; fin: number } {
-  const bogota = new Date(ahora.getTime() - BOGOTA_OFFSET_MS);
-  const dow = bogota.getUTCDay();
-  const desdeLunes = (dow + 6) % 7;
-  const lunesBogota = Date.UTC(
-    bogota.getUTCFullYear(), bogota.getUTCMonth(), bogota.getUTCDate() - desdeLunes, 0, 0, 0, 0,
-  );
-  const inicio = lunesBogota + BOGOTA_OFFSET_MS;
-  const fin = inicio + 7 * DAY_MS - 1;
-  return { inicio, fin };
-}
-
-export function visitadoEstaSemana(
-  ultimoSeguimientoAt: string | null | undefined,
-  ahora: Date,
-): boolean {
-  if (!ultimoSeguimientoAt) return false;
-  const t = new Date(ultimoSeguimientoAt).getTime();
-  const { inicio, fin } = limitesSemanaBogota(ahora);
-  return t >= inicio && t <= fin;
-}
-
-export function diasDesdeUltimoSeguimiento(
+// Antigüedad del último toque al punto, para mostrar "hace N días".
+//
+// OJO: esto NO es "visitado". `ultimoSeguimientoAt` no guarda autor, así que no
+// puede responder si lo visitó ESTE gestor, que es lo que dice la regla de
+// negocio (recogido / residuo nuevo / nota, hechos por él). Esa pregunta la
+// responde el backend: los ids visitados vienen en el plan del ciclo
+// (GET /visitas/plan). Antes se derivaba de este campo y, entre otras cosas,
+// una nota no lo actualizaba, así que el punto figuraba sin visitar.
+export function diasDesdeUltimoToque(
   ultimoSeguimientoAt: string | null | undefined,
   ahora: Date,
 ): number {

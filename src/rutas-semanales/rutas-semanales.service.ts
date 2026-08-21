@@ -4,19 +4,33 @@ import { In, Repository } from 'typeorm';
 import { RutaSemanal } from './entities/ruta-semanal.entity';
 import type { ParadaLite } from './lib/paradas.types';
 import { limitesSemana, semanaVencida, calcularArrastre } from './lib/ruta-semanal.util';
-import { isoWeekLabel, isoWeekParity, splitAlternado } from './lib/plan-semanal.util';
+import { mitadDePunto, semanasDelCiclo, type RangoSemana } from './lib/ciclo-semanal.util';
 import { PuntoResiduo } from '../puntos/entities/punto-residuo.entity';
 import { esPuntoEnEmergencia } from '../puntos/lib/emergencia.util';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 
 export type CrearRutaInput = {
   gestorId: string; paradas: ParadaLite[]; segmentos: unknown[]; ahora?: Date;
+  // Lunes de la semana del ciclo que se está planificando. Sin esto solo se
+  // podía crear la ruta de la semana en curso, y el gestor no tenía forma de
+  // armar la de la semana siguiente.
+  semanaInicioISO?: string;
 };
 
-export type PlanSemanal = {
+export type SemanaPlan = RangoSemana & {
+  esActual: boolean;
+  // Solo la semana en curso puede traer emergencias: un punto vencido se
+  // adelanta a esta semana aunque por reparto le tocara la siguiente.
   emergencia: string[];
   regular: string[];
-  semanaISO: string;
+  // emergencia + regular, que es contra lo que se mide el cumplimiento.
+  planificados: string[];
+};
+
+export type PlanCiclo = {
+  gestorId: string;
+  asignados: number;
+  semanas: [SemanaPlan, SemanaPlan];
 };
 
 @Injectable()
@@ -29,29 +43,58 @@ export class RutasSemanalesService {
     private readonly asignacionesService: AsignacionesService,
   ) {}
 
-  // Plan semanal automático del gestor: los puntos en emergencia (≥4 días
-  // sin recoger, ver emergencia.util.ts) siempre entran, sin tope. Del resto
-  // de los puntos asignados, se muestra el 50% que corresponde según la
-  // paridad de la semana ISO (ver plan-semanal.util.ts) — la otra mitad
-  // aparece la semana siguiente, alternando.
-  async getPlanSemanal(gestorId: string, ahora = new Date()): Promise<PlanSemanal> {
+  // Plan del ciclo de 2 semanas: entre ambas cubren el 100% de los puntos
+  // asignados al gestor. Cada punto cae siempre en la misma mitad
+  // (mitadDePunto), salvo que esté en emergencia (≥4 días sin recoger, ver
+  // emergencia.util.ts): esos se adelantan a la semana en curso, sin tope,
+  // para que nada vencido espere una semana más.
+  //
+  // Antes esto devolvía una sola semana con la mitad de los puntos, mientras
+  // la ruta del gestor listaba todos: las visitas a la otra mitad no contaban
+  // en ningún lado.
+  async getPlanCiclo(gestorId: string, ahora = new Date()): Promise<PlanCiclo> {
+    const [semActual, semSiguiente] = semanasDelCiclo(ahora);
+    const armar = (rango: RangoSemana, esActual: boolean, emergencia: string[], regular: string[]): SemanaPlan => ({
+      ...rango,
+      esActual,
+      emergencia,
+      regular,
+      planificados: [...emergencia, ...regular],
+    });
+
     const asignadosIds = await this.asignacionesService.getPuntosDeGestor(gestorId);
     if (asignadosIds.length === 0) {
-      return { emergencia: [], regular: [], semanaISO: isoWeekLabel(ahora) };
+      return {
+        gestorId,
+        asignados: 0,
+        semanas: [armar(semActual, true, [], []), armar(semSiguiente, false, [], [])],
+      };
     }
+
     const puntos = await this.puntosRepo.find({ where: { id: In(asignadosIds) } });
+    const porNumero = [...puntos].sort((a, b) => (a.pointNumber ?? 0) - (b.pointNumber ?? 0));
 
     const emergencia: string[] = [];
-    const regulares: PuntoResiduo[] = [];
-    for (const p of puntos) {
-      if (esPuntoEnEmergencia(p, ahora)) emergencia.push(p.id);
-      else regulares.push(p);
-    }
-    regulares.sort((a, b) => (a.pointNumber ?? 0) - (b.pointNumber ?? 0));
-    const paridad = isoWeekParity(ahora);
-    const regular = splitAlternado(regulares.map((p) => p.id), paridad);
+    const regularActual: string[] = [];
+    const regularSiguiente: string[] = [];
 
-    return { emergencia, regular, semanaISO: isoWeekLabel(ahora) };
+    for (const p of porNumero) {
+      if (esPuntoEnEmergencia(p, ahora)) {
+        emergencia.push(p.id);
+        continue;
+      }
+      if (mitadDePunto(p) === semActual.slot) regularActual.push(p.id);
+      else regularSiguiente.push(p.id);
+    }
+
+    return {
+      gestorId,
+      asignados: puntos.length,
+      semanas: [
+        armar(semActual, true, emergencia, regularActual),
+        armar(semSiguiente, false, [], regularSiguiente),
+      ],
+    };
   }
 
   async cerrarSemanasVencidas(ahora = new Date()): Promise<number> {
@@ -73,9 +116,28 @@ export class RutasSemanalesService {
     return this.repo.findOne({ where: { gestorId, semanaInicio: new Date(inicioISO) } });
   }
 
+  // Las rutas de las dos semanas del ciclo, en el mismo orden que el plan.
+  async getRutasDelCiclo(gestorId: string, ahora = new Date()): Promise<[RutaSemanal | null, RutaSemanal | null]> {
+    await this.cerrarSemanasVencidas(ahora);
+    const semanas = semanasDelCiclo(ahora);
+    const rutas = await Promise.all(
+      semanas.map((s) => this.repo.findOne({ where: { gestorId, semanaInicio: new Date(s.inicioISO) } })),
+    );
+    return [rutas[0] ?? null, rutas[1] ?? null];
+  }
+
   async crearRutaSemana(input: CrearRutaInput): Promise<RutaSemanal> {
     const ahora = input.ahora ?? new Date();
-    const { inicioISO, finISO } = limitesSemana(ahora);
+    // Solo se puede planificar una de las dos semanas del ciclo: así el gestor
+    // no arma la ruta de una semana que no corresponde.
+    const semanas = semanasDelCiclo(ahora);
+    const semana = input.semanaInicioISO
+      ? semanas.find((s) => s.inicioISO === input.semanaInicioISO)
+      : semanas[0];
+    if (!semana) {
+      throw new BadRequestException('La semana indicada no pertenece al ciclo actual');
+    }
+    const { inicioISO, finISO } = semana;
     const existente = await this.repo.findOne({ where: { gestorId: input.gestorId, semanaInicio: new Date(inicioISO) } });
     if (existente) {
       existente.paradas = input.paradas as RutaSemanal['paradas'];

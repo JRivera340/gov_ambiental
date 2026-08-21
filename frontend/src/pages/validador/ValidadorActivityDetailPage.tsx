@@ -12,6 +12,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Loading } from '../../components/Loading';
 import type { Activity, ResiduoEntry, User } from '../../types';
 import { RESIDUO_TIPOS } from '../../types/residuoTipos';
+import { notificarPuntoEliminado } from '../../lib/puntosChannel';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -207,6 +208,9 @@ export const ValidadorActivityDetailPage: React.FC = () => {
     setProcessing(true);
     try {
       await activityService.remove(activity.id);
+      // El panel admin vive en la pestaña que abrió esta: sin el aviso, seguía
+      // mostrando el punto borrado hasta que alguien refrescaba.
+      notificarPuntoEliminado(activity.id);
       showToast('Punto eliminado', 'success');
       setTimeout(volverSegunOrigen, 1000);
     } catch (e: any) {

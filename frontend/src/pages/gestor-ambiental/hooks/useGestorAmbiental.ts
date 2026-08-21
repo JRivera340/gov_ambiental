@@ -12,6 +12,7 @@ import { useAmbientalFilters } from './useAmbientalFilters';
 import { useRutaAmbiental } from './useRutaAmbiental';
 import { useSectoresAmbiental } from './useSectoresAmbiental';
 import { useActividadesCalor } from './useActividadesCalor';
+import { cerrarSesion } from '../../../lib/cerrarSesion';
 
 // ════════════════════════════════════════════════════════════════
 // useGestorAmbiental — todo el estado/effects/memos/handlers del
@@ -23,7 +24,6 @@ import { useActividadesCalor } from './useActividadesCalor';
 export function useGestorAmbiental() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
 
   const [viewMode, setViewMode] = useState<ViewMode>('general-map');
   const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>({
@@ -121,6 +121,10 @@ export function useGestorAmbiental() {
         limit: 2000,
       });
       setActivities(data || []);
+      // Marcar recogido, agregar un residuo o dejar una nota cambia qué puntos
+      // figuran como visitados: sin esto la ruta y el progreso quedaban
+      // mostrando el estado anterior hasta recargar la página.
+      ruta.recargarPlan();
     } catch (error) {
       console.error('Error loading activities:', error);
       setToast({ message: 'Error al cargar actividades', type: 'error' });
@@ -165,8 +169,7 @@ export function useGestorAmbiental() {
   };
 
   const handleLogout = () => {
-    logout();
-    navigate('/', { replace: true });
+    cerrarSesion();
   };
 
   // ── Filtered activities ──

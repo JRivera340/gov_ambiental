@@ -24,20 +24,48 @@ export interface RutaSemanalDTO {
   updatedAt?: string;
 }
 
-export interface PlanSemanalDTO {
+/** Una de las dos semanas del ciclo. Entre ambas cubren todos los puntos asignados. */
+export interface SemanaPlanDTO {
+  slot: 0 | 1;
+  semanaISO: string;
+  inicioISO: string;
+  finISO: string;
+  /** "Semana del 17 al 23 de agosto" — la arma el backend, la UI no compone fechas. */
+  etiqueta: string;
+  ventanaDesdeISO: string;
+  esActual: boolean;
+  /** Solo la semana en curso trae emergencias: los vencidos se adelantan a ella. */
   emergencia: string[];
   regular: string[];
-  semanaISO: string;
+  planificados: string[];
+  /** Puntos ya visitados de esta semana. Solo viene de GET /visitas/plan. */
+  visitados: string[];
+}
+export interface PlanCicloDTO {
+  gestorId: string;
+  asignados: number;
+  semanas: [SemanaPlanDTO, SemanaPlanDTO];
+}
+
+export interface SemanaDesempenoDTO {
+  slot: 0 | 1;
+  esActual: boolean;
+  inicioISO: string;
+  finISO: string;
+  etiqueta: string;
+  planificados: number;
+  visitados: number;
+  pct: number;
 }
 export interface DesempenoGestorDTO {
   gestorId: string;
   asignados: number;
-  planificadosEstaSemana: number;
-  visitados: number;
-  pct: number;
+  semanas: [SemanaDesempenoDTO, SemanaDesempenoDTO];
+  visitasFueraDePlan: number;
 }
 export interface ResumenDesempenoDTO {
-  semanaISO: string;
+  cicloInicioISO: string;
+  cicloFinISO: string;
   gestores: DesempenoGestorDTO[];
   targetTotal: number;
   actualTotal: number;
@@ -64,8 +92,13 @@ export const ambientalService = {
     const { data } = await api.get<RutaSemanalDTO | null>('/rutas-semanales/mine');
     return data ?? null;
   },
-  async crearRutaSemana(paradas: ParadaLite[], segmentos: any[]): Promise<RutaSemanalDTO> {
-    const { data } = await api.post<RutaSemanalDTO>('/rutas-semanales', { paradas, segmentos });
+  /** Las rutas de las dos semanas del ciclo, en el mismo orden que el plan. */
+  async getRutasDelCiclo(): Promise<[RutaSemanalDTO | null, RutaSemanalDTO | null]> {
+    const { data } = await api.get<[RutaSemanalDTO | null, RutaSemanalDTO | null]>('/rutas-semanales/mine/ciclo');
+    return Array.isArray(data) ? data : [null, null];
+  },
+  async crearRutaSemana(paradas: ParadaLite[], segmentos: any[], semanaInicioISO?: string): Promise<RutaSemanalDTO> {
+    const { data } = await api.post<RutaSemanalDTO>('/rutas-semanales', { paradas, segmentos, semanaInicioISO });
     return data;
   },
   async cancelarRutaSemana(rutaId: string): Promise<RutaSemanalDTO> {
@@ -76,8 +109,11 @@ export const ambientalService = {
     const { data } = await api.get<string[]>('/rutas-semanales/arrastre/mine');
     return Array.isArray(data) ? data : [];
   },
-  async getPlanSemanal(): Promise<PlanSemanalDTO> {
-    const { data } = await api.get<PlanSemanalDTO>('/rutas-semanales/plan');
+  // Fuente única de "qué está visitado": el plan del ciclo ya viene cruzado
+  // con las visitas reales. Antes cada pantalla lo deducía por su cuenta y no
+  // coincidían entre sí.
+  async getPlanCiclo(): Promise<PlanCicloDTO> {
+    const { data } = await api.get<PlanCicloDTO>('/visitas/plan');
     return data;
   },
   async getDesempeno(gestorId?: string): Promise<ResumenDesempenoDTO> {

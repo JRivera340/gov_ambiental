@@ -9,6 +9,10 @@ import {
 // se deriva con COUNT(*) > 0 sobre esta tabla filtrada por semanaISO.
 @Entity('visitas_punto')
 @Index(['gestorId', 'semanaISO'])
+// El conteo de desempeño filtra por rango de fechas, no por semanaISO: una
+// visita adelantada a un punto de la semana siguiente tiene que contar para
+// esa semana (ver VisitasService.getIdsVisitadosEnRango).
+@Index(['gestorId', 'fecha'])
 export class VisitaPunto {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

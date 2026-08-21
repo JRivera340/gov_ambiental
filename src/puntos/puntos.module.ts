@@ -9,9 +9,10 @@ import { AsignacionesModule } from '../asignaciones/asignaciones.module';
 import { ProcesosModule } from '../procesos/procesos.module';
 import { ReporteService } from '../reporte/reporte.service';
 import { VisitasModule } from '../visitas/visitas.module';
+import { CatalogosModule } from '../catalogos/catalogos.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PuntoResiduo]), AsignacionesModule, ProcesosModule, VisitasModule],
+  imports: [TypeOrmModule.forFeature([PuntoResiduo]), AsignacionesModule, ProcesosModule, VisitasModule, CatalogosModule],
   controllers: [PuntosController],
   providers: [
     PuntosService,

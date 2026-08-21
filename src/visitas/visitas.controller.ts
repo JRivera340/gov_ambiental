@@ -24,4 +24,12 @@ export class VisitasController {
   getMine(@Req() req: any) {
     return this.visitasService.getResumenDesempeno(req.user.userId);
   }
+
+  // Plan del ciclo + puntos ya visitados en cada semana. Fuente única de
+  // "visitado" para la ruta y el perfil del gestor.
+  @Get('plan')
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  getPlan(@Req() req: any) {
+    return this.visitasService.getPlanConVisitas(req.user.userId);
+  }
 }

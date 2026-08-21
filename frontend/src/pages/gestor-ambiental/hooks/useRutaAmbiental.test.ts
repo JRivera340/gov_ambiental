@@ -19,8 +19,8 @@ vi.mock('../lib/geo', () => ({
   nearestNeighborRoute: vi.fn((_o: any, pts: any[]) => pts),
 }));
 const candidatoDefault = { puntoId: 'x', lat: 4, lng: -74, barrio: 'B', diasVencido: 0, tiposResiduo: [], visitado: false, diasSinSeguimiento: 0 };
-vi.mock('../lib/rutaModos', () => ({
-  getPuntosPorModo: vi.fn(() => [candidatoDefault]),
+vi.mock('../lib/rutasCiclo', () => ({
+  getParadasDeSemana: vi.fn(() => [candidatoDefault]),
 }));
 vi.mock('../lib/residuos', () => ({
   getResiduos: vi.fn(() => []),
@@ -39,6 +39,24 @@ vi.mock('../../../services/ambiental.service', () => ({
       estado: 'cancelada', paradas: [], segmentos: [], arrastre: [],
     }),
     getArrastre: vi.fn().mockResolvedValue([]),
+    getPlanCiclo: vi.fn().mockResolvedValue({
+      gestorId: 'g1',
+      asignados: 1,
+      semanas: [
+        {
+          slot: 0, semanaISO: '2026-W28', inicioISO: '2026-07-06T05:00:00.000Z',
+          finISO: '2026-07-13T04:59:59.999Z', etiqueta: 'Semana del 6 al 12 de julio',
+          ventanaDesdeISO: '2026-07-06T05:00:00.000Z', esActual: true,
+          emergencia: [], regular: ['x'], planificados: ['x'], visitados: [],
+        },
+        {
+          slot: 1, semanaISO: '2026-W29', inicioISO: '2026-07-13T05:00:00.000Z',
+          finISO: '2026-07-20T04:59:59.999Z', etiqueta: 'Semana del 13 al 19 de julio',
+          ventanaDesdeISO: '2026-07-06T05:00:00.000Z', esActual: false,
+          emergencia: [], regular: [], planificados: [], visitados: [],
+        },
+      ],
+    }),
   },
 }));
 
@@ -79,7 +97,10 @@ describe('useRutaAmbiental', () => {
 
   it('calcularRuta arma la ruta, la guarda y activa la vista', async () => {
     const { result, setViewMode } = setup();
-    await act(async () => { await result.current.calcularRuta('completa'); });
+    // La ruta se arma sobre la semana del ciclo, asi que hay que esperar a que
+    // el plan llegue del backend antes de calcular.
+    await waitFor(() => { expect(result.current.plan).not.toBeNull(); });
+    await act(async () => { await result.current.calcularRuta(0); });
     expect(ruta.buildSegmentos).toHaveBeenCalled();
     expect(ruta.saveRutaActiva).toHaveBeenCalled();
     expect(result.current.rutaActiva?.estado).toBe('en_progreso');
@@ -106,7 +127,8 @@ describe('useRutaAmbiental', () => {
 
   it('cancelarRuta no toca el historial local si el backend falla', async () => {
     const { result } = setup();
-    await act(async () => { await result.current.calcularRuta('completa'); });
+    await waitFor(() => { expect(result.current.plan).not.toBeNull(); });
+    await act(async () => { await result.current.calcularRuta(0); });
     expect(result.current.rutaSemanalId).toBe('rs1');
     vi.mocked(ambientalService.cancelarRutaSemana).mockRejectedValueOnce(new Error('fail'));
 

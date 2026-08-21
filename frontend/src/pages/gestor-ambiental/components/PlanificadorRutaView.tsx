@@ -5,31 +5,47 @@ import { RutaPolylineLayer } from './RutaPolylineLayer';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { EdgeDrawer } from '../../../components/shell/EdgeDrawer';
 import { esLunesBogota, diasRestantesSemana } from '../lib/rutaSemanal.lib';
-import { getPuntosModoCompleta, getPuntosModoEmergencia, getPuntosModoSinVisita, type RutaModo } from '../lib/rutaModos';
+import { resumenSemana, type SlotRuta } from '../lib/rutasCiclo';
+import type { SemanaPlanDTO } from '../../../services/ambiental.service';
 
-interface ModoCardProps {
-  titulo: string;
-  descripcion: string;
-  count: number;
-  color: string;
+interface SemanaCardProps {
+  semana: SemanaPlanDTO;
   disabled: boolean;
   loading: boolean;
   onClick: () => void;
 }
 
-const ModoCard: React.FC<ModoCardProps> = ({ titulo, descripcion, count, color, disabled, loading, onClick }) => {
+// Una tarjeta por semana del ciclo. Antes había tres modos (Completa /
+// Emergencia / Sin Visita) armados sobre todos los puntos asignados: el gestor
+// podía recorrer puntos de la semana que no le tocaba y esas visitas no
+// contaban. Ahora solo se planifica una de las dos semanas reales del ciclo.
+const SemanaCard: React.FC<SemanaCardProps> = ({ semana, disabled, loading, onClick }) => {
+  const { total, visitados, pendientes, emergencias, pct } = resumenSemana(semana);
+  const color = semana.esActual ? '#2563eb' : '#64748b';
+
   return (
     <div className="p-3 rounded-2xl border border-neutral-200 shadow-sm bg-white">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-bold text-neutral-800">{titulo}</p>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <p className="text-xs font-bold text-neutral-800">{semana.etiqueta}</p>
         <span
           className="text-[11px] font-black px-2 py-0.5 rounded-full shrink-0"
           style={{ background: `${color}1a`, color }}
         >
-          {count}
+          {total}
         </span>
       </div>
-      <p className="text-[11px] text-neutral-500 mb-3">{descripcion}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color }}>
+        {semana.esActual ? 'En curso' : 'Siguiente'}
+      </p>
+      <p className="text-[11px] text-neutral-500 mb-1">
+        {visitados} de {total} visitados · {pendientes} por visitar
+      </p>
+      {emergencias > 0 && (
+        <p className="text-[11px] font-bold text-red-600 mb-1">{emergencias} en emergencia</p>
+      )}
+      <div className="h-1.5 rounded-full bg-neutral-100 mb-3 overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
       <button
         onClick={onClick}
         disabled={disabled}
@@ -50,19 +66,16 @@ export const PlanificadorRutaView: React.FC = () => {
     semanaFinISO,
     rutaActiva,
     setViewMode,
+    plan,
   } = useGestorAmbientalCtx();
 
-  const [calculando, setCalculando] = useState<RutaModo | null>(null);
+  const [calculando, setCalculando] = useState<SlotRuta | null>(null);
   const hayRutaActiva = !!rutaActiva && rutaActiva.estado === 'en_progreso';
 
-  const modoCompleta = getPuntosModoCompleta(puntosParaRuta);
-  const modoEmergencia = getPuntosModoEmergencia(puntosParaRuta);
-  const modoSinVisita = getPuntosModoSinVisita(puntosParaRuta);
-
-  const handleCalcular = async (modo: RutaModo) => {
-    setCalculando(modo);
+  const handleCalcular = async (slot: SlotRuta) => {
+    setCalculando(slot);
     try {
-      await calcularRuta(modo);
+      await calcularRuta(slot);
     } finally {
       setCalculando(null);
     }
@@ -138,33 +151,16 @@ export const PlanificadorRutaView: React.FC = () => {
       )}
 
       <div className="p-4 flex flex-col gap-3">
-        <ModoCard
-          titulo="Ruta Completa"
-          descripcion="Todos tus puntos asignados sin visitar esta semana"
-          count={modoCompleta.length}
-          color="#2563eb"
-          disabled={hayRutaActiva || modoCompleta.length === 0 || calculando !== null}
-          loading={calculando === 'completa'}
-          onClick={() => handleCalcular('completa')}
-        />
-        <ModoCard
-          titulo="Ruta de Emergencia"
-          descripcion="Puntos vencidos o en emergencia"
-          count={modoEmergencia.length}
-          color="#dc2626"
-          disabled={hayRutaActiva || modoEmergencia.length === 0 || calculando !== null}
-          loading={calculando === 'emergencia'}
-          onClick={() => handleCalcular('emergencia')}
-        />
-        <ModoCard
-          titulo="Ruta Sin Visita"
-          descripcion="Sin seguimiento hace más de 7 días"
-          count={modoSinVisita.length}
-          color="#d97706"
-          disabled={hayRutaActiva || modoSinVisita.length === 0 || calculando !== null}
-          loading={calculando === 'sin_visita'}
-          onClick={() => handleCalcular('sin_visita')}
-        />
+        {!plan && <p className="text-[11px] text-neutral-400">Cargando el plan del ciclo…</p>}
+        {plan?.semanas.map((semana, i) => (
+          <SemanaCard
+            key={semana.inicioISO}
+            semana={semana}
+            disabled={hayRutaActiva || semana.planificados.length === 0 || calculando !== null}
+            loading={calculando === (i as SlotRuta)}
+            onClick={() => handleCalcular(i as SlotRuta)}
+          />
+        ))}
       </div>
     </>
   );

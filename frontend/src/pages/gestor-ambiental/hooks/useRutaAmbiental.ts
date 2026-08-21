@@ -4,15 +4,15 @@ import type { Activity } from '../../../types';
 import type { ViewMode } from '../lib/constants';
 import type { ParadaRuta, RutaActiva } from '../lib/ruta.types';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
-import { visitadoEstaSemana, diasDesdeUltimoSeguimiento } from '../lib/visitado';
+import { diasDesdeUltimoToque } from '../lib/visitado';
 import {
   getRutaActiva, saveRutaActiva, clearRutaActiva,
   addToHistorial, cancelarRutaAndAddToHistorial, getHistorialRutas, deleteFromHistorial,
   buildSegmentos, getUnvisitedActivityIds,
 } from '../lib/ruta';
 import { nearestNeighborRoute } from '../lib/geo';
-import { getPuntosPorModo, type RutaModo } from '../lib/rutaModos';
-import { ambientalService, type RutaSemanalDTO } from '../../../services/ambiental.service';
+import { getParadasDeSemana, type SlotRuta } from '../lib/rutasCiclo';
+import { ambientalService, type RutaSemanalDTO, type PlanCicloDTO } from '../../../services/ambiental.service';
 import { paradaLiteFromParadaRuta, hidratarParadas } from '../lib/rutaSemanal.lib';
 
 type RutaUser = { id: string; name: string; lastname?: string } | null;
@@ -57,9 +57,22 @@ export function useRutaAmbiental(
   );
   const [historialRutaSeleccionada, setHistorialRutaSeleccionada] = useState<RutaActiva | null>(null);
   const [puntosAsignados, setPuntosAsignados] = useState<string[]>([]);
+  const [plan, setPlan] = useState<PlanCicloDTO | null>(null);
   const [rutaSemanalId, setRutaSemanalId] = useState<string | null>(null);
   const [arrastreIds, setArrastreIds] = useState<string[]>([]);
   const [semanaFinISO, setSemanaFinISO] = useState<string | null>(null);
+
+  // El plan del ciclo trae, además del reparto en dos semanas, qué puntos ya
+  // están visitados. Es la única fuente de "visitado": antes cada pantalla lo
+  // deducía por su cuenta (unas por ultimoSeguimientoAt, otras por autoría de
+  // residuo) y los números no coincidían entre sí ni con el backend.
+  const recargarPlan = useCallback(async () => {
+    try {
+      setPlan(await ambientalService.getPlanCiclo());
+    } catch {
+      setPlan(null);
+    }
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -67,8 +80,19 @@ export function useRutaAmbiental(
     ambientalService.getMisPuntos()
       .then(ps => { if (vivo) setPuntosAsignados(ps); })
       .catch(() => { if (vivo) setPuntosAsignados([]); });
+    recargarPlan();
     return () => { vivo = false; };
-  }, [user]);
+  }, [user, recargarPlan]);
+
+  const semanaEnCurso = plan?.semanas[0] ?? null;
+  const semanaSiguiente = plan?.semanas[1] ?? null;
+
+  // Visitados de todo el ciclo: un punto visitado cuenta como tal aunque
+  // pertenezca a la semana siguiente.
+  const visitadosIds = useMemo(
+    () => new Set((plan?.semanas ?? []).flatMap((s) => s.visitados)),
+    [plan],
+  );
 
   // ── Puntos candidatos para la ruta ─────────────────────────────
   const puntosParaRuta = useMemo((): ParadaRuta[] => {
@@ -116,12 +140,15 @@ export function useRutaAmbiental(
         barrio: a.barrio,
         diasVencido: maxDias,
         tiposResiduo: [...new Set(residuos.map(r => r.tipoResiduo))],
-        visitado: visitadoEstaSemana(ultimoSeguimientoAt, ahora),
-        diasSinSeguimiento: diasDesdeUltimoSeguimiento(ultimoSeguimientoAt, ahora),
+        // Visitado según el backend (recogido / residuo nuevo / nota hechos
+        // por este gestor), no según ultimoSeguimientoAt, que no distingue
+        // quién tocó el punto y no se actualizaba al dejar una nota.
+        visitado: visitadosIds.has(a.id),
+        diasSinSeguimiento: diasDesdeUltimoToque(ultimoSeguimientoAt, ahora),
         pendienteAnterior: pendientesAnteriores.has(a.id),
       };
     });
-  }, [activities, user, puntosAsignados]);
+  }, [activities, user, puntosAsignados, visitadosIds]);
 
   const puntosRef = useRef(puntosParaRuta);
   useEffect(() => {
@@ -169,16 +196,24 @@ export function useRutaAmbiental(
     setViewMode('planificador-ruta');
   }, []);
 
-  const calcularRuta = useCallback(async (modo: RutaModo) => {
+  // Se planifica una de las dos semanas del ciclo (0 = en curso, 1 = siguiente).
+  // Antes se elegía entre tres modos armados sobre todos los puntos asignados,
+  // y el gestor podía recorrer una semana que no le tocaba sin que contara.
+  const calcularRuta = useCallback(async (slot: SlotRuta) => {
     if (!user) return;
     if (rutaActiva && rutaActiva.estado === 'en_progreso') {
       if (setToast) setToast({ message: 'Ya tenés una ruta activa — finalizala o cancelala antes de calcular una nueva', type: 'info' });
       setViewMode('ruta-activa');
       return;
     }
-    const candidatos = getPuntosPorModo(modo, puntosParaRuta);
+    const semana = plan?.semanas[slot];
+    if (!semana) {
+      if (setToast) setToast({ message: 'No se pudo cargar el plan de la semana', type: 'error' });
+      return;
+    }
+    const candidatos = getParadasDeSemana(puntosParaRuta, semana).filter((p) => !p.visitado);
     if (candidatos.length === 0) {
-      if (setToast) setToast({ message: 'No hay puntos para este modo de ruta', type: 'info' });
+      if (setToast) setToast({ message: 'No quedan puntos por visitar en esta semana', type: 'info' });
       return;
     }
     const origen = await new Promise<{ lat: number; lng: number }>((resolve) => {
@@ -198,6 +233,7 @@ export function useRutaAmbiental(
       const dto = await ambientalService.crearRutaSemana(
         rutaOrdenada.map(paradaLiteFromParadaRuta),
         segmentos,
+        semana.inicioISO,
       );
       setRutaSemanalId(dto.id);
       setSemanaFinISO(dto.semanaFin ?? null);
@@ -209,7 +245,7 @@ export function useRutaAmbiental(
       console.error('Error al crear la ruta de la semana:', error);
       if (setToast) setToast({ message: 'No se pudo crear la ruta de la semana', type: 'error' });
     }
-  }, [user, puntosParaRuta, setToast, rutaActiva]);
+  }, [user, puntosParaRuta, setToast, rutaActiva, plan]);
 
   const entrarSegmento = useCallback((segId: 'A' | 'B' | 'C') => {
     setActiveSegmento(segId);
@@ -269,6 +305,10 @@ export function useRutaAmbiental(
     historialRutaSeleccionada,
     puntosParaRuta,
     puntosAsignados,
+    plan,
+    semanaEnCurso,
+    semanaSiguiente,
+    recargarPlan,
     rutaSemanalId,
     arrastreIds,
     semanaFinISO,

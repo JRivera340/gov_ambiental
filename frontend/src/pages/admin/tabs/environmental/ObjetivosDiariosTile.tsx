@@ -1,13 +1,15 @@
-// ObjetivosDiariosTile.tsx — meta semanal agregada vs completado real, pensado
-// para mostrarse en pantalla/proyector (vista resumen tipo "objetivos"). Usa
-// el mismo agregado que DesempenoGestoresPanel (getResumenDesempeno sin
-// filtro) — una sola fuente de verdad para ambos.
+// ObjetivosDiariosTile.tsx — meta del ciclo agregada vs completado real,
+// pensado para mostrarse en pantalla/proyector (vista resumen tipo
+// "objetivos"). Usa el mismo agregado que DesempenoGestoresPanel
+// (getResumenDesempeno sin filtro) — una sola fuente de verdad para ambos, y
+// los totales suman las dos semanas del ciclo.
 import React, { useEffect, useState } from 'react';
 import { ambientalService } from '../../../../services/ambiental.service';
+import { formatRangoCiclo } from '../../../gestor-ambiental/lib/semanaLabel';
 
 export const ObjetivosDiariosTile: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [semanaISO, setSemanaISO] = useState('');
+  const [rangoCiclo, setRangoCiclo] = useState('');
   const [targetTotal, setTargetTotal] = useState(0);
   const [actualTotal, setActualTotal] = useState(0);
 
@@ -16,7 +18,7 @@ export const ObjetivosDiariosTile: React.FC = () => {
     ambientalService.getDesempeno()
       .then((data) => {
         if (cancelado) return;
-        setSemanaISO(data.semanaISO);
+        setRangoCiclo(formatRangoCiclo(data.cicloInicioISO, data.cicloFinISO));
         setTargetTotal(data.targetTotal);
         setActualTotal(data.actualTotal);
       })
@@ -30,8 +32,8 @@ export const ObjetivosDiariosTile: React.FC = () => {
   return (
     <div className="card p-3 bg-white border-l-4 border-l-[#9333ea] shadow-sm flex flex-col min-h-[110px] overflow-hidden">
       <div className="flex justify-between items-center mb-2 pb-1 border-b border-neutral-50">
-        <h3 className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">Objetivos Semanales — Todos los Gestores</h3>
-        {semanaISO && <span className="text-[7px] text-neutral-400 font-bold uppercase">Semana {semanaISO}</span>}
+        <h3 className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">Objetivos del Ciclo — Todos los Gestores</h3>
+        {rangoCiclo && <span className="text-[7px] text-neutral-400 font-bold uppercase">{rangoCiclo}</span>}
       </div>
       {loading ? (
         <p className="text-[10px] text-neutral-400">Cargando…</p>

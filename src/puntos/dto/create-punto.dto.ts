@@ -7,8 +7,12 @@ export class CreatePuntoDto {
   @IsNumber()
   lng!: number;
 
+  // Opcional a proposito: el barrio autoritativo lo resuelve el backend desde
+  // lat/lng (ver BarriosService). Antes era @IsString() obligatorio, pero la
+  // cadena vacia pasaba la validacion y se guardaban puntos sin barrio.
+  @IsOptional()
   @IsString()
-  barrio!: string;
+  barrio?: string;
 
   @IsOptional()
   @IsISO8601()

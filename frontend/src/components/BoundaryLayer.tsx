@@ -100,6 +100,24 @@ export const BoundaryLayer: React.FC<BoundaryLayerProps> = ({
     loadBoundary();
   }, [kmlPath, filterByName]);
 
+  // Un 404 del KMZ/KML (archivo que no llegó al build, ruta mal escrita) se
+  // tragaba en silencio: el mapa simplemente quedaba sin jurisdicción y nadie
+  // se enteraba hasta que alguien notaba que faltaba la zona roja. Ahora se
+  // avisa encima del mapa.
+  if (error && visible) {
+    const archivo = kmlPath.split('/').pop();
+    return (
+      <div style={{
+        position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 1200,
+        background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c',
+        borderRadius: 10, padding: '6px 10px', fontSize: 11, fontWeight: 700,
+        boxShadow: '0 2px 8px rgba(0,0,0,.12)', pointerEvents: 'none', whiteSpace: 'nowrap',
+      }}>
+        No se pudo cargar la capa {archivo}
+      </div>
+    );
+  }
+
   if (loading || !geoJsonData || !visible) return null;
 
   return (

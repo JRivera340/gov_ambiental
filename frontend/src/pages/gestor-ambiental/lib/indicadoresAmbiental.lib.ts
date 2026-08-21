@@ -17,7 +17,10 @@ export function tiempoMedioRecoleccionDias(puntos: Activity[]): number {
   return n === 0 ? 0 : suma / n;
 }
 
-export function coberturaPct(puntos: Activity[]): number {
+// Puntos cuyos residuos estan todos recogidos. NO es cobertura de visitas:
+// no mira gestor ni semana. Se llamaba coberturaPct y se confundia con el
+// cumplimiento de la ruta, que es otra cosa y vive en el backend.
+export function pctPuntosSinPendientes(puntos: Activity[]): number {
   let conResiduos = 0, atendidos = 0;
   for (const p of puntos) {
     const res = getResiduos(p);

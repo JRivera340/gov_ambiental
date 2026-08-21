@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Activity } from '../../../../types';
 import {
-  tiempoMedioRecoleccionDias, coberturaPct, puntosVencidos, residuosPorTipo, puntosReincidentes,
+  tiempoMedioRecoleccionDias, pctPuntosSinPendientes, puntosVencidos, residuosPorTipo, puntosReincidentes,
 } from '../../../gestor-ambiental/lib/indicadoresAmbiental.lib';
 
 export const IndicadoresAmbientalPanel: React.FC<{ actividades: Activity[] }> = ({ actividades }) => {
@@ -10,7 +10,7 @@ export const IndicadoresAmbientalPanel: React.FC<{ actividades: Activity[] }> = 
   // panel siempre en "sin datos suficientes".
   const puntos = actividades;
   const tiempo = tiempoMedioRecoleccionDias(puntos);
-  const cobertura = coberturaPct(puntos);
+  const sinPendientes = pctPuntosSinPendientes(puntos);
   const vencidos = puntosVencidos(puntos).length;
   const reincidentes = puntosReincidentes(puntos);
   const porTipo = residuosPorTipo(puntos);
@@ -37,7 +37,7 @@ export const IndicadoresAmbientalPanel: React.FC<{ actividades: Activity[] }> = 
       <h3 className="text-sm font-black text-neutral-900">Indicadores Ambiental</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <KPI label="Tiempo recolección" value={`${tiempo.toFixed(1)} d`} />
-        <KPI label="Cobertura" value={`${cobertura}%`} />
+        <KPI label="Sin pendientes" value={`${sinPendientes}%`} />
         <KPI label="Puntos vencidos" value={`${vencidos}`} />
         <KPI label="Reincidentes" value={`${reincidentes.length}`} />
       </div>

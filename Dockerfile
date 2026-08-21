@@ -9,6 +9,9 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
+# KmzParserService y BarriosService leen los KMZ/KML desde process.cwd()/boundaries
+# — sin esto la imagen queda sin los archivos y los sectores salen vacios en produccion.
+COPY --from=build /app/boundaries ./boundaries
 COPY package*.json ./
 EXPOSE 3001
 CMD ["node", "dist/main"]

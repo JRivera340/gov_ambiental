@@ -11,6 +11,7 @@ import type { Activity } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { startOfMonthStr as gSOM, endOfMonthStr as gEOM } from '../../utils/dateRanges';
+import { cerrarSesion } from '../../lib/cerrarSesion';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,6 @@ const InvalidateMap = () => {
 export const ValidadorMapaDashboard: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
-  const logout = useAuthStore(s => s.logout);
   const filterRef = useRef<HTMLDivElement>(null);
 
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -92,7 +92,7 @@ export const ValidadorMapaDashboard: React.FC = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [mapMode, setMapMode] = useState<'actividad' | 'residuos'>('actividad');
 
-  const handleLogout = () => { logout(); navigate('/', { replace: true }); };
+  const handleLogout = () => { cerrarSesion(); };
 
   const applyFilterMode = (mode: 'monthly' | 'annual') => {
     setFilterMode(mode);
