@@ -31,7 +31,9 @@ const baseParams = (over: any = {}) => ({
 describe('useActividadesCalor', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('actividadesEnCalor lista residuos pendientes, oldest first, e ignora recogidos/no-acumulación', () => {
+  // Mono-subtipo: todo lo que llega a este backend ya es punto de acumulación,
+  // así que no hay filtro por subtipo — solo se ignoran los ya recogidos.
+  it('actividadesEnCalor lista residuos pendientes, oldest first, e ignora recogidos', () => {
     const activities = [
       acumul('a1', [
         { id: 'r1', recogido: false, dateTime: '2026-02-01T00:00:00Z', tipoResiduo: 'X' },
@@ -42,7 +44,7 @@ describe('useActividadesCalor', () => {
     ];
     const { result } = renderHook(() => useActividadesCalor(baseParams({ activities }) as any));
     const calor = result.current.actividadesEnCalor;
-    expect(calor.map(c => c.residuo.id)).toEqual(['r3', 'r1']);
+    expect(calor.map(c => c.residuo.id)).toEqual(['z', 'r3', 'r1']);
   });
 
   it('handleAutoMarkOrdinarios sin sectores hoy avisa y no marca', async () => {

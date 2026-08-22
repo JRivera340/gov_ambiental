@@ -3,8 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 vi.mock('../lib/ruta', () => ({
-  getRutaActiva: vi.fn(() => null),
-  saveRutaActiva: vi.fn(),
   clearRutaActiva: vi.fn(),
   addToHistorial: vi.fn(),
   cancelarRutaAndAddToHistorial: vi.fn(),
@@ -67,22 +65,26 @@ import { waitFor } from '@testing-library/react';
 
 const user = { id: 'g1', name: 'Ana', lastname: 'P' };
 
-const setup = (initialRuta: any = null) => {
-  (ruta.getRutaActiva as any).mockReturnValue(initialRuta);
+// La ruta activa ya no sale de localStorage: se deriva de la fila de la
+// semana que devuelve el backend, y se rehidrata contra los puntos actuales.
+const setup = (dtoInicial: any = null) => {
+  if (dtoInicial) vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce(dtoInicial);
   const setViewMode = vi.fn();
   const { result } = renderHook(() => useRutaAmbiental([] as any, user, setViewMode));
   return { result, setViewMode };
 };
 
-const rutaConParada = () => ({
-  id: 'r1', gestorId: 'g1', estado: 'en_progreso',
-  segmentos: [{ id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' }],
+const dtoConParada = (overrides: any = {}) => ({
+  id: 'r1', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+  estado: 'en_progreso',
+  paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
+  segmentos: [], arrastre: [],
+  ...overrides,
 });
 
 describe('useRutaAmbiental', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (ruta.getRutaActiva as any).mockReturnValue(null);
     (ruta.getHistorialRutas as any).mockReturnValue([]);
     (ruta.buildSegmentos as any).mockReturnValue([
       { id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' },
@@ -102,13 +104,13 @@ describe('useRutaAmbiental', () => {
     await waitFor(() => { expect(result.current.plan).not.toBeNull(); });
     await act(async () => { await result.current.calcularRuta(0); });
     expect(ruta.buildSegmentos).toHaveBeenCalled();
-    expect(ruta.saveRutaActiva).toHaveBeenCalled();
     expect(result.current.rutaActiva?.estado).toBe('en_progreso');
     expect(setViewMode).toHaveBeenCalledWith('ruta-activa');
   });
 
-  it('finalizarRuta archiva, limpia y va al historial', () => {
-    const { result, setViewMode } = setup(rutaConParada());
+  it('finalizarRuta archiva, limpia y va al historial', async () => {
+    const { result, setViewMode } = setup(dtoConParada());
+    await waitFor(() => { expect(result.current.rutaActiva).not.toBeNull(); });
     act(() => result.current.finalizarRuta());
     expect(ruta.addToHistorial).toHaveBeenCalledWith(expect.objectContaining({ estado: 'finalizada' }));
     expect(ruta.clearRutaActiva).toHaveBeenCalledWith('g1');
@@ -117,7 +119,8 @@ describe('useRutaAmbiental', () => {
   });
 
   it('cancelarRuta sincroniza con el backend, usa el helper de cancelación y limpia', async () => {
-    const { result, setViewMode } = setup(rutaConParada());
+    const { result, setViewMode } = setup(dtoConParada());
+    await waitFor(() => { expect(result.current.rutaActiva).not.toBeNull(); });
     await act(async () => { await result.current.cancelarRuta(); });
     expect(ruta.cancelarRutaAndAddToHistorial).toHaveBeenCalled();
     expect(ruta.clearRutaActiva).toHaveBeenCalledWith('g1');
@@ -159,7 +162,7 @@ describe('useRutaAmbiental', () => {
     expect(result.current.rutaActiva).not.toBeNull();
   });
 
-  it('mapea el estado cancelada del backend al reconstruir la ruta activa', async () => {
+  it('una ruta cancelada en el backend no vuelve a mostrarse como activa', async () => {
     vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
       id: 'rs-cancelada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
       estado: 'cancelada',
@@ -170,7 +173,8 @@ describe('useRutaAmbiental', () => {
     await waitFor(() => {
       expect(result.current.rutaSemanalId).toBe('rs-cancelada');
     });
-    expect(result.current.rutaActiva?.estado).toBe('cancelada');
+    expect(result.current.rutaActiva).toBeNull();
+    expect(ruta.cancelarRutaAndAddToHistorial).toHaveBeenCalled();
   });
 
   it('reconstruye segmentos desde las paradas hidratadas, no desde dto.segmentos congelado', async () => {

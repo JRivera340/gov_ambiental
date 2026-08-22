@@ -116,25 +116,76 @@ export function openDirections(destLat: number, destLng: number): void {
   }
 }
 
-export function buildGoogleMapsUrls(paradas: ParadaRuta[]): string[] {
-  const pendientes = paradas.filter(p => !p.visitado);
-  if (pendientes.length === 0) return [];
-  const urls: string[] = [];
-  const CHUNK = 10; // origin + 8 waypoints + destination = 10 stops max
-  for (let i = 0; i < pendientes.length; i += CHUNK) {
-    const chunk = pendientes.slice(i, i + CHUNK);
-    const originPt = chunk[0];
-    const dest = chunk[chunk.length - 1];
-    const wayptStr = chunk.slice(1, -1).map(p => `${p.lat},${p.lng}`).join('|');
-    let url =
-      `https://www.google.com/maps/dir/?api=1` +
-      `&origin=${originPt.lat},${originPt.lng}` +
-      `&destination=${dest.lat},${dest.lng}` +
-      `&travelmode=driving`;
-    if (wayptStr) url += `&waypoints=${wayptStr}`;
-    urls.push(url);
+// Google Maps acepta como máximo 10 paradas por ruta (origen + 8 intermedias
+// + destino, o el origen del propio celular + 9 paradas). Por eso una ruta de
+// 25 puntos no puede abrirse en un solo enlace: se parte en tramos.
+export const PARADAS_POR_TRAMO = 10;
+
+export type TramoGoogleMaps = {
+  /** 0-based, para keys y etiquetas. */
+  indice: number;
+  /** Numeración 1-based sobre las paradas pendientes del segmento. */
+  desde: number;
+  hasta: number;
+  paradas: ParadaRuta[];
+};
+
+/** Tramos navegables de un segmento: solo las paradas que faltan visitar. */
+export function construirTramos(paradas: ParadaRuta[]): TramoGoogleMaps[] {
+  const pendientes = paradas.filter((p) => !p.visitado);
+  const tramos: TramoGoogleMaps[] = [];
+  for (let i = 0; i < pendientes.length; i += PARADAS_POR_TRAMO) {
+    const chunk = pendientes.slice(i, i + PARADAS_POR_TRAMO);
+    tramos.push({
+      indice: tramos.length,
+      desde: i + 1,
+      hasta: i + chunk.length,
+      paradas: chunk,
+    });
   }
-  return urls;
+  return tramos;
+}
+
+/**
+ * URL de navegación de un tramo. Con `origin` (ubicación real del gestor) las
+ * paradas del tramo son todas destino/waypoints; sin él, la primera parada
+ * hace de origen.
+ */
+export function urlTramoGoogleMaps(
+  tramo: TramoGoogleMaps,
+  origin?: { lat: number; lng: number },
+): string {
+  const paradas = tramo.paradas;
+  if (paradas.length === 0) return '';
+  const puntos = origin ? paradas : paradas.slice(1);
+  const inicio = origin ?? paradas[0];
+  const destino = puntos[puntos.length - 1] ?? paradas[0];
+  const intermedias = puntos.slice(0, -1).map((p) => `${p.lat},${p.lng}`).join('|');
+  let url =
+    `https://www.google.com/maps/dir/?api=1` +
+    `&origin=${inicio.lat},${inicio.lng}` +
+    `&destination=${destino.lat},${destino.lng}` +
+    `&travelmode=driving`;
+  if (intermedias) url += `&waypoints=${intermedias}`;
+  return url;
+}
+
+/** Abre el tramo arrancando desde donde está parado el gestor, si lo permite. */
+export function abrirTramoEnGoogleMaps(tramo: TramoGoogleMaps): void {
+  const abrir = (origin?: { lat: number; lng: number }) => {
+    const url = urlTramoGoogleMaps(tramo, origin);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+  if (!navigator.geolocation) { abrir(); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => abrir({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => abrir(),
+    { enableHighAccuracy: true, timeout: 5000 },
+  );
+}
+
+export function buildGoogleMapsUrls(paradas: ParadaRuta[]): string[] {
+  return construirTramos(paradas).map((tramo) => urlTramoGoogleMaps(tramo));
 }
 
 export function calcularOrigenRecomendado(

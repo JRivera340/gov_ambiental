@@ -8,10 +8,9 @@ import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { EdgeDrawer } from '../../../components/shell/EdgeDrawer';
 import type { SegmentoRuta } from '../lib/ruta.types';
 
-const SEGMENT_COLORS: Record<'A' | 'B' | 'C', string> = {
+const SEGMENT_COLORS: Record<'A' | 'B', string> = {
   A: '#2563eb',
   B: '#16a34a',
-  C: '#7c3aed',
 };
 
 const ESTADO_BADGE: Record<SegmentoRuta['estado'], string> = {

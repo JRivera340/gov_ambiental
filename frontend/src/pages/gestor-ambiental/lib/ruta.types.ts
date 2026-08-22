@@ -14,7 +14,7 @@ export interface ParadaRuta {
 }
 
 export interface SegmentoRuta {
-  id: 'A' | 'B' | 'C';
+  id: 'A' | 'B';
   label: string;
   estado: 'pendiente' | 'en_progreso' | 'completado';
   paradas: ParadaRuta[];

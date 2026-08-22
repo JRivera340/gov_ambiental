@@ -8,7 +8,9 @@ import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { tipoResiduoLabels } from '../lib/constants';
 import type { SegmentoRuta } from '../lib/ruta.types';
 
-const SEGMENT_COLORS: Record<'A' | 'B' | 'C', string> = {
+// Las rutas viejas del historial (guardadas en localStorage) pueden tener un
+// tercer segmento 'C', de cuando la ruta se partia en bloques de 25.
+const SEGMENT_COLORS: Record<string, string> = {
   A: '#2563eb', B: '#16a34a', C: '#7c3aed',
 };
 

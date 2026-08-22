@@ -6,14 +6,13 @@ import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { RutaPolylineLayer } from './RutaPolylineLayer';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { EdgeDrawer } from '../../../components/shell/EdgeDrawer';
-import { buildGoogleMapsUrls } from '../lib/geo';
+import { construirTramos, abrirTramoEnGoogleMaps, openDirections, PARADAS_POR_TRAMO } from '../lib/geo';
 import { tipoResiduoLabels } from '../lib/constants';
 import type { ParadaRuta } from '../lib/ruta.types';
 
-const SEGMENT_COLORS: Record<'A' | 'B' | 'C', string> = {
+const SEGMENT_COLORS: Record<'A' | 'B', string> = {
   A: '#2563eb',
   B: '#16a34a',
-  C: '#7c3aed',
 };
 
 export const RutaSegmentoView: React.FC = () => {
@@ -36,7 +35,8 @@ export const RutaSegmentoView: React.FC = () => {
     ? Math.round((visitados / segmento.paradas.length) * 100)
     : 0;
 
-  const gmapsUrls = buildGoogleMapsUrls(segmento.paradas);
+  const tramos = construirTramos(segmento.paradas);
+  const pendientes = segmento.paradas.length - visitados;
 
   const center: [number, number] =
     segmento.paradas.length > 0
@@ -68,31 +68,49 @@ export const RutaSegmentoView: React.FC = () => {
           <div className="h-1.5 bg-neutral-100 rounded-full overflow-hidden mt-2">
             <div className="h-full rounded-full transition-all" style={{ width: `${porcentaje}%`, background: color }} />
           </div>
-          <p className="text-[10px] text-neutral-400 mt-1">{visitados}/{segmento.paradas.length} puntos visitados</p>
+          <p className="text-[10px] text-neutral-400 mt-1">
+            {visitados}/{segmento.paradas.length} puntos visitados
+            {pendientes > 0 && ` · ${pendientes} por visitar`}
+          </p>
         </div>
 
         <div className="p-4 border-b border-neutral-100">
-          {gmapsUrls.length > 0 ? (
+          {tramos.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {gmapsUrls.map((url, idx) => {
-                const total = segmento.paradas.filter(p => !p.visitado).length;
-                const from = idx * 10 + 1;
-                const to = Math.min((idx + 1) * 10, total);
-                return (
-                  <a
-                    key={idx}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                    Google Maps {gmapsUrls.length > 1 ? `— paradas ${from}–${to}` : `(${total} puntos)`}
-                  </a>
-                );
-              })}
+              {/* Un solo botón para arrancar a navegar: abre Google Maps con
+                  la ubicación actual del gestor como origen y las paradas
+                  pendientes en orden. Google Maps solo admite 10 paradas por
+                  ruta, así que el resto queda a un toque, en tramos. */}
+              <button
+                onClick={() => abrirTramoEnGoogleMaps(tramos[0])}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+                {tramos.length === 1
+                  ? `Abrir en Google Maps (${pendientes} ${pendientes === 1 ? 'parada' : 'paradas'})`
+                  : `Navegar en Google Maps — paradas ${tramos[0].desde}–${tramos[0].hasta}`}
+              </button>
+
+              {tramos.length > 1 && (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tramos.slice(1).map((tramo) => (
+                      <button
+                        key={tramo.indice}
+                        onClick={() => abrirTramoEnGoogleMaps(tramo)}
+                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all"
+                      >
+                        Paradas {tramo.desde}–{tramo.hasta}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-neutral-400">
+                    Google Maps admite {PARADAS_POR_TRAMO} paradas por ruta — {pendientes} pendientes en {tramos.length} tramos.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <p className="py-2 text-center text-xs font-bold text-green-600">
@@ -123,7 +141,7 @@ export const RutaSegmentoView: React.FC = () => {
                     >
                       {parada.numeroSegmento}
                     </span>
-                    <span className="text-[11px] font-bold text-neutral-800 truncate">{parada.barrio}</span>
+                    <span className="text-[11px] font-bold text-neutral-800 truncate">{parada.barrio || 'Sin barrio'}</span>
                     {parada.visitado && <span className="text-[10px] text-green-600 font-bold">✓</span>}
                   </div>
                   {parada.tiposResiduo.length > 0 && (
@@ -145,6 +163,14 @@ export const RutaSegmentoView: React.FC = () => {
                     <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">
                       ✓ Visitado
                     </span>
+                  )}
+                  {!parada.visitado && (
+                    <button
+                      onClick={() => openDirections(parada.lat, parada.lng)}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all"
+                    >
+                      Ir
+                    </button>
                   )}
                   <button
                     onClick={() => handleVerDetalle(parada.puntoId)}
@@ -195,7 +221,7 @@ export const RutaSegmentoView: React.FC = () => {
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-black text-neutral-900">
-                  #{paradaSeleccionada.numeroSegmento} — {paradaSeleccionada.barrio}
+                  #{paradaSeleccionada.numeroSegmento} — {paradaSeleccionada.barrio || 'Sin barrio'}
                 </p>
                 {paradaSeleccionada.visitado && <span className="text-[10px] text-green-600 font-bold">✓</span>}
               </div>
@@ -224,12 +250,22 @@ export const RutaSegmentoView: React.FC = () => {
               ✓ Visitado
             </span>
           )}
-          <button
-            onClick={() => handleVerDetalle(paradaSeleccionada.puntoId)}
-            className="w-full py-2 rounded-xl text-[11px] font-bold border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-all"
-          >
-            Ver detalle
-          </button>
+          <div className="flex gap-2">
+            {!paradaSeleccionada.visitado && (
+              <button
+                onClick={() => openDirections(paradaSeleccionada.lat, paradaSeleccionada.lng)}
+                className="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all"
+              >
+                Ir
+              </button>
+            )}
+            <button
+              onClick={() => handleVerDetalle(paradaSeleccionada.puntoId)}
+              className="flex-1 py-2 rounded-xl text-[11px] font-bold border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-all"
+            >
+              Ver detalle
+            </button>
+          </div>
         </div>
       )}
     </div>

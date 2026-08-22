@@ -1,6 +1,6 @@
 import type { RutaActiva, SegmentoRuta, ParadaRuta } from './ruta.types';
 
-const SEGMENT_IDS: ('A' | 'B' | 'C')[] = ['A', 'B', 'C'];
+const SEGMENT_IDS: ('A' | 'B')[] = ['A', 'B'];
 
 export function segmentoEstado(paradas: ParadaRuta[]): SegmentoRuta['estado'] {
   if (paradas.length === 0) return 'pendiente';
@@ -10,20 +10,31 @@ export function segmentoEstado(paradas: ParadaRuta[]): SegmentoRuta['estado'] {
   return anyVisited ? 'en_progreso' : 'pendiente';
 }
 
+// La ruta de la semana se recorre en dos tramos, no en bloques fijos de 25:
+// el gestor divide su semana en dos salidas y cada tramo tiene que ser la
+// mitad de SU ruta, no un corte arbitrario que dejaba un tercer segmento con
+// cuatro paradas sueltas.
 export function buildSegmentos(rutaOrdenada: ParadaRuta[]): SegmentoRuta[] {
+  if (rutaOrdenada.length === 0) return [];
+  const corte = Math.ceil(rutaOrdenada.length / 2);
+  const trozos = rutaOrdenada.length <= 1
+    ? [rutaOrdenada]
+    : [rutaOrdenada.slice(0, corte), rutaOrdenada.slice(corte)];
+
   const segmentos: SegmentoRuta[] = [];
-  for (let i = 0; i < rutaOrdenada.length; i += 25) {
-    const idx = segmentos.length;
-    const chunk = rutaOrdenada.slice(i, i + 25);
-    const from = i + 1;
-    const to = i + chunk.length;
+  let desde = 0;
+  trozos.forEach((chunk, idx) => {
+    if (chunk.length === 0) return;
+    const from = desde + 1;
+    const to = desde + chunk.length;
+    desde = to;
     segmentos.push({
       id: SEGMENT_IDS[idx],
       label: `Segmento ${SEGMENT_IDS[idx]} — puntos ${from} al ${to}`,
       estado: segmentoEstado(chunk),
       paradas: chunk.map((p, j) => ({ ...p, numeroSegmento: j + 1 })),
     });
-  }
+  });
   return segmentos;
 }
 
@@ -35,19 +46,10 @@ function historialKey(gestorId: string) {
   return `ambiental_historial_rutas_${gestorId}`;
 }
 
-export function getRutaActiva(gestorId: string): RutaActiva | null {
-  try {
-    const raw = localStorage.getItem(activeKey(gestorId));
-    return raw ? (JSON.parse(raw) as RutaActiva) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveRutaActiva(ruta: RutaActiva): void {
-  localStorage.setItem(activeKey(ruta.gestorId), JSON.stringify(ruta));
-}
-
+// La ruta activa ya no se cachea en localStorage: se deriva de la fila de la
+// semana del backend y se rehidrata contra los puntos actuales del gestor
+// (ver useRutaAmbiental). `clearRutaActiva` se conserva para limpiar la clave
+// que quedó de la versión anterior en los navegadores ya usados.
 export function clearRutaActiva(gestorId: string): void {
   localStorage.removeItem(activeKey(gestorId));
 }

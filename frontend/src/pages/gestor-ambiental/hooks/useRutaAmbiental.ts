@@ -6,7 +6,7 @@ import type { ParadaRuta, RutaActiva } from '../lib/ruta.types';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 import { diasDesdeUltimoToque } from '../lib/visitado';
 import {
-  getRutaActiva, saveRutaActiva, clearRutaActiva,
+  clearRutaActiva,
   addToHistorial, cancelarRutaAndAddToHistorial, getHistorialRutas, deleteFromHistorial,
   buildSegmentos, getUnvisitedActivityIds,
 } from '../lib/ruta';
@@ -48,10 +48,16 @@ export function useRutaAmbiental(
   setViewMode: Dispatch<SetStateAction<ViewMode>>,
   setToast?: ToastSetter,
 ) {
-  const [rutaActiva, setRutaActiva] = useState<RutaActiva | null>(() =>
-    user ? getRutaActiva(user.id) : null
-  );
-  const [activeSegmento, setActiveSegmento] = useState<'A' | 'B' | 'C' | null>(null);
+  // La ruta de la semana se guarda como DTO crudo y la ruta activa se deriva
+  // de él en cada render. Antes se armaba una sola vez, en el fetch inicial,
+  // cuando todavía no habían llegado ni las actividades ni el plan del ciclo:
+  // las paradas quedaban con `visitado: false` para siempre y los segmentos
+  // mostraban 0% aunque el gestor ya hubiera visitado media ruta.
+  const [rutaDto, setRutaDto] = useState<RutaSemanalDTO | null>(null);
+  // Ruta que el gestor finalizó/canceló/descartó en esta sesión — el DTO sigue
+  // en memoria para el historial, pero no debe volver a mostrarse como activa.
+  const [rutaCerradaId, setRutaCerradaId] = useState<string | null>(null);
+  const [activeSegmento, setActiveSegmento] = useState<'A' | 'B' | null>(null);
   const [historialRutas, setHistorialRutas] = useState<RutaActiva[]>(() =>
     user ? getHistorialRutas(user.id) : []
   );
@@ -155,6 +161,15 @@ export function useRutaAmbiental(
     puntosRef.current = puntosParaRuta;
   }, [puntosParaRuta]);
 
+  // Ruta activa derivada: se recalcula cada vez que cambian los puntos (o sea,
+  // cada vez que llega el plan del ciclo o el gestor marca un seguimiento), así
+  // el progreso de los segmentos siempre refleja lo que ya visitó.
+  const rutaActiva = useMemo<RutaActiva | null>(() => {
+    if (!rutaDto || rutaDto.estado !== 'en_progreso') return null;
+    if (rutaCerradaId === rutaDto.id) return null;
+    return reconstruirRutaActiva(rutaDto, puntosParaRuta);
+  }, [rutaDto, rutaCerradaId, puntosParaRuta]);
+
   useEffect(() => {
     let vivo = true;
     if (!user) return;
@@ -165,9 +180,8 @@ export function useRutaAmbiental(
         if (dto) {
           setRutaSemanalId(dto.id);
           setSemanaFinISO(dto.semanaFin ?? null);
-          if (dto.estado === 'en_progreso') {
-            setRutaActiva(reconstruirRutaActiva(dto, puntosRef.current));
-          } else if (user) {
+          setRutaDto(dto);
+          if (dto.estado !== 'en_progreso') {
             // No es una ruta en curso (se cerró sola al pasar la semana, o
             // quedó cancelada) y el frontend nunca la movió a historial —
             // se registra ahora con la hora real de cierre, sin mostrarla
@@ -183,7 +197,6 @@ export function useRutaAmbiental(
               }
               setHistorialRutas(getHistorialRutas(user.id));
             }
-            setRutaActiva(null);
           }
         }
       })
@@ -237,9 +250,8 @@ export function useRutaAmbiental(
       );
       setRutaSemanalId(dto.id);
       setSemanaFinISO(dto.semanaFin ?? null);
-      const nuevaRuta = reconstruirRutaActiva(dto, puntosParaRuta);
-      saveRutaActiva(nuevaRuta);
-      setRutaActiva(nuevaRuta);
+      setRutaDto(dto);
+      setRutaCerradaId(null);
       setViewMode('ruta-activa');
     } catch (error) {
       console.error('Error al crear la ruta de la semana:', error);
@@ -247,7 +259,7 @@ export function useRutaAmbiental(
     }
   }, [user, puntosParaRuta, setToast, rutaActiva, plan]);
 
-  const entrarSegmento = useCallback((segId: 'A' | 'B' | 'C') => {
+  const entrarSegmento = useCallback((segId: 'A' | 'B') => {
     setActiveSegmento(segId);
     setViewMode('ruta-segmento');
   }, []);
@@ -257,7 +269,7 @@ export function useRutaAmbiental(
     const finalizada: RutaActiva = { ...rutaActiva, estado: 'finalizada' };
     addToHistorial(finalizada);
     clearRutaActiva(user.id);
-    setRutaActiva(null);
+    setRutaCerradaId(rutaActiva.id);
     setHistorialRutas(getHistorialRutas(user.id));
     setViewMode('historial-rutas');
   }, [rutaActiva, user]);
@@ -275,7 +287,7 @@ export function useRutaAmbiental(
     }
     cancelarRutaAndAddToHistorial(rutaActiva);
     clearRutaActiva(user.id);
-    setRutaActiva(null);
+    setRutaCerradaId(rutaActiva.id);
     setHistorialRutas(getHistorialRutas(user.id));
     setViewMode('historial-rutas');
   }, [rutaActiva, user, rutaSemanalId, setToast]);
@@ -283,9 +295,9 @@ export function useRutaAmbiental(
   const descartarRutaActiva = useCallback(() => {
     if (!user) return;
     clearRutaActiva(user.id);
-    setRutaActiva(null);
+    if (rutaActiva) setRutaCerradaId(rutaActiva.id);
     setViewMode('general-map');
-  }, [user]);
+  }, [user, rutaActiva]);
 
   const verHistorialRuta = useCallback((ruta: RutaActiva) => {
     setHistorialRutaSeleccionada(ruta);

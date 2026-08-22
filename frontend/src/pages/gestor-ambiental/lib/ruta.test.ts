@@ -24,31 +24,36 @@ describe('buildSegmentos', () => {
     expect(buildSegmentos([])).toEqual([]);
   });
 
-  it('agrupa 25 paradas en un solo segmento A', () => {
-    const segs = buildSegmentos(paradas(25));
+  it('una sola parada queda en el segmento A', () => {
+    const segs = buildSegmentos(paradas(1));
     expect(segs).toHaveLength(1);
     expect(segs[0].id).toBe('A');
-    expect(segs[0].paradas).toHaveLength(25);
-    expect(segs[0].label).toContain('puntos 1 al 25');
-    expect(segs[0].estado).toBe('pendiente');
+    expect(segs[0].label).toContain('puntos 1 al 1');
   });
 
-  it('parte en segmentos de 25', () => {
-    const segs = buildSegmentos(paradas(30));
+  it('parte la ruta en dos tramos, sin importar el tamano', () => {
+    const segs = buildSegmentos(paradas(54));
     expect(segs).toHaveLength(2);
     expect(segs[0].id).toBe('A');
-    expect(segs[0].paradas).toHaveLength(25);
+    expect(segs[0].paradas).toHaveLength(27);
+    expect(segs[0].label).toContain('puntos 1 al 27');
     expect(segs[1].id).toBe('B');
-    expect(segs[1].paradas).toHaveLength(5);
-    expect(segs[1].label).toContain('puntos 26 al 30');
+    expect(segs[1].paradas).toHaveLength(27);
+    expect(segs[1].label).toContain('puntos 28 al 54');
+  });
+
+  it('con cantidad impar el primer tramo se queda con la parada de mas', () => {
+    const segs = buildSegmentos(paradas(25));
+    expect(segs.map((s) => s.paradas.length)).toEqual([13, 12]);
+    expect(segs[1].label).toContain('puntos 14 al 25');
   });
 
   it('renumera cada parada dentro de su segmento (numeroSegmento)', () => {
     const segs = buildSegmentos(paradas(30));
     expect(segs[0].paradas[0].numeroSegmento).toBe(1);
-    expect(segs[0].paradas[24].numeroSegmento).toBe(25);
+    expect(segs[0].paradas[14].numeroSegmento).toBe(15);
     expect(segs[1].paradas[0].numeroSegmento).toBe(1);
-    expect(segs[1].paradas[4].numeroSegmento).toBe(5);
+    expect(segs[1].paradas[14].numeroSegmento).toBe(15);
   });
 });
 

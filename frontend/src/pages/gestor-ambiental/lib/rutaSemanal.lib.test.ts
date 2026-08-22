@@ -22,10 +22,19 @@ describe('hidratarParadas', () => {
     expect(out[0].visitado).toBe(false);
     expect(out[0].tiposResiduo).toEqual(['RESIDUOS_ORDINARIOS']); // enriquecido del punto
   });
-  it('cae al snapshot del backend cuando el punto ya no está en el pool actual', () => {
+  it('descarta las paradas de puntos que ya no son del gestor', () => {
+    const dto: any = { paradas: [
+      { puntoId: 'a', lat: 4.6, lng: -74.07, barrio: 'LOURDES', visitado: false },
+      { puntoId: 'reasignado', lat: 4.7, lng: -74.08, barrio: 'OTRO', visitado: true },
+    ] };
+    const out = hidratarParadas(dto, [PR('a', 'LOURDES', false)]);
+    expect(out.map((p) => p.puntoId)).toEqual(['a']);
+    expect(out[0].numeroGlobal).toBe(1);
+  });
+
+  it('cae al snapshot del backend mientras el pool de puntos no llegó', () => {
     const dto: any = { paradas: [{ puntoId: 'unknown-id', lat: 4.7, lng: -74.08, barrio: 'OTRO', visitado: true }] };
-    const puntos = [PR('a', 'LOURDES', false)];
-    const out = hidratarParadas(dto, puntos);
+    const out = hidratarParadas(dto, []);
     expect(out[0].diasVencido).toBe(0);
     expect(out[0].tiposResiduo).toEqual([]);
     expect(out[0].visitado).toBe(true);
