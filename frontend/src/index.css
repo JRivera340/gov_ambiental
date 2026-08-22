@@ -853,3 +853,89 @@ input:-ms-input-placeholder {
 .hide-scrollbar::-webkit-scrollbar-thumb {
   display: none !important;
 }
+/* ============================================
+   PANEL DE ADMINISTRACIÓN — SALA DE CONTROL
+   Lienzo, vidrio y movimiento del tablero admin.
+   Alcance acotado: solo aplica bajo .admin-canvas.
+   ============================================ */
+
+.admin-canvas {
+  position: relative;
+  background-color: #eceff4;
+  background-image:
+    radial-gradient(120% 90% at 12% 0%, rgba(228, 3, 46, 0.10) 0%, transparent 55%),
+    radial-gradient(100% 80% at 100% 0%, rgba(22, 163, 74, 0.09) 0%, transparent 50%),
+    linear-gradient(180deg, #f4f6f9 0%, #e8ecf2 100%);
+}
+
+/* Textura cartográfica: retícula tenue, del mundo del mapa que este panel
+   supervisa. Se queda debajo del canvas de partículas y del contenido. */
+.admin-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(26, 32, 44, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26, 32, 44, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(120% 100% at 50% 0%, black 20%, transparent 85%);
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 0%, black 20%, transparent 85%);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 8px 24px -12px rgba(16, 24, 40, 0.18);
+}
+
+.glass-panel-solid {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 8px 24px -12px rgba(16, 24, 40, 0.2);
+}
+
+/* Cifras del tablero: monoespaciada tabular para que las columnas de
+   números se puedan comparar de un vistazo. */
+.tabular {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+
+/* Entrada escalonada de las tarjetas al cargar la vista. */
+@keyframes admin-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.admin-rise {
+  animation: admin-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.admin-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.admin-lift:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 16px 32px -14px rgba(16, 24, 40, 0.26);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-rise { animation: none; }
+  .admin-lift { transition: none; }
+  .admin-lift:hover { transform: none; }
+}

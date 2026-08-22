@@ -75,6 +75,11 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Grotesca institucional para titulos y etiquetas de seccion.
+        display: ['Archivo', 'Inter', 'system-ui', 'sans-serif'],
+        // Cifras tabulares: en un tablero comparativo los numeros tienen que
+        // alinearse columna a columna.
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       fontSize: {
         'xs': ['0.75rem', { lineHeight: '1.5' }],
@@ -104,6 +109,8 @@ export default {
         'card-hover': '0 8px 20px -4px rgba(228, 3, 46, 0.12), 0 4px 12px -4px rgba(228, 3, 46, 0.08)',
         'button': '0 1px 2px 0 rgba(228, 3, 46, 0.08)',
         'inner': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)',
+        'glass': 'inset 0 1px 0 rgba(255,255,255,0.75), 0 8px 24px -12px rgba(16,24,40,0.18)',
+        'glass-hover': 'inset 0 1px 0 rgba(255,255,255,0.85), 0 16px 32px -14px rgba(16,24,40,0.26)',
       },
       spacing: {
         '18': '4.5rem',
