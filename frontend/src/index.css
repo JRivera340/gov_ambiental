@@ -670,36 +670,10 @@
   animation: fadeIn 0.6s ease-out;
 }
 
-/* Estilos para mejorar visibilidad en login */
-input::placeholder {
-  color: rgba(255, 255, 255, 0.7) !important;
-  opacity: 1;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-}
-
-input::-webkit-input-placeholder {
-  color: rgba(255, 255, 255, 0.7) !important;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-}
-
-input::-moz-placeholder {
-  color: rgba(255, 255, 255, 0.7) !important;
-  opacity: 1;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-}
-
-input:-ms-input-placeholder {
-  color: rgba(255, 255, 255, 0.7) !important;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-}
+/* El placeholder de los inputs se pintaba de blanco con !important para el
+   login del hub. Este módulo no tiene login propio (se entra por handoff), así
+   que esa regla solo servía para dejar invisible el texto de ayuda de todos
+   los buscadores sobre fondo blanco. Se usa el color por defecto de Tailwind. */
 
 /* ============================================
    ESTILOS PARA MAPA PÚBLICO

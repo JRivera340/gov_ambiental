@@ -328,8 +328,9 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               <input
                 value={listSearchNumber}
                 onChange={e => setListSearchNumber(e.target.value)}
-                placeholder="N° punto"
-                className="tabular text-[11px] px-2 py-1.5 border border-neutral-200 rounded-lg bg-white w-24 outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Buscador"
+                aria-label="Filtrar el mapa por número de punto"
+                className="tabular text-[11px] font-bold text-neutral-900 placeholder:font-bold placeholder:text-neutral-500 px-2 py-1.5 border border-neutral-200 rounded-lg bg-white w-24 outline-none focus:ring-2 focus:ring-primary/20"
               />
               <select
                 value={statusFilter}
@@ -440,7 +441,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                     inputMode="numeric"
                     placeholder="N° del punto"
                     aria-label="Elegir un punto por su número"
-                    className="tabular flex-1 min-w-0 text-[11px] px-2 py-1.5 border border-neutral-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-purple-200"
+                    className="tabular flex-1 min-w-0 text-[11px] font-bold text-neutral-900 placeholder:font-bold placeholder:text-neutral-500 px-2 py-1.5 border border-neutral-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-purple-200"
                   />
                   <button
                     type="submit"
