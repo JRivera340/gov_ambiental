@@ -155,12 +155,14 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
   const [hijosIds, setHijosIds] = useState<Set<string>>(new Set());
   const [fusionando, setFusionando] = useState(false);
   const [errorFusion, setErrorFusion] = useState<string | null>(null);
+  const [buscarFusion, setBuscarFusion] = useState('');
 
   const salirDeFusion = () => {
     setModoFusion(false);
     setPadreId(null);
     setHijosIds(new Set());
     setErrorFusion(null);
+    setBuscarFusion('');
   };
 
   const alTocarPuntoEnFusion = (punto: Activity) => {
@@ -181,6 +183,31 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
       else siguientes.add(punto.id);
       return siguientes;
     });
+  };
+
+  /**
+   * Selecciona un punto escribiendo su número, sin buscarlo en el mapa.
+   *
+   * Hace lo mismo que tocar el marcador: el primero es el padre y los
+   * siguientes se le unen. Busca solo entre los puntos que el mapa está
+   * mostrando — si los filtros de arriba lo esconden, avisa en vez de
+   * seleccionar algo que el usuario no puede ver.
+   */
+  const seleccionarPorNumero = () => {
+    const termino = buscarFusion.trim();
+    if (!termino) return;
+
+    const punto = ambientalActivities.find(
+      a => String(getGlobalActivityIndex(a.id) || '') === termino,
+    );
+
+    if (!punto) {
+      setErrorFusion(`No hay ningún punto #${termino} entre los que muestra el mapa.`);
+      return;
+    }
+
+    alTocarPuntoEnFusion(punto);
+    setBuscarFusion('');
   };
 
   const confirmarFusion = async () => {
@@ -389,20 +416,55 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                   Se conserva la ubicación y los datos del padre.
                 </p>
 
-                <ol className="text-[11px] text-neutral-600 space-y-1 mb-3">
+                <ol className="text-[11px] text-neutral-600 space-y-1 mb-2.5">
                   <li className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: '#A855F7' }} />
-                    1. Toca el punto que se queda
+                    1. Elige el punto que se queda
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: '#3B82F6' }} />
-                    2. Toca los que se le unen
+                    2. Elige los que se le unen
                   </li>
                 </ol>
 
+                {/* Buscar por número: el mapa tiene cientos de puntos y muchos
+                    quedan encimados, así que apuntarle al marcador correcto no
+                    siempre es viable. */}
+                <form
+                  onSubmit={e => { e.preventDefault(); seleccionarPorNumero(); }}
+                  className="flex gap-1.5 mb-2.5"
+                >
+                  <input
+                    value={buscarFusion}
+                    onChange={e => setBuscarFusion(e.target.value)}
+                    inputMode="numeric"
+                    placeholder="N° del punto"
+                    aria-label="Elegir un punto por su número"
+                    className="tabular flex-1 min-w-0 text-[11px] px-2 py-1.5 border border-neutral-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-purple-200"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!buscarFusion.trim()}
+                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-purple-300 text-purple-700 bg-white hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
+                  >
+                    Elegir
+                  </button>
+                </form>
+
                 <div className="text-[11px] text-neutral-700 bg-neutral-100/80 rounded-lg px-2.5 py-2 mb-3">
-                  <p>Padre: <strong>{padreId ? `#${getGlobalActivityIndex(padreId) || '—'}` : 'sin elegir'}</strong></p>
-                  <p className="mt-0.5">Se le unen: <strong className="tabular">{hijosIds.size}</strong></p>
+                  <p>Se queda: <strong>{padreId ? `#${getGlobalActivityIndex(padreId) || '—'}` : 'sin elegir'}</strong></p>
+                  {hijosIds.size === 0 ? (
+                    <p className="mt-0.5 text-neutral-500">Todavía no se le une ninguno</p>
+                  ) : (
+                    <p className="mt-1 leading-snug">
+                      Se le unen ({hijosIds.size}):{' '}
+                      <strong className="tabular">
+                        {[...hijosIds]
+                          .map(id => `#${getGlobalActivityIndex(id) || '—'}`)
+                          .join(', ')}
+                      </strong>
+                    </p>
+                  )}
                 </div>
 
                 {errorFusion && (
