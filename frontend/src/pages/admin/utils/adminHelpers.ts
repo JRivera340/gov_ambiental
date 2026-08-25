@@ -210,6 +210,8 @@ export const getCategoryIcon = (
   isCobertura?: boolean,
   isSectorAmbiental?: boolean,
   number?: number,
+  /** Fuerza el color del marcador (fusión de puntos: padre e hijos). */
+  colorForzado?: string,
 ): DivIcon => {
   // Mono-dominio: todo lo que llega a este backend ya es AMBIENTAL / punto
   // de acumulación — no hay operativoCategoria/operativoSubtipo que leer.
@@ -227,6 +229,10 @@ export const getCategoryIcon = (
     const matches = getResiduos(a).some((r: any) => getResiduoLabel(r.tipoResiduo) === filterLabel);
     if (matches) color = tipoResiduoColors[selectedTipoResiduo] || color;
   }
+
+  // El color de la fusión manda sobre todo lo demás: mientras se eligen padre
+  // e hijos, importa más ver la selección que el tipo de residuo.
+  if (colorForzado) color = colorForzado;
 
   return createMarkerIcon(color, 'AMBIENTAL', 'AMBIENTAL_PUNTOS_ACUMULACION', number);
 };

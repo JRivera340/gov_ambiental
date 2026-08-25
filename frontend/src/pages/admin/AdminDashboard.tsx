@@ -191,6 +191,7 @@ export const AdminDashboard: React.FC = () => {
                 globalSubtipo=""
                 setSelectedActivity={setSelectedActivity}
                 setShowDetailModal={setShowDetailModal}
+                recargarPuntos={cargarPuntos}
               />
             ) : (
               <div className="h-full overflow-y-auto pr-1">

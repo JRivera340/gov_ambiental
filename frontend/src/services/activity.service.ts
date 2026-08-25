@@ -96,6 +96,18 @@ export const activityService = {
     return normalizeActivity(data);
   },
 
+  /**
+   * Fusiona varios puntos en uno.
+   *
+   * Los residuos de los hijos se copian al padre y los hijos se eliminan. La
+   * ubicación y los datos que quedan son los del padre; los de los hijos se
+   * descartan. Es irreversible.
+   */
+  async mergePuntos(parentId: string, childIds: string[]): Promise<Activity> {
+    const { data } = await api.post<Activity>('/puntos/merge', { parentId, childIds });
+    return normalizeActivity(data);
+  },
+
   // ADMIN: eliminar un punto por completo (y su asignación).
   async remove(id: string): Promise<void> {
     await api.delete(`/puntos/${id}`);

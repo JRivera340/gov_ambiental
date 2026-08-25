@@ -11,6 +11,7 @@ import { ClickableMarker } from '../components/shared/ClickableMarker';
 import { PieChart } from '../components/shared/PieChart';
 import type { Activity } from '../../../types';
 import { getCategoryIcon, getResiduos } from '../utils/adminHelpers';
+import { activityService } from '../../../services/activity.service';
 import { INST_RED, AMB_GREEN, technicalResidueKeys, tipoResiduoColors, residuoLabels } from '../utils/adminConstants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,6 +70,8 @@ export interface EnvironmentalTabProps {
   // Acciones
   setSelectedActivity: (a: Activity) => void;
   setShowDetailModal: (v: boolean) => void;
+  /** Vuelve a pedir los puntos al backend (tras fusionar, por ejemplo). */
+  recargarPuntos: () => void;
 }
 
 // ── Piezas de la vista ─────────────────────────────────────
@@ -139,9 +142,61 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
   ambientalInsightsData,
   alertas,
   globalSubtipo,
+  recargarPuntos,
 }) => {
   const [panelDerecho, setPanelDerecho] = useState<PanelDerecho>('tipos');
   const [listaAbierta, setListaAbierta] = useState(false);
+
+  // ── Fusión de puntos ──────────────────────────────────────
+  // Un punto padre absorbe los residuos de los hijos; los hijos se eliminan.
+  // La ubicación y los datos que quedan son los del padre.
+  const [modoFusion, setModoFusion] = useState(false);
+  const [padreId, setPadreId] = useState<string | null>(null);
+  const [hijosIds, setHijosIds] = useState<Set<string>>(new Set());
+  const [fusionando, setFusionando] = useState(false);
+  const [errorFusion, setErrorFusion] = useState<string | null>(null);
+
+  const salirDeFusion = () => {
+    setModoFusion(false);
+    setPadreId(null);
+    setHijosIds(new Set());
+    setErrorFusion(null);
+  };
+
+  const alTocarPuntoEnFusion = (punto: Activity) => {
+    setErrorFusion(null);
+    if (!padreId) {
+      setPadreId(punto.id);
+      return;
+    }
+    if (padreId === punto.id) {
+      // Volver a tocar el padre lo libera y limpia la selección.
+      setPadreId(null);
+      setHijosIds(new Set());
+      return;
+    }
+    setHijosIds(previos => {
+      const siguientes = new Set(previos);
+      if (siguientes.has(punto.id)) siguientes.delete(punto.id);
+      else siguientes.add(punto.id);
+      return siguientes;
+    });
+  };
+
+  const confirmarFusion = async () => {
+    if (!padreId || hijosIds.size === 0) return;
+    setFusionando(true);
+    setErrorFusion(null);
+    try {
+      await activityService.mergePuntos(padreId, [...hijosIds]);
+      salirDeFusion();
+      recargarPuntos();
+    } catch (e: any) {
+      setErrorFusion(e?.response?.data?.message || 'No se pudieron fusionar los puntos.');
+    } finally {
+      setFusionando(false);
+    }
+  };
 
   const handleLayerChange = (layer: keyof LayerVisibility, visible: boolean) =>
     setLayerVisibility(prev => ({ ...prev, [layer]: visible }));
@@ -235,6 +290,14 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                 <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 5.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.814-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
                 En emergencia
               </button>
+              <button
+                onClick={() => (modoFusion ? salirDeFusion() : setModoFusion(true))}
+                aria-pressed={modoFusion}
+                className={`text-[11px] px-2.5 py-1.5 rounded-lg border font-bold flex items-center gap-1.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${modoFusion ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 004.5 9.75v7.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25v-.75M16.5 4.5h2.25A2.25 2.25 0 0121 6.75v7.5" /></svg>
+                {modoFusion ? 'Cancelar fusión' : 'Unir puntos'}
+              </button>
               <input
                 value={listSearchNumber}
                 onChange={e => setListSearchNumber(e.target.value)}
@@ -284,21 +347,87 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               {ambientalActivities.map(a => {
                 const displayIdx = getGlobalActivityIndex(a.id) || 0;
                 if (listSearchNumber && displayIdx.toString() !== listSearchNumber.trim()) return null;
+
+                // En fusión el marcador cambia de color para que se vea de un
+                // vistazo quién absorbe a quién: morado el padre, azul los hijos.
+                const esPadre = modoFusion && padreId === a.id;
+                const esHijo = modoFusion && hijosIds.has(a.id);
+                const icono = esPadre
+                  ? getCategoryIcon(a, tipoResiduoFilter, false, true, displayIdx, '#A855F7')
+                  : esHijo
+                    ? getCategoryIcon(a, tipoResiduoFilter, false, true, displayIdx, '#3B82F6')
+                    : getCategoryIcon(a, tipoResiduoFilter, false, true, displayIdx);
+
                 return (
                   <ClickableMarker
                     key={a.id}
                     position={[a.lat, a.lng]}
-                    icon={getCategoryIcon(a, tipoResiduoFilter, false, true, displayIdx)}
+                    icon={icono}
                     activity={a}
                     index={displayIdx}
                     // El admin necesita ver info real y poder aprobar/rechazar
                     // si el punto está pendiente — la consulta pública
                     // (/public/actividad) es de solo lectura para ciudadanos.
-                    onActivityClick={activity => window.open(`/validador/actividad/${activity.id}`, '_blank')}
+                    onActivityClick={activity => {
+                      if (modoFusion) {
+                        alTocarPuntoEnFusion(activity);
+                        return;
+                      }
+                      window.open(`/validador/actividad/${activity.id}`, '_blank');
+                    }}
                   />
                 );
               })}
             </AnyMapContainer>
+
+            {/* Fusión de puntos: guía + confirmación, sobre el mapa */}
+            {modoFusion && (
+              <div className="glass-panel-solid absolute top-3 left-3 z-[1002] w-[260px] rounded-2xl p-3.5 shadow-xl">
+                <h4 className="font-display text-[12px] font-bold text-neutral-800 mb-1">Unir puntos</h4>
+                <p className="text-[10px] text-neutral-500 leading-snug mb-2.5">
+                  Los residuos de los hijos pasan al padre y los hijos se eliminan.
+                  Se conserva la ubicación y los datos del padre.
+                </p>
+
+                <ol className="text-[11px] text-neutral-600 space-y-1 mb-3">
+                  <li className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: '#A855F7' }} />
+                    1. Toca el punto que se queda
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: '#3B82F6' }} />
+                    2. Toca los que se le unen
+                  </li>
+                </ol>
+
+                <div className="text-[11px] text-neutral-700 bg-neutral-100/80 rounded-lg px-2.5 py-2 mb-3">
+                  <p>Padre: <strong>{padreId ? `#${getGlobalActivityIndex(padreId) || '—'}` : 'sin elegir'}</strong></p>
+                  <p className="mt-0.5">Se le unen: <strong className="tabular">{hijosIds.size}</strong></p>
+                </div>
+
+                {errorFusion && (
+                  <p className="text-[11px] text-red-600 mb-2 leading-snug">{errorFusion}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmarFusion}
+                    disabled={!padreId || hijosIds.size === 0 || fusionando}
+                    className="flex-1 text-[11px] font-bold px-3 py-2 rounded-lg text-white transition-colors disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
+                    style={{ background: !padreId || hijosIds.size === 0 || fusionando ? '#CBD5E0' : '#A855F7' }}
+                  >
+                    {fusionando ? 'Uniendo…' : 'Unir'}
+                  </button>
+                  <button
+                    onClick={salirDeFusion}
+                    disabled={fusionando}
+                    className="text-[11px] font-bold px-3 py-2 rounded-lg border border-neutral-300 text-neutral-600 hover:bg-neutral-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Lista de puntos — el botón de arriba antes no abría nada. */}
             {listaAbierta && (
@@ -414,7 +543,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
           </div>
 
           {/* Análisis: un panel por vez, en vez de tres tarjetas apiladas */}
-          <div className="glass-panel rounded-2xl p-3.5 flex-1 min-h-[300px] flex flex-col">
+          <div className="glass-panel rounded-2xl p-3.5 flex-1 min-h-[420px] flex flex-col">
             <div className="flex items-center gap-1 mb-3 shrink-0">
               {PANELES.map(p => {
                 const activo = p.key === panelDerecho;
@@ -433,9 +562,9 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               })}
             </div>
 
-            <div className="flex-1 min-h-0 relative">
+            <div className="flex-1 min-h-0 flex flex-col">
               {panelDerecho === 'tipos' && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex-1 min-h-0 flex items-center justify-center">
                   <PieChart
                     data={Object.fromEntries(
                       (globalSubtipo === 'AMBIENTAL_PUNTOS_ACUMULACION' || globalSubtipo === ''
@@ -452,7 +581,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               )}
 
               {panelDerecho === 'ocupacion' && (
-                <div className="absolute inset-0 flex flex-col">
+                <div className="flex-1 min-h-0 flex flex-col">
                   <p className="text-[11px] text-neutral-500 mb-1 shrink-0">Metros lineales ocupados por tipo</p>
                   <div className="flex-1 min-h-0 flex items-center justify-center">
                     <PieChart
@@ -472,7 +601,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               )}
 
               {panelDerecho === 'tiempos' && (
-                <div className="absolute inset-0 overflow-y-auto pr-1">
+                <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                   <p className="text-[11px] text-neutral-500 mb-3">
                     Días promedio entre el registro del residuo y su recolección.
                   </p>
@@ -499,15 +628,15 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
                       );
                     })}
                   </div>
-                  <div className="mt-4 pt-3 border-t border-neutral-200/70 grid grid-cols-3 gap-2">
+                  <div className="mt-4 pt-3 border-t border-neutral-200/70 grid grid-cols-3 gap-3 shrink-0">
                     {[
                       { label: 'Publicados', valor: ambientalInsightsData.totalPub, color: '#16a34a' },
                       { label: 'En validación', valor: ambientalInsightsData.totalVal, color: '#2563eb' },
                       { label: 'Rechazados', valor: ambientalInsightsData.totalRech, color: '#e4032e' },
                     ].map(item => (
-                      <div key={item.label}>
+                      <div key={item.label} className="min-w-0">
                         <p className="tabular text-lg font-extrabold leading-none" style={{ color: item.color }}>{item.valor}</p>
-                        <p className="text-[10px] text-neutral-500 mt-0.5">{item.label}</p>
+                        <p className="text-[10px] text-neutral-500 mt-1 leading-tight">{item.label}</p>
                       </div>
                     ))}
                   </div>
