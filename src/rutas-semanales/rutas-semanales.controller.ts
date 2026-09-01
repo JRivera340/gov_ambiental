@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -14,14 +14,7 @@ export class RutasSemanalesController {
   @Get('mine')
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   getMine(@Req() req: any) {
-    return this.rutasService.getRutaDeLaSemana(req.user.userId);
-  }
-
-  // Las rutas de las dos semanas del ciclo, en el orden del plan.
-  @Get('mine/ciclo')
-  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
-  getMineCiclo(@Req() req: any) {
-    return this.rutasService.getRutasDelCiclo(req.user.userId);
+    return this.rutasService.getRutaDeLaQuincena(req.user.userId);
   }
 
   @Get('arrastre/mine')
@@ -30,23 +23,33 @@ export class RutasSemanalesController {
     return this.rutasService.getArrastrePendiente(req.user.userId);
   }
 
-  // Plan del ciclo de 2 semanas, sin el cruce con las visitas: ese vive en
+  // Historial de rutas de quincenas cerradas. El gestor solo ve el suyo; el
+  // admin consulta el de cualquiera pasando gestorId.
+  @Get('historial')
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  getHistorial(@Req() req: any, @Query('gestorId') gestorId?: string, @Query('limit') limit?: string) {
+    const esAdmin = req.user.role === Role.ADMIN;
+    const objetivo = esAdmin && gestorId ? gestorId : req.user.userId;
+    const limite = limit ? Number(limit) : 20;
+    return this.rutasService.getHistorial(objetivo, Number.isFinite(limite) ? limite : 20);
+  }
+
+  // Plan de la quincena, sin el cruce con las visitas: ese vive en
   // GET /visitas/plan, porque VisitasService ya depende de este módulo y
   // pedirle la dependencia inversa cerraría un ciclo en Nest.
   @Get('plan')
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   getPlan(@Req() req: any) {
-    return this.rutasService.getPlanCiclo(req.user.userId);
+    return this.rutasService.getPlanQuincena(req.user.userId);
   }
 
   @Post()
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
-  crear(@Req() req: any, @Body() body: { paradas: ParadaLite[]; segmentos: unknown[]; semanaInicioISO?: string }) {
-    return this.rutasService.crearRutaSemana({
+  crear(@Req() req: any, @Body() body: { paradas: ParadaLite[]; segmentos: unknown[] }) {
+    return this.rutasService.crearRutaQuincena({
       gestorId: req.user.userId,
       paradas: body.paradas,
       segmentos: body.segmentos,
-      semanaInicioISO: body.semanaInicioISO,
     });
   }
 

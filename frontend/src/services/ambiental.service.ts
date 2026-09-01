@@ -24,48 +24,40 @@ export interface RutaSemanalDTO {
   updatedAt?: string;
 }
 
-/** Una de las dos semanas del ciclo. Entre ambas cubren todos los puntos asignados. */
-export interface SemanaPlanDTO {
-  slot: 0 | 1;
-  semanaISO: string;
+/** La quincena en curso: 14 días corridos que cubren el 100% de los asignados. */
+export interface QuincenaPlanDTO {
+  /** Índice absoluto desde el lunes ancla. Identifica la quincena sin arrastrar fechas. */
+  indice: number;
   inicioISO: string;
   finISO: string;
-  /** "Semana del 17 al 23 de agosto" — la arma el backend, la UI no compone fechas. */
+  /** "Quincena del 10 al 23 de agosto" — la arma el backend, la UI no compone fechas. */
   etiqueta: string;
-  ventanaDesdeISO: string;
-  esActual: boolean;
-  /** Solo la semana en curso trae emergencias: los vencidos se adelantan a ella. */
+  /** Puntos vencidos: van primero en el orden del plan. */
   emergencia: string[];
   regular: string[];
   planificados: string[];
-  /** Puntos ya visitados de esta semana. Solo viene de GET /visitas/plan. */
+  /** Puntos ya visitados. Solo viene de GET /visitas/plan. */
   visitados: string[];
 }
-export interface PlanCicloDTO {
+export interface PlanQuincenaDTO {
   gestorId: string;
   asignados: number;
-  semanas: [SemanaPlanDTO, SemanaPlanDTO];
+  quincena: QuincenaPlanDTO;
 }
 
-export interface SemanaDesempenoDTO {
-  slot: 0 | 1;
-  esActual: boolean;
-  inicioISO: string;
-  finISO: string;
-  etiqueta: string;
-  planificados: number;
-  visitados: number;
-  pct: number;
-}
 export interface DesempenoGestorDTO {
   gestorId: string;
   asignados: number;
-  semanas: [SemanaDesempenoDTO, SemanaDesempenoDTO];
+  planificados: number;
+  visitados: number;
+  pct: number;
   visitasFueraDePlan: number;
 }
 export interface ResumenDesempenoDTO {
-  cicloInicioISO: string;
-  cicloFinISO: string;
+  quincenaInicioISO: string;
+  quincenaFinISO: string;
+  /** "Quincena del 10 al 23 de agosto". Nunca formato de semana ISO. */
+  etiqueta: string;
   gestores: DesempenoGestorDTO[];
   targetTotal: number;
   actualTotal: number;
@@ -88,20 +80,15 @@ export const ambientalService = {
     const { data } = await api.patch<AsignacionRow>('/asignaciones/punto', { puntoResiduoId, gestorId });
     return data;
   },
-  async getRutaSemanal(): Promise<RutaSemanalDTO | null> {
+  async getRutaQuincena(): Promise<RutaSemanalDTO | null> {
     const { data } = await api.get<RutaSemanalDTO | null>('/rutas-semanales/mine');
     return data ?? null;
   },
-  /** Las rutas de las dos semanas del ciclo, en el mismo orden que el plan. */
-  async getRutasDelCiclo(): Promise<[RutaSemanalDTO | null, RutaSemanalDTO | null]> {
-    const { data } = await api.get<[RutaSemanalDTO | null, RutaSemanalDTO | null]>('/rutas-semanales/mine/ciclo');
-    return Array.isArray(data) ? data : [null, null];
-  },
-  async crearRutaSemana(paradas: ParadaLite[], segmentos: any[], semanaInicioISO?: string): Promise<RutaSemanalDTO> {
-    const { data } = await api.post<RutaSemanalDTO>('/rutas-semanales', { paradas, segmentos, semanaInicioISO });
+  async crearRutaQuincena(paradas: ParadaLite[], segmentos: any[]): Promise<RutaSemanalDTO> {
+    const { data } = await api.post<RutaSemanalDTO>('/rutas-semanales', { paradas, segmentos });
     return data;
   },
-  async cancelarRutaSemana(rutaId: string): Promise<RutaSemanalDTO> {
+  async cancelarRutaQuincena(rutaId: string): Promise<RutaSemanalDTO> {
     const { data } = await api.patch<RutaSemanalDTO>(`/rutas-semanales/${rutaId}/cancelar`);
     return data;
   },
@@ -109,12 +96,20 @@ export const ambientalService = {
     const { data } = await api.get<string[]>('/rutas-semanales/arrastre/mine');
     return Array.isArray(data) ? data : [];
   },
-  // Fuente única de "qué está visitado": el plan del ciclo ya viene cruzado
-  // con las visitas reales. Antes cada pantalla lo deducía por su cuenta y no
-  // coincidían entre sí.
-  async getPlanCiclo(): Promise<PlanCicloDTO> {
-    const { data } = await api.get<PlanCicloDTO>('/visitas/plan');
+  // Fuente única de "qué está visitado": el plan de la quincena ya viene
+  // cruzado con las visitas reales. Antes cada pantalla lo deducía por su
+  // cuenta y no coincidían entre sí.
+  async getPlanQuincena(): Promise<PlanQuincenaDTO> {
+    const { data } = await api.get<PlanQuincenaDTO>('/visitas/plan');
     return data;
+  },
+  // Rutas de quincenas ya cerradas. Sin gestorId trae las propias; el admin
+  // pasa el id del gestor que está mirando.
+  async getHistorialRutas(gestorId?: string, limit = 20): Promise<RutaSemanalDTO[]> {
+    const { data } = await api.get<RutaSemanalDTO[]>('/rutas-semanales/historial', {
+      params: { ...(gestorId ? { gestorId } : {}), limit },
+    });
+    return Array.isArray(data) ? data : [];
   },
   async getDesempeno(gestorId?: string): Promise<ResumenDesempenoDTO> {
     const { data } = await api.get<ResumenDesempenoDTO>('/visitas/desempeno', { params: gestorId ? { gestorId } : undefined });

@@ -17,8 +17,8 @@ vi.mock('../lib/geo', () => ({
   nearestNeighborRoute: vi.fn((_o: any, pts: any[]) => pts),
 }));
 const candidatoDefault = { puntoId: 'x', lat: 4, lng: -74, barrio: 'B', diasVencido: 0, tiposResiduo: [], visitado: false, diasSinSeguimiento: 0 };
-vi.mock('../lib/rutasCiclo', () => ({
-  getParadasDeSemana: vi.fn(() => [candidatoDefault]),
+vi.mock('../lib/rutasQuincena', () => ({
+  getParadasDeQuincena: vi.fn(() => [candidatoDefault]),
 }));
 vi.mock('../lib/residuos', () => ({
   getResiduos: vi.fn(() => []),
@@ -27,33 +27,27 @@ vi.mock('../lib/residuos', () => ({
 vi.mock('../../../services/ambiental.service', () => ({
   ambientalService: {
     getMisPuntos: vi.fn().mockResolvedValue([]),
-    getRutaSemanal: vi.fn().mockResolvedValue(null),
-    crearRutaSemana: vi.fn().mockResolvedValue({
-      id: 'rs1', gestorId: 'u1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+    getRutaQuincena: vi.fn().mockResolvedValue(null),
+    crearRutaQuincena: vi.fn().mockResolvedValue({
+      id: 'rs1', gestorId: 'u1', semanaInicio: '2026-07-06', semanaFin: '2026-07-20',
       estado: 'en_progreso', paradas: [], segmentos: [], arrastre: [],
     }),
-    cancelarRutaSemana: vi.fn().mockResolvedValue({
-      id: 'rs1', gestorId: 'u1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+    cancelarRutaQuincena: vi.fn().mockResolvedValue({
+      id: 'rs1', gestorId: 'u1', semanaInicio: '2026-07-06', semanaFin: '2026-07-20',
       estado: 'cancelada', paradas: [], segmentos: [], arrastre: [],
     }),
     getArrastre: vi.fn().mockResolvedValue([]),
-    getPlanCiclo: vi.fn().mockResolvedValue({
+    getHistorialRutas: vi.fn().mockResolvedValue([]),
+    getPlanQuincena: vi.fn().mockResolvedValue({
       gestorId: 'g1',
       asignados: 1,
-      semanas: [
-        {
-          slot: 0, semanaISO: '2026-W28', inicioISO: '2026-07-06T05:00:00.000Z',
-          finISO: '2026-07-13T04:59:59.999Z', etiqueta: 'Semana del 6 al 12 de julio',
-          ventanaDesdeISO: '2026-07-06T05:00:00.000Z', esActual: true,
-          emergencia: [], regular: ['x'], planificados: ['x'], visitados: [],
-        },
-        {
-          slot: 1, semanaISO: '2026-W29', inicioISO: '2026-07-13T05:00:00.000Z',
-          finISO: '2026-07-20T04:59:59.999Z', etiqueta: 'Semana del 13 al 19 de julio',
-          ventanaDesdeISO: '2026-07-06T05:00:00.000Z', esActual: false,
-          emergencia: [], regular: [], planificados: [], visitados: [],
-        },
-      ],
+      quincena: {
+        indice: 65,
+        inicioISO: '2026-07-06T05:00:00.000Z',
+        finISO: '2026-07-20T04:59:59.999Z',
+        etiqueta: 'Quincena del 6 al 19 de julio',
+        emergencia: [], regular: ['x'], planificados: ['x'], visitados: [],
+      },
     }),
   },
 }));
@@ -66,16 +60,16 @@ import { waitFor } from '@testing-library/react';
 const user = { id: 'g1', name: 'Ana', lastname: 'P' };
 
 // La ruta activa ya no sale de localStorage: se deriva de la fila de la
-// semana que devuelve el backend, y se rehidrata contra los puntos actuales.
+// quincena que devuelve el backend, y se rehidrata contra los puntos actuales.
 const setup = (dtoInicial: any = null) => {
-  if (dtoInicial) vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce(dtoInicial);
+  if (dtoInicial) vi.mocked(ambientalService.getRutaQuincena).mockResolvedValueOnce(dtoInicial);
   const setViewMode = vi.fn();
   const { result } = renderHook(() => useRutaAmbiental([] as any, user, setViewMode));
   return { result, setViewMode };
 };
 
 const dtoConParada = (overrides: any = {}) => ({
-  id: 'r1', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+  id: 'r1', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-20',
   estado: 'en_progreso',
   paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
   segmentos: [], arrastre: [],
@@ -102,7 +96,7 @@ describe('useRutaAmbiental', () => {
     // La ruta se arma sobre la semana del ciclo, asi que hay que esperar a que
     // el plan llegue del backend antes de calcular.
     await waitFor(() => { expect(result.current.plan).not.toBeNull(); });
-    await act(async () => { await result.current.calcularRuta(0); });
+    await act(async () => { await result.current.calcularRuta(); });
     expect(ruta.buildSegmentos).toHaveBeenCalled();
     expect(result.current.rutaActiva?.estado).toBe('en_progreso');
     expect(setViewMode).toHaveBeenCalledWith('ruta-activa');
@@ -131,9 +125,9 @@ describe('useRutaAmbiental', () => {
   it('cancelarRuta no toca el historial local si el backend falla', async () => {
     const { result } = setup();
     await waitFor(() => { expect(result.current.plan).not.toBeNull(); });
-    await act(async () => { await result.current.calcularRuta(0); });
+    await act(async () => { await result.current.calcularRuta(); });
     expect(result.current.rutaSemanalId).toBe('rs1');
-    vi.mocked(ambientalService.cancelarRutaSemana).mockRejectedValueOnce(new Error('fail'));
+    vi.mocked(ambientalService.cancelarRutaQuincena).mockRejectedValueOnce(new Error('fail'));
 
     await act(async () => { await result.current.cancelarRuta(); });
 
@@ -149,8 +143,8 @@ describe('useRutaAmbiental', () => {
   });
 
   it('hidrata la ruta activa desde el backend al montar', async () => {
-    vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
-      id: 'rs-hidratada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+    vi.mocked(ambientalService.getRutaQuincena).mockResolvedValueOnce({
+      id: 'rs-hidratada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-20',
       estado: 'en_progreso',
       paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
       segmentos: [], arrastre: [],
@@ -163,8 +157,8 @@ describe('useRutaAmbiental', () => {
   });
 
   it('una ruta cancelada en el backend no vuelve a mostrarse como activa', async () => {
-    vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
-      id: 'rs-cancelada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+    vi.mocked(ambientalService.getRutaQuincena).mockResolvedValueOnce({
+      id: 'rs-cancelada', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-20',
       estado: 'cancelada',
       paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: false }],
       segmentos: [], arrastre: [],
@@ -184,8 +178,8 @@ describe('useRutaAmbiental', () => {
     (ruta.buildSegmentos as any).mockImplementation((paradas: any[]) => [
       { id: 'A', paradas, estado: paradas.every(p => p.visitado) ? 'completado' : 'pendiente' },
     ]);
-    vi.mocked(ambientalService.getRutaSemanal).mockResolvedValueOnce({
-      id: 'rs-stale-segmentos', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-12',
+    vi.mocked(ambientalService.getRutaQuincena).mockResolvedValueOnce({
+      id: 'rs-stale-segmentos', gestorId: 'g1', semanaInicio: '2026-07-06', semanaFin: '2026-07-20',
       estado: 'en_progreso',
       paradas: [{ puntoId: 'x', lat: 4, lng: -74, barrio: 'B', visitado: true }],
       segmentos: [{ id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' }],

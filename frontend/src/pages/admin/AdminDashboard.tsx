@@ -11,7 +11,7 @@ import type { Activity } from '../../types';
 import { AsignacionPuntosPanel } from './tabs/environmental/AsignacionPuntosPanel';
 import { IndicadoresAmbientalPanel } from './tabs/environmental/IndicadoresAmbientalPanel';
 import { DesempenoGestoresPanel } from './tabs/environmental/DesempenoGestoresPanel';
-import { CicloRibbon } from './components/CicloRibbon';
+import { QuincenaRibbon } from './components/QuincenaRibbon';
 import { EnvironmentalTab } from './tabs/EnvironmentalTab';
 import { computeAmbientalInsights, isPuntoEmergencia } from './utils/adminHelpers';
 import type { LayerVisibility } from '../../components/MapLayerControl';
@@ -132,7 +132,7 @@ export const AdminDashboard: React.FC = () => {
         <AmbientCanvas densidad={90} />
 
         <div className="relative z-10 flex-1 min-h-0 flex flex-col gap-3 px-3 sm:px-5 pt-3 pb-4 overflow-hidden">
-          <CicloRibbon />
+          <QuincenaRibbon />
 
           {/* Navegación de vistas */}
           <nav className="shrink-0 flex items-center gap-1 glass-panel rounded-2xl p-1.5 overflow-x-auto hide-scrollbar">

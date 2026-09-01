@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { formatRango, formatRangoSemana, formatRangoCiclo } from './semanaLabel';
+import { formatRango, formatRangoQuincena } from './rangoLabel';
 
 // Lunes 17 de agosto 2026 00:00 Bogotá → domingo 23 de agosto 23:59:59.999
 const LUNES = '2026-08-17T05:00:00.000Z';
 const DOMINGO = '2026-08-24T04:59:59.999Z';
+// Quincena del 10 al 23 de agosto (14 días desde el lunes 10).
+const Q_INICIO = '2026-08-10T05:00:00.000Z';
+const Q_FIN = '2026-08-24T04:59:59.999Z';
 
 describe('formatRango', () => {
   it('usa un solo mes cuando no lo cruza', () => {
@@ -21,22 +24,16 @@ describe('formatRango', () => {
   });
 });
 
-describe('formatRangoSemana', () => {
+describe('formatRangoQuincena', () => {
   it('coincide con el formato que arma el backend', () => {
-    expect(formatRangoSemana(LUNES, DOMINGO)).toBe('Semana del 17 al 23 de agosto');
+    expect(formatRangoQuincena(Q_INICIO, Q_FIN)).toBe('Quincena del 10 al 23 de agosto');
   });
 
   it('nunca usa el formato de semana ISO', () => {
-    expect(formatRangoSemana(LUNES, DOMINGO)).not.toMatch(/W\d/);
-  });
-});
-
-describe('formatRangoCiclo', () => {
-  it('describe las dos semanas del ciclo', () => {
-    expect(formatRangoCiclo(LUNES, '2026-08-31T04:59:59.999Z')).toBe('Del 17 al 30 de agosto');
+    expect(formatRangoQuincena(Q_INICIO, Q_FIN)).not.toMatch(/W\d/);
   });
 
   it('devuelve vacio si falta alguna fecha', () => {
-    expect(formatRangoCiclo('', '')).toBe('');
+    expect(formatRangoQuincena('', '')).toBe('');
   });
 });

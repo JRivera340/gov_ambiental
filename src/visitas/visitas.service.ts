@@ -3,32 +3,24 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VisitaPunto } from './entities/visita-punto.entity';
 import { isoWeekLabel } from '../rutas-semanales/lib/plan-semanal.util';
-import { semanasDelCiclo } from '../rutas-semanales/lib/ciclo-semanal.util';
+import { limitesQuincena } from '../rutas-semanales/lib/ciclo-quincenal.util';
 import { RutasSemanalesService } from '../rutas-semanales/rutas-semanales.service';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
-
-export type SemanaDesempeno = {
-  slot: 0 | 1;
-  esActual: boolean;
-  inicioISO: string;
-  finISO: string;
-  // "Semana del 17 al 23 de agosto" — la UI muestra esto, nunca "2026-W34".
-  etiqueta: string;
-  planificados: number;
-  visitados: number;
-  pct: number;
-};
 
 export type DesempenoGestor = {
   gestorId: string;
   asignados: number;
-  semanas: [SemanaDesempeno, SemanaDesempeno];
+  planificados: number;
+  visitados: number;
+  pct: number;
   visitasFueraDePlan: number;
 };
 
 export type ResumenDesempeno = {
-  cicloInicioISO: string;
-  cicloFinISO: string;
+  quincenaInicioISO: string;
+  quincenaFinISO: string;
+  // "Quincena del 10 al 23 de agosto" — la UI muestra esto, nunca "2026-W34".
+  etiqueta: string;
   gestores: DesempenoGestor[];
   targetTotal: number;
   actualTotal: number;
@@ -46,7 +38,7 @@ export class VisitasService {
   // Registra una visita real de un gestor a un punto (llamado desde
   // PuntosService en cada acción de seguimiento — marcar recogido, agregar
   // residuo o agregar nota, ver puntos.service.ts). Append-only: no
-  // deduplica, "visitado esta semana" se deriva contando filas.
+  // deduplica, "visitado en la quincena" se deriva contando filas.
   async registrarVisita(puntoResiduoId: string, gestorId: string, fecha: Date = new Date()): Promise<VisitaPunto> {
     const visita = this.repo.create({
       puntoResiduoId,
@@ -85,9 +77,9 @@ export class VisitasService {
 
   // Ids de puntos que el gestor visitó dentro de un rango de fechas.
   //
-  // Se consulta por rango y no por igualdad de semanaISO a propósito: una
-  // visita adelantada a un punto de la semana siguiente tiene que contar para
-  // esa semana, no perderse. semanaISO queda como dato de auditoría.
+  // Se consulta por rango y no por igualdad de semanaISO a propósito: la
+  // quincena abarca dos semanas ISO, así que filtrar por semanaISO perdería la
+  // mitad de las visitas. semanaISO queda como dato de auditoría.
   async getIdsVisitadosEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
     const filas = await this.repo
       .createQueryBuilder('v')
@@ -98,81 +90,59 @@ export class VisitasService {
     return new Set(filas.map((f) => f.puntoResiduoId));
   }
 
-  // Plan del ciclo con los puntos que el gestor ya visitó en cada semana. Es
-  // lo que consume la ruta y el perfil del gestor: una sola fuente de verdad
-  // sobre qué está visitado, en vez de que cada pantalla lo dedujera por su
-  // cuenta (había cuatro definiciones distintas y no coincidían).
+  // Plan de la quincena con los puntos que el gestor ya visitó. Es lo que
+  // consume la ruta y el perfil del gestor: una sola fuente de verdad sobre qué
+  // está visitado, en vez de que cada pantalla lo dedujera por su cuenta (había
+  // cuatro definiciones distintas y no coincidían).
   async getPlanConVisitas(gestorId: string, ahora = new Date()) {
-    const plan = await this.rutasSemanalesService.getPlanCiclo(gestorId, ahora);
-    const semanas = await Promise.all(
-      plan.semanas.map(async (s) => {
-        const visitados = await this.getIdsVisitadosEnRango(gestorId, s.ventanaDesdeISO, s.finISO);
-        return { ...s, visitados: s.planificados.filter((puntoId) => visitados.has(puntoId)) };
-      }),
-    );
-    return { ...plan, semanas };
+    const plan = await this.rutasSemanalesService.getPlanQuincena(gestorId, ahora);
+    const q = plan.quincena;
+    const visitados = await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+    return {
+      ...plan,
+      quincena: { ...q, visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)) },
+    };
   }
 
-  // Desempeño del ciclo de 2 semanas por gestor. Cada punto se cuenta en la
-  // semana a la que pertenece, así que visitar un punto de la semana que viene
-  // suma en esa semana en vez de no sumar en ninguna (que era el bug: gestores
-  // que sí recorrieron sus puntos aparecían en 0%).
+  // Desempeño de la quincena por gestor: un solo bloque de 14 días contra el
+  // 100% de los puntos asignados. Antes se medía por semana con la mitad de los
+  // puntos en cada una, y las visitas a la mitad que no tocaba no sumaban en
+  // ningún lado (gestores que sí recorrieron sus puntos aparecían en 0%).
   async getResumenDesempeno(gestorId?: string, ahora = new Date()): Promise<ResumenDesempeno> {
     const todos = await this.gestorIdsConAsignaciones();
     const gestorIds = gestorId ? todos.filter((id) => id === gestorId) : todos;
+    const rango = limitesQuincena(ahora);
 
-    const resultado: DesempenoGestor[] = [];
-    let cicloInicioISO = '';
-    let cicloFinISO = '';
-
+    const gestores: DesempenoGestor[] = [];
     for (const id of gestorIds) {
-      const plan = await this.rutasSemanalesService.getPlanCiclo(id, ahora);
-      cicloInicioISO = plan.semanas[0].inicioISO;
-      cicloFinISO = plan.semanas[1].finISO;
+      const plan = await this.rutasSemanalesService.getPlanQuincena(id, ahora);
+      const q = plan.quincena;
+      const visitadosIds = await this.getIdsVisitadosEnRango(id, q.inicioISO, q.finISO);
+      const visitados = q.planificados.filter((puntoId) => visitadosIds.has(puntoId)).length;
 
-      const visitadosPorSemana = await Promise.all(
-        plan.semanas.map((s) => this.getIdsVisitadosEnRango(id, s.ventanaDesdeISO, s.finISO)),
-      );
-
-      const semanas = plan.semanas.map((s, i) => {
-        const visitados = s.planificados.filter((puntoId) => visitadosPorSemana[i].has(puntoId)).length;
-        return {
-          slot: s.slot,
-          esActual: s.esActual,
-          inicioISO: s.inicioISO,
-          finISO: s.finISO,
-          etiqueta: s.etiqueta,
-          planificados: s.planificados.length,
-          visitados,
-          pct: s.planificados.length > 0 ? Math.round((visitados / s.planificados.length) * 100) : 0,
-        };
-      }) as [SemanaDesempeno, SemanaDesempeno];
-
-      // Visitas a puntos que ya no están en ningún plan (reasignados o sin
+      // Visitas a puntos que ya no están en el plan (reasignados o sin
       // asignación): se muestran aparte para que ningún trabajo real quede
       // invisible, pero no inflan el porcentaje.
-      const enPlan = new Set(plan.semanas.flatMap((s) => s.planificados));
-      const visitadosTodos = new Set<string>([...visitadosPorSemana[0], ...visitadosPorSemana[1]]);
-      const visitasFueraDePlan = [...visitadosTodos].filter((puntoId) => !enPlan.has(puntoId)).length;
+      const enPlan = new Set(q.planificados);
+      const visitasFueraDePlan = [...visitadosIds].filter((puntoId) => !enPlan.has(puntoId)).length;
 
-      resultado.push({ gestorId: id, asignados: plan.asignados, semanas, visitasFueraDePlan });
+      gestores.push({
+        gestorId: id,
+        asignados: plan.asignados,
+        planificados: q.planificados.length,
+        visitados,
+        pct: q.planificados.length > 0 ? Math.round((visitados / q.planificados.length) * 100) : 0,
+        visitasFueraDePlan,
+      });
     }
-
-    if (!cicloInicioISO) {
-      const [actual, siguiente] = semanasDelCiclo(ahora);
-      cicloInicioISO = actual.inicioISO;
-      cicloFinISO = siguiente.finISO;
-    }
-
-    const sumar = (pick: (s: SemanaDesempeno) => number) =>
-      resultado.reduce((total, g) => total + g.semanas.reduce((sub, s) => sub + pick(s), 0), 0);
 
     return {
-      cicloInicioISO,
-      cicloFinISO,
-      gestores: resultado,
-      targetTotal: sumar((s) => s.planificados),
-      actualTotal: sumar((s) => s.visitados),
+      quincenaInicioISO: rango.inicioISO,
+      quincenaFinISO: rango.finISO,
+      etiqueta: rango.etiqueta,
+      gestores,
+      targetTotal: gestores.reduce((t, g) => t + g.planificados, 0),
+      actualTotal: gestores.reduce((t, g) => t + g.visitados, 0),
     };
   }
 }
