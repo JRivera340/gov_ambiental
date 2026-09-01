@@ -25,6 +25,17 @@ export class VisitasController {
     return this.visitasService.getResumenDesempeno(req.user.userId);
   }
 
+  // Historial de quincenas cerradas con el cumplimiento real. El gestor ve el
+  // suyo; el admin consulta el de cualquiera pasando gestorId.
+  @Get('historial')
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  getHistorial(@Req() req: any, @Query('gestorId') gestorId?: string, @Query('limit') limit?: string) {
+    const esAdmin = req.user.role === Role.ADMIN;
+    const objetivo = esAdmin && gestorId ? gestorId : req.user.userId;
+    const limite = limit ? Number(limit) : 20;
+    return this.visitasService.getHistorialConVisitas(objetivo, Number.isFinite(limite) ? limite : 20);
+  }
+
   // Plan del ciclo + puntos ya visitados en cada semana. Fuente única de
   // "visitado" para la ruta y el perfil del gestor.
   @Get('plan')

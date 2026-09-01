@@ -39,3 +39,24 @@ export function formatRangoQuincena(inicioISO: string, finISO: string): string {
   if (!inicioISO || !finISO) return '';
   return `Quincena del ${formatRango(inicioISO, finISO)}`;
 }
+
+const MESES_CORTOS = [
+  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+];
+
+/** "1 – 15 sep" — para captions donde no entra la etiqueta completa. */
+export function formatRangoCorto(inicioISO: string, finISO: string): string {
+  if (!inicioISO || !finISO) return '';
+  const inicio = enBogota(inicioISO);
+  const fin = enBogota(finISO);
+  return `${inicio.getUTCDate()} – ${fin.getUTCDate()} ${MESES_CORTOS[fin.getUTCMonth()]}`;
+}
+
+/** "Agosto 2026" — cabecera del mes en el historial. */
+export function formatMes(iso: string): string {
+  if (!iso) return '';
+  const d = enBogota(iso);
+  const mes = MESES[d.getUTCMonth()];
+  return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} ${d.getUTCFullYear()}`;
+}

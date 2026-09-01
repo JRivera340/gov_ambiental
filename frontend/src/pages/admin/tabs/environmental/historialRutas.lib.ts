@@ -46,3 +46,47 @@ export function totalesHistorial(quincenas: QuincenaHistorialDTO[]): {
     canceladas: quincenas.filter((q) => estadoQuincena(q) === 'cancelada').length,
   };
 }
+
+export type MesHistorial = {
+  /** Índice del mes: año*12 + mes. Ordena y sirve de key. */
+  clave: number;
+  /** ISO del inicio de la primera quincena del mes, para etiquetar. */
+  inicioISO: string;
+  quincenas: QuincenaHistorialDTO[];
+  planificados: number;
+  visitados: number;
+  pct: number;
+};
+
+// Agrupa las quincenas por mes. Cada mes tiene dos (1-15 y 16-fin), así que el
+// supervisor puede leer el mes completo sin sumar a mano.
+//
+// El índice de quincena que manda el backend es (año*12 + mes)*2 + mitad, así
+// que el mes se recupera dividiendo por 2 — sin volver a parsear fechas ni
+// arriesgar un desfase de zona horaria.
+export function agruparPorMes(quincenas: QuincenaHistorialDTO[]): MesHistorial[] {
+  const porMes = new Map<number, MesHistorial>();
+
+  for (const q of quincenas) {
+    const clave = Math.floor(q.indice / 2);
+    let mes = porMes.get(clave);
+    if (!mes) {
+      mes = { clave, inicioISO: q.inicioISO, quincenas: [], planificados: 0, visitados: 0, pct: 0 };
+      porMes.set(clave, mes);
+    }
+    mes.quincenas.push(q);
+    mes.planificados += q.planificados;
+    mes.visitados += q.visitados;
+  }
+
+  const meses = [...porMes.values()].sort((a, b) => b.clave - a.clave);
+  for (const mes of meses) {
+    // Más reciente primero dentro del mes: la segunda quincena arriba.
+    mes.quincenas.sort((a, b) => b.indice - a.indice);
+    // La etiqueta sale de la quincena más temprana del mes: la segunda termina
+    // a las 00:00 del mes siguiente y nombraría el mes equivocado.
+    mes.inicioISO = mes.quincenas[mes.quincenas.length - 1].inicioISO;
+    mes.pct = mes.planificados > 0 ? Math.round((mes.visitados / mes.planificados) * 100) : 0;
+  }
+  return meses;
+}

@@ -52,6 +52,15 @@ export const AdminDashboard: React.FC = () => {
   const [emergencyFilter, setEmergencyFilter] = useState(false);
   const [listSearchNumber, setListSearchNumber] = useState('');
   const [, setPointsSidebarOpen] = useState(false);
+
+  // Desde el historial de rutas se salta al punto. El admin no tiene modal de
+  // detalle propio, así que se reusa la vista de Operación: filtrar la lista
+  // por número deja el punto solo, en el mapa y en el listado.
+  const irAlPunto = useCallback((pointNumber: number) => {
+    setListSearchNumber(String(pointNumber));
+    setPointsSidebarOpen(true);
+    setVista('operacion');
+  }, []);
   const [, setSelectedActivity] = useState<Activity | null>(null);
   const [, setShowDetailModal] = useState(false);
 
@@ -197,7 +206,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="h-full overflow-y-auto pr-1">
                 {vista === 'asignacion' && <AsignacionPuntosPanel actividades={actividadesParaAsignacion} />}
                 {vista === 'indicadores' && <IndicadoresAmbientalPanel actividades={activities} />}
-                {vista === 'desempeno' && <DesempenoGestoresPanel />}
+                {vista === 'desempeno' && <DesempenoGestoresPanel onVerPunto={irAlPunto} />}
               </div>
             )}
           </div>

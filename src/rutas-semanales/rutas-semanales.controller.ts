@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,17 +21,6 @@ export class RutasSemanalesController {
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   getArrastre(@Req() req: any) {
     return this.rutasService.getArrastrePendiente(req.user.userId);
-  }
-
-  // Historial de rutas de quincenas cerradas. El gestor solo ve el suyo; el
-  // admin consulta el de cualquiera pasando gestorId.
-  @Get('historial')
-  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
-  getHistorial(@Req() req: any, @Query('gestorId') gestorId?: string, @Query('limit') limit?: string) {
-    const esAdmin = req.user.role === Role.ADMIN;
-    const objetivo = esAdmin && gestorId ? gestorId : req.user.userId;
-    const limite = limit ? Number(limit) : 20;
-    return this.rutasService.getHistorial(objetivo, Number.isFinite(limite) ? limite : 20);
   }
 
   // Plan de la quincena, sin el cruce con las visitas: ese vive en

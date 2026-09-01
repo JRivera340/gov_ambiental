@@ -1,8 +1,9 @@
 // DesempenoGestoresPanel.tsx — cumplimiento por gestor en la quincena en curso
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ambientalService, type DesempenoGestorDTO } from '../../../../services/ambiental.service';
+import { ambientalService, type DesempenoGestorDTO, type ResumenDesempenoDTO } from '../../../../services/ambiental.service';
 import { usersService } from '../../../../services/users.service';
 import { HistorialRutasPanel } from './HistorialRutasPanel';
+import { formatRangoCorto } from '../../../gestor-ambiental/lib/rangoLabel';
 
 type Orden = 'cumplimiento' | 'asignados' | 'nombre';
 
@@ -21,10 +22,18 @@ function pctColor(pct: number): string {
 // El backend ya manda el porcentaje de la quincena; antes había que sumar
 // las dos semanas del ciclo acá.
 
-export const DesempenoGestoresPanel: React.FC = () => {
+interface Props {
+  /** Lleva a la vista de operación con ese punto filtrado. */
+  onVerPunto?: (pointNumber: number) => void;
+}
+
+export const DesempenoGestoresPanel: React.FC<Props> = ({ onVerPunto }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gestores, setGestores] = useState<DesempenoGestorDTO[]>([]);
+  // El rango de la quincena que se está midiendo. Sin esto las cards decían
+  // "Quincena" a secas y no había forma de saber de qué periodo hablaban.
+  const [quincena, setQuincena] = useState<{ inicioISO: string; finISO: string; etiqueta: string } | null>(null);
   const [nombrePorId, setNombrePorId] = useState<Record<string, string>>({});
   const [orden, setOrden] = useState<Orden>('cumplimiento');
   // Gestor cuyo historial se está mirando. El historial reemplaza la grilla en
@@ -35,8 +44,13 @@ export const DesempenoGestoresPanel: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const resumen = await ambientalService.getDesempeno();
+      const resumen: ResumenDesempenoDTO = await ambientalService.getDesempeno();
       setGestores(resumen.gestores);
+      setQuincena({
+        inicioISO: resumen.quincenaInicioISO,
+        finISO: resumen.quincenaFinISO,
+        etiqueta: resumen.etiqueta,
+      });
     } catch {
       setError('No se pudo cargar el desempeño de gestores. Intentá de nuevo.');
     } finally {
@@ -76,6 +90,7 @@ export const DesempenoGestoresPanel: React.FC = () => {
         gestorId={historialDe}
         nombre={nombreDe(historialDe)}
         onVolver={() => setHistorialDe(null)}
+        onVerPunto={onVerPunto}
       />
     );
   }
@@ -94,7 +109,7 @@ export const DesempenoGestoresPanel: React.FC = () => {
         <div>
           <h2 className="font-display text-[14px] font-extrabold text-neutral-900 tracking-tight">Desempeño de gestores</h2>
           <p className="text-[11px] text-neutral-500 mt-0.5">
-            Porcentaje de los puntos asignados que ya se visitaron en esta quincena.
+            {quincena ? `${quincena.etiqueta}. ` : ''}Porcentaje de los puntos asignados que ya se visitaron.
             {enRiesgo > 0 && (
               <span className="ml-1 font-semibold text-primary-600">
                 {enRiesgo} {enRiesgo === 1 ? 'gestor va' : 'gestores van'} por debajo del 50%.
@@ -146,7 +161,9 @@ export const DesempenoGestoresPanel: React.FC = () => {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="tabular text-2xl font-extrabold leading-none" style={{ color: pctColor(g.pct) }}>{g.pct}%</p>
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-neutral-400 mt-0.5">Quincena</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-neutral-400 mt-0.5">
+                    {quincena ? formatRangoCorto(quincena.inicioISO, quincena.finISO) : 'Quincena'}
+                  </p>
                 </div>
               </div>
 

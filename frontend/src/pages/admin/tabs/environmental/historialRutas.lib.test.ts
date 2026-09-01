@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { estadoQuincena, cierreQuincena, totalesHistorial } from './historialRutas.lib';
+import { estadoQuincena, cierreQuincena, totalesHistorial, agruparPorMes } from './historialRutas.lib';
 import type { QuincenaHistorialDTO } from '../../../../services/ambiental.service';
 
 const ruta = (over: Partial<QuincenaHistorialDTO['rutas'][0]> = {}): QuincenaHistorialDTO['rutas'][0] => ({
@@ -87,5 +87,68 @@ describe('totalesHistorial', () => {
     expect(totalesHistorial([])).toEqual({
       quincenas: 0, planificados: 0, visitados: 0, pct: 0, canceladas: 0,
     });
+  });
+});
+
+describe('agruparPorMes', () => {
+  // (año*12 + mes)*2 + mitad. Agosto 2026 = (2026*12 + 7)*2 = 48638.
+  const AGO_1 = 48638;
+  const AGO_2 = 48639;
+  const SEP_1 = 48640;
+
+  const q = (indice: number, inicioISO: string, over: Partial<QuincenaHistorialDTO> = {}) =>
+    quincena({ indice, inicioISO, planificados: 10, visitados: 5, ...over });
+
+  it('junta las dos quincenas de un mes en una sola entrada', () => {
+    const meses = agruparPorMes([
+      q(AGO_2, '2026-08-16T05:00:00.000Z'),
+      q(AGO_1, '2026-08-01T05:00:00.000Z'),
+    ]);
+    expect(meses).toHaveLength(1);
+    expect(meses[0].quincenas).toHaveLength(2);
+    expect(meses[0].planificados).toBe(20);
+    expect(meses[0].visitados).toBe(10);
+    expect(meses[0].pct).toBe(50);
+  });
+
+  it('separa meses distintos y los ordena del mas reciente al mas viejo', () => {
+    const meses = agruparPorMes([
+      q(SEP_1, '2026-09-01T05:00:00.000Z'),
+      q(AGO_1, '2026-08-01T05:00:00.000Z'),
+    ]);
+    expect(meses.map((m) => m.clave)).toEqual([Math.floor(SEP_1 / 2), Math.floor(AGO_1 / 2)]);
+  });
+
+  it('dentro del mes deja la segunda quincena arriba', () => {
+    const meses = agruparPorMes([
+      q(AGO_1, '2026-08-01T05:00:00.000Z'),
+      q(AGO_2, '2026-08-16T05:00:00.000Z'),
+    ]);
+    expect(meses[0].quincenas.map((x) => x.indice)).toEqual([AGO_2, AGO_1]);
+  });
+
+  // La segunda quincena termina a las 00:00 del 1 del mes siguiente: etiquetar
+  // el mes con ella daria "Septiembre" para un mes que es agosto.
+  it('etiqueta el mes con la quincena mas temprana', () => {
+    const meses = agruparPorMes([
+      q(AGO_2, '2026-08-16T05:00:00.000Z'),
+      q(AGO_1, '2026-08-01T05:00:00.000Z'),
+    ]);
+    expect(meses[0].inicioISO).toBe('2026-08-01T05:00:00.000Z');
+  });
+
+  it('un mes con una sola quincena tambien agrupa', () => {
+    const meses = agruparPorMes([q(AGO_2, '2026-08-16T05:00:00.000Z')]);
+    expect(meses).toHaveLength(1);
+    expect(meses[0].inicioISO).toBe('2026-08-16T05:00:00.000Z');
+  });
+
+  it('no divide por cero con un mes sin puntos planificados', () => {
+    const meses = agruparPorMes([q(AGO_1, '2026-08-01T05:00:00.000Z', { planificados: 0, visitados: 0 })]);
+    expect(meses[0].pct).toBe(0);
+  });
+
+  it('historial vacio da lista vacia', () => {
+    expect(agruparPorMes([])).toEqual([]);
   });
 });

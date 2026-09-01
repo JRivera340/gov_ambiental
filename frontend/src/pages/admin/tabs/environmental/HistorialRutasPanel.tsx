@@ -4,17 +4,18 @@ import {
   type QuincenaHistorialDTO,
   type ParadaHistorialDTO,
 } from '../../../../services/ambiental.service';
-import { estadoQuincena, cierreQuincena, totalesHistorial } from './historialRutas.lib';
+import { formatMes } from '../../../gestor-ambiental/lib/rangoLabel';
+import { estadoQuincena, cierreQuincena, totalesHistorial, agruparPorMes } from './historialRutas.lib';
 
-// Historial de rutas de un gestor — quincenas ya cerradas.
+// Historial de rutas de un gestor — quincenas ya cerradas, agrupadas por mes.
 //
 // Se abre desde la card del gestor en Desempeño, que muestra solo la quincena
-// en curso. Los datos salen de la tabla `ruta_semanal`: el historial que ve el
-// gestor en su celular vive en localStorage y el admin no puede alcanzarlo.
+// en curso. Los datos salen de GET /visitas/historial, que cruza las rutas
+// guardadas con las visitas reales: el flag `visitado` de la tabla de rutas se
+// congela al crear la ruta y mostraba 0% en quincenas ya recorridas.
 //
-// El agrupado por quincena lo hace el backend. Antes se listaba una card por
-// fila de ruta, y como las rutas viejas duran 7 días, el panel mostraba semanas
-// con etiqueta de quincena.
+// Cada mes trae sus dos quincenas (1-15 y 16-fin) más el acumulado del mes, que
+// es la unidad de control que pidió la Alcaldía.
 
 const ESTADOS: Record<string, { label: string; color: string; fondo: string }> = {
   cerrada: { label: 'Cerrada', color: '#16a34a', fondo: 'rgba(22,163,74,.10)' },
@@ -39,7 +40,8 @@ const ListaPuntos: React.FC<{
   color: string;
   paradas: ParadaHistorialDTO[];
   vacio: string;
-}> = ({ titulo, color, paradas, vacio }) => (
+  onVerPunto?: (pointNumber: number) => void;
+}> = ({ titulo, color, paradas, vacio, onVerPunto }) => (
   <div className="min-w-0">
     <p className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color }}>
       {titulo} <span className="tabular">({paradas.length})</span>
@@ -48,20 +50,44 @@ const ListaPuntos: React.FC<{
       <p className="text-[10px] text-neutral-400">{vacio}</p>
     ) : (
       <ul className="flex flex-col gap-0.5 max-h-[200px] overflow-y-auto pr-1">
-        {paradas.map((p) => (
-          <li key={p.puntoId} className="flex items-baseline gap-1.5 text-[11px] leading-tight">
-            <span className="tabular font-bold shrink-0" style={{ color }}>
-              {p.pointNumber != null ? `#${p.pointNumber}` : '—'}
-            </span>
-            <span className="text-neutral-600 truncate">{p.barrio || 'Sin barrio'}</span>
-          </li>
-        ))}
+        {paradas.map((p) => {
+          // Sin número no hay forma de ubicarlo en la vista de operación, así
+          // que esos se muestran pero no son clickeables.
+          const clickeable = onVerPunto && p.pointNumber != null;
+          const contenido = (
+            <>
+              <span className="tabular font-bold shrink-0" style={{ color }}>
+                {p.pointNumber != null ? `#${p.pointNumber}` : '—'}
+              </span>
+              <span className="text-neutral-600 truncate">{p.barrio || 'Sin barrio'}</span>
+            </>
+          );
+          return (
+            <li key={p.puntoId} className="text-[11px] leading-tight">
+              {clickeable ? (
+                <button
+                  onClick={() => onVerPunto!(p.pointNumber as number)}
+                  title="Ver el punto en el mapa"
+                  className="w-full flex items-baseline gap-1.5 text-left rounded px-1 -mx-1 py-0.5 hover:bg-neutral-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                >
+                  {contenido}
+                  <span className="ml-auto text-[10px] font-bold shrink-0" style={{ color }}>→</span>
+                </button>
+              ) : (
+                <span className="flex items-baseline gap-1.5 px-1 py-0.5">{contenido}</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     )}
   </div>
 );
 
-const QuincenaCard: React.FC<{ quincena: QuincenaHistorialDTO }> = ({ quincena }) => {
+const QuincenaCard: React.FC<{
+  quincena: QuincenaHistorialDTO;
+  onVerPunto?: (pointNumber: number) => void;
+}> = ({ quincena, onVerPunto }) => {
   const [abierta, setAbierta] = useState(false);
   const estado = ESTADOS[estadoQuincena(quincena)] ?? ESTADOS.cerrada;
   const visitados = quincena.paradas.filter((p) => p.visitado);
@@ -131,12 +157,14 @@ const QuincenaCard: React.FC<{ quincena: QuincenaHistorialDTO }> = ({ quincena }
                 color="#e4032e"
                 paradas={pendientes}
                 vacio="Recorrió todos los puntos."
+                onVerPunto={onVerPunto}
               />
               <ListaPuntos
                 titulo="Visitados"
                 color="#16a34a"
                 paradas={visitados}
                 vacio="No visitó ningún punto."
+                onVerPunto={onVerPunto}
               />
             </div>
           )}
@@ -150,9 +178,11 @@ interface Props {
   gestorId: string;
   nombre: string;
   onVolver: () => void;
+  /** Lleva a la vista de operación con ese punto filtrado. */
+  onVerPunto?: (pointNumber: number) => void;
 }
 
-export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolver }) => {
+export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolver, onVerPunto }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quincenas, setQuincenas] = useState<QuincenaHistorialDTO[]>([]);
@@ -169,6 +199,7 @@ export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolve
   }, [gestorId]);
 
   const totales = useMemo(() => totalesHistorial(quincenas), [quincenas]);
+  const meses = useMemo(() => agruparPorMes(quincenas), [quincenas]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -186,7 +217,8 @@ export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolve
             </h2>
           </div>
           <p className="text-[11px] text-neutral-500 mt-1">
-            Una entrada por quincena (del 1 al 15 y del 16 al fin de mes). La quincena en curso se ve en Desempeño.
+            Por mes, con sus dos quincenas (del 1 al 15 y del 16 al fin de mes).
+            La quincena en curso se ve en Desempeño.
           </p>
         </div>
 
@@ -222,7 +254,7 @@ export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolve
         <div className="glass-panel rounded-2xl p-5 text-[12px] font-semibold text-neutral-500">
           Cargando historial…
         </div>
-      ) : quincenas.length === 0 ? (
+      ) : meses.length === 0 ? (
         <div className="glass-panel rounded-2xl p-6 text-center">
           <p className="text-[13px] font-bold text-neutral-700">Este gestor todavía no cerró ninguna quincena</p>
           <p className="text-[11px] text-neutral-500 mt-1">
@@ -230,9 +262,25 @@ export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolve
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
-          {quincenas.map((q) => <QuincenaCard key={q.indice} quincena={q} />)}
-        </div>
+        meses.map((mes) => (
+          <section key={mes.clave} className="flex flex-col gap-2">
+            {/* Cabecera del mes: el acumulado de sus dos quincenas. */}
+            <div className="flex items-baseline justify-between gap-3 px-1">
+              <h3 className="font-display text-[13px] font-extrabold text-neutral-800 tracking-tight">
+                {formatMes(mes.inicioISO)}
+              </h3>
+              <p className="text-[11px] text-neutral-500 tabular">
+                <span className="font-bold" style={{ color: pctColor(mes.pct) }}>{mes.pct}%</span>
+                <span className="text-neutral-400"> · {mes.visitados} de {mes.planificados} en el mes</span>
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
+              {mes.quincenas.map((q) => (
+                <QuincenaCard key={q.indice} quincena={q} onVerPunto={onVerPunto} />
+              ))}
+            </div>
+          </section>
+        ))
       )}
     </div>
   );

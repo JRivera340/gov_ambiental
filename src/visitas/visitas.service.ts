@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { VisitaPunto } from './entities/visita-punto.entity';
 import { isoWeekLabel } from '../rutas-semanales/lib/plan-semanal.util';
 import { limitesQuincena } from '../rutas-semanales/lib/ciclo-quincenal.util';
-import { RutasSemanalesService } from '../rutas-semanales/rutas-semanales.service';
+import { RutasSemanalesService, type QuincenaHistorial } from '../rutas-semanales/rutas-semanales.service';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 
 export type DesempenoGestor = {
@@ -102,6 +102,39 @@ export class VisitasService {
       ...plan,
       quincena: { ...q, visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)) },
     };
+  }
+
+  // Historial de quincenas cerradas con el cumplimiento REAL.
+  //
+  // `paradas[].visitado` de la tabla de rutas no sirve para esto: se escribe una
+  // sola vez, al crear la ruta —cuando el gestor todavía no visitó nada— y nunca
+  // se actualiza. El historial mostraba entonces 0% en quincenas que el gestor
+  // había recorrido entera, contradiciendo al panel de Desempeño, que sí mide
+  // contra visitas_punto. Acá se recalcula cada parada contra las visitas del
+  // rango de la quincena, que es la misma fuente que usa getResumenDesempeno.
+  async getHistorialConVisitas(gestorId: string, limite = 20, ahora = new Date()): Promise<QuincenaHistorial[]> {
+    const quincenas = await this.rutasSemanalesService.getHistorial(gestorId, limite, ahora);
+
+    return Promise.all(
+      quincenas.map(async (q) => {
+        const visitadosIds = await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+        const paradas = q.paradas.map((p) => ({ ...p, visitado: visitadosIds.has(p.puntoId) }));
+        // Sin visitar primero: es lo que el supervisor necesita ver.
+        paradas.sort((a, b) => {
+          if (a.visitado !== b.visitado) return Number(a.visitado) - Number(b.visitado);
+          return (a.pointNumber ?? 0) - (b.pointNumber ?? 0);
+        });
+        const visitados = paradas.filter((p) => p.visitado).length;
+        return {
+          ...q,
+          paradas,
+          planificados: paradas.length,
+          visitados,
+          pendientes: paradas.length - visitados,
+          pct: paradas.length > 0 ? Math.round((visitados / paradas.length) * 100) : 0,
+        };
+      }),
+    );
   }
 
   // Desempeño de la quincena por gestor: un solo bloque de calendario contra el

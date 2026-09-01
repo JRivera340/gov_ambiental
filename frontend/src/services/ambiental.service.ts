@@ -125,10 +125,11 @@ export const ambientalService = {
     const { data } = await api.get<PlanQuincenaDTO>('/visitas/plan');
     return data;
   },
-  // Rutas de quincenas ya cerradas. Sin gestorId trae las propias; el admin
-  // pasa el id del gestor que está mirando.
+  // Quincenas ya cerradas, con el cumplimiento real (cruzado con las visitas,
+  // no con el flag congelado de la ruta). Sin gestorId trae las propias; el
+  // admin pasa el id del gestor que está mirando.
   async getHistorialRutas(gestorId?: string, limit = 20): Promise<QuincenaHistorialDTO[]> {
-    const { data } = await api.get<QuincenaHistorialDTO[]>('/rutas-semanales/historial', {
+    const { data } = await api.get<QuincenaHistorialDTO[]>('/visitas/historial', {
       params: { ...(gestorId ? { gestorId } : {}), limit },
     });
     return Array.isArray(data) ? data : [];
