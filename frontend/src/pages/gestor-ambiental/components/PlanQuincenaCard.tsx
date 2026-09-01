@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ambientalService, type PlanQuincenaDTO } from '../../../services/ambiental.service';
 import { resumenQuincena } from '../lib/rutasQuincena';
-import { diaDeQuincena } from '../lib/rutaSemanal.lib';
+import { diaDeQuincena, diasDeQuincena } from '../lib/rutaSemanal.lib';
 import type { Activity } from '../../../types';
 
 interface Props {
@@ -9,10 +9,8 @@ interface Props {
   onVerPunto: (activity: Activity) => void;
 }
 
-const DIAS_QUINCENA = 14;
-
-// Los puntos de la quincena del gestor: los 14 días cubren el 100% de sus
-// asignados. Los puntos en emergencia (≥4 días sin recoger) van primero.
+// Los puntos de la quincena del gestor: el periodo (del 1 al 15, o del 16 al
+// fin de mes) cubre el 100% de sus asignados. Los puntos en emergencia (≥4 días sin recoger) van primero.
 //
 // Antes esto mostraba dos bloques, uno por semana del ciclo, y la mitad de los
 // puntos aparecía como "de la semana siguiente" — el gestor no podía tocarlos
@@ -54,7 +52,8 @@ export const PlanQuincenaCard: React.FC<Props> = ({ activities, onVerPunto }) =>
 
   const { quincena } = plan;
   const { total, visitados, pct } = resumenQuincena(quincena);
-  const dia = diaDeQuincena(quincena.inicioISO, new Date());
+  const dia = diaDeQuincena(quincena.inicioISO, quincena.finISO, new Date());
+  const totalDias = diasDeQuincena(quincena.inicioISO, quincena.finISO);
   const yaVisitado = new Set(quincena.visitados);
   const emergencias = new Set(quincena.emergencia);
   const puntos = quincena.planificados
@@ -67,7 +66,7 @@ export const PlanQuincenaCard: React.FC<Props> = ({ activities, onVerPunto }) =>
         <h3 className="text-xs font-black text-neutral-900">Tus puntos de la quincena</h3>
         <p className="text-[10px] text-neutral-400 mt-0.5">
           {quincena.etiqueta}
-          {dia > 0 && <> · día {dia} de {DIAS_QUINCENA}</>}
+          {dia > 0 && <> · día {dia} de {totalDias}</>}
         </p>
       </div>
 

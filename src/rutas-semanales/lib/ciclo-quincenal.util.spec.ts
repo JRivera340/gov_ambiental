@@ -1,85 +1,126 @@
-import { limitesQuincena, diaDeQuincena, etiquetaRango, DIAS_QUINCENA } from './ciclo-quincenal.util';
+import { limitesQuincena, diaDeQuincena, diasDeQuincena, etiquetaRango } from './ciclo-quincenal.util';
+
+// Medianoche de Bogota es 05:00 UTC.
+const B = (iso: string) => new Date(iso);
 
 describe('limitesQuincena', () => {
-  it('siempre arranca un lunes a las 00:00 de Bogota', () => {
-    const q = limitesQuincena(new Date('2026-08-21T15:00:00.000Z'));
-    // 00:00 Bogota es 05:00 UTC.
-    expect(q.inicioISO.endsWith('T05:00:00.000Z')).toBe(true);
-    expect(new Date(q.inicioISO).getUTCDay()).toBe(1);
+  it('del 1 al 15 cuando la fecha cae en la primera mitad', () => {
+    const q = limitesQuincena(B('2026-08-07T15:00:00.000Z'));
+    expect(q.inicioISO).toBe('2026-08-01T05:00:00.000Z');
+    expect(q.finISO).toBe('2026-08-16T04:59:59.999Z');
+    expect(q.etiqueta).toBe('Quincena del 1 al 15 de agosto');
   });
 
-  it('dura exactamente 14 dias', () => {
-    const q = limitesQuincena(new Date('2026-08-21T15:00:00.000Z'));
-    const ms = new Date(q.finISO).getTime() - new Date(q.inicioISO).getTime() + 1;
-    expect(ms).toBe(DIAS_QUINCENA * 86400000);
+  it('del 16 al fin de mes cuando la fecha cae en la segunda mitad', () => {
+    const q = limitesQuincena(B('2026-08-21T15:00:00.000Z'));
+    expect(q.inicioISO).toBe('2026-08-16T05:00:00.000Z');
+    expect(q.finISO).toBe('2026-09-01T04:59:59.999Z');
+    expect(q.etiqueta).toBe('Quincena del 16 al 31 de agosto');
   });
 
-  it('las dos semanas de la quincena caen en la misma quincena', () => {
-    const primeraSemana = limitesQuincena(new Date('2026-08-12T15:00:00.000Z'));
-    const segundaSemana = limitesQuincena(new Date('2026-08-19T15:00:00.000Z'));
-    expect(segundaSemana.indice).toBe(primeraSemana.indice);
-    expect(segundaSemana.inicioISO).toBe(primeraSemana.inicioISO);
+  it('el dia 15 todavia es de la primera quincena y el 16 ya es de la segunda', () => {
+    expect(limitesQuincena(B('2026-08-15T23:00:00.000Z')).etiqueta).toBe('Quincena del 1 al 15 de agosto');
+    // 2026-08-16T04:00Z son las 23:00 del 15 en Bogota: sigue siendo la primera.
+    expect(limitesQuincena(B('2026-08-16T04:00:00.000Z')).etiqueta).toBe('Quincena del 1 al 15 de agosto');
+    // 2026-08-16T05:00Z es medianoche del 16 en Bogota: ya es la segunda.
+    expect(limitesQuincena(B('2026-08-16T05:00:00.000Z')).etiqueta).toBe('Quincena del 16 al 31 de agosto');
   });
 
-  it('la quincena siguiente empieza justo cuando termina la anterior', () => {
-    const actual = limitesQuincena(new Date('2026-08-21T15:00:00.000Z'));
-    const siguiente = limitesQuincena(new Date('2026-08-31T15:00:00.000Z'));
-    expect(siguiente.indice).toBe(actual.indice + 1);
-    expect(new Date(actual.finISO).getTime() + 1).toBe(new Date(siguiente.inicioISO).getTime());
+  it('ninguna quincena cruza de mes', () => {
+    const q = limitesQuincena(B('2026-08-31T20:00:00.000Z'));
+    const inicio = new Date(new Date(q.inicioISO).getTime() - 5 * 3600000);
+    const fin = new Date(new Date(q.finISO).getTime() - 5 * 3600000);
+    expect(inicio.getUTCMonth()).toBe(fin.getUTCMonth());
+    expect(fin.getUTCDate()).toBe(31);
   });
 
-  it('no se rompe en el cambio de año (el bug de derivar el ciclo de la semana ISO)', () => {
-    // 2026 tiene 53 semanas: con aritmetica sobre el numero de semana, W53 y W1
-    // caian en la misma mitad y una quincena quedaba de 7 dias.
-    const finDeAno = limitesQuincena(new Date('2026-12-31T15:00:00.000Z'));
-    const enero = limitesQuincena(new Date('2027-01-04T12:00:00.000Z'));
-    expect(enero.indice).toBe(finDeAno.indice);
-    const ms = new Date(finDeAno.finISO).getTime() - new Date(finDeAno.inicioISO).getTime() + 1;
-    expect(ms).toBe(DIAS_QUINCENA * 86400000);
+  it('la segunda quincena se ajusta al largo del mes', () => {
+    // Septiembre tiene 30.
+    expect(limitesQuincena(B('2026-09-20T15:00:00.000Z')).etiqueta).toBe('Quincena del 16 al 30 de septiembre');
+    // Febrero comun tiene 28.
+    expect(limitesQuincena(B('2026-02-20T15:00:00.000Z')).etiqueta).toBe('Quincena del 16 al 28 de febrero');
+    // Febrero bisiesto tiene 29.
+    expect(limitesQuincena(B('2028-02-20T15:00:00.000Z')).etiqueta).toBe('Quincena del 16 al 29 de febrero');
+  });
+
+  it('la segunda quincena de diciembre no se pasa al año siguiente', () => {
+    const q = limitesQuincena(B('2026-12-20T15:00:00.000Z'));
+    expect(q.inicioISO).toBe('2026-12-16T05:00:00.000Z');
+    expect(q.finISO).toBe('2027-01-01T04:59:59.999Z');
+    expect(q.etiqueta).toBe('Quincena del 16 al 31 de diciembre');
+  });
+
+  it('el indice es monotono y consecutivo entre quincenas', () => {
+    const primera = limitesQuincena(B('2026-08-07T15:00:00.000Z'));
+    const segunda = limitesQuincena(B('2026-08-21T15:00:00.000Z'));
+    const siguienteMes = limitesQuincena(B('2026-09-03T15:00:00.000Z'));
+    expect(segunda.indice).toBe(primera.indice + 1);
+    expect(siguienteMes.indice).toBe(segunda.indice + 1);
+  });
+
+  it('el indice cruza bien el cambio de año', () => {
+    const diciembre = limitesQuincena(B('2026-12-20T15:00:00.000Z'));
+    const enero = limitesQuincena(B('2027-01-05T15:00:00.000Z'));
+    expect(enero.indice).toBe(diciembre.indice + 1);
+  });
+
+  it('dos fechas de la misma quincena dan el mismo rango', () => {
+    const a = limitesQuincena(B('2026-08-16T12:00:00.000Z'));
+    const b = limitesQuincena(B('2026-08-30T12:00:00.000Z'));
+    expect(b.indice).toBe(a.indice);
+    expect(b.inicioISO).toBe(a.inicioISO);
   });
 });
 
-describe('etiquetaRango', () => {
-  it('usa un solo mes cuando la quincena no lo cruza', () => {
-    expect(limitesQuincena(new Date('2026-08-21T15:00:00.000Z')).etiqueta)
-      .toBe('Quincena del 10 al 23 de agosto');
+describe('diasDeQuincena', () => {
+  const dias = (fecha: string) => {
+    const q = limitesQuincena(B(fecha));
+    return diasDeQuincena(q.inicioISO, q.finISO);
+  };
+
+  it('la primera quincena siempre tiene 15 dias', () => {
+    expect(dias('2026-02-05T15:00:00.000Z')).toBe(15);
+    expect(dias('2026-08-05T15:00:00.000Z')).toBe(15);
   });
 
-  it('nombra los dos meses cuando la quincena los cruza', () => {
-    expect(limitesQuincena(new Date('2026-09-02T15:00:00.000Z')).etiqueta)
-      .toBe('Quincena del 24 de agosto al 6 de septiembre');
+  it('la segunda depende del largo del mes', () => {
+    expect(dias('2026-08-20T15:00:00.000Z')).toBe(16); // 31 dias
+    expect(dias('2026-09-20T15:00:00.000Z')).toBe(15); // 30 dias
+    expect(dias('2026-02-20T15:00:00.000Z')).toBe(13); // 28 dias
+    expect(dias('2028-02-20T15:00:00.000Z')).toBe(14); // 29 dias
   });
 
-  it('agrega el año cuando la quincena cruza de año', () => {
-    expect(limitesQuincena(new Date('2026-12-31T15:00:00.000Z')).etiqueta)
-      .toBe('Quincena del 28 de diciembre de 2026 al 10 de enero de 2027');
-  });
-
-  it('nunca muestra el formato de semana ISO', () => {
-    expect(etiquetaRango('2026-08-10T05:00:00.000Z', '2026-08-24T04:59:59.999Z')).not.toMatch(/W\d/);
+  it('sin fechas da 0', () => {
+    expect(diasDeQuincena('', '')).toBe(0);
   });
 });
 
 describe('diaDeQuincena', () => {
-  const inicioISO = '2026-08-10T05:00:00.000Z';
+  const q = limitesQuincena(B('2026-08-07T15:00:00.000Z')); // 1..15 de agosto
 
   it('el primer dia es 1, no 0', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-08-10T06:00:00.000Z'))).toBe(1);
+    expect(diaDeQuincena(q.inicioISO, q.finISO, B('2026-08-01T06:00:00.000Z'))).toBe(1);
   });
 
-  it('el ultimo dia es 14', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-08-23T23:00:00.000Z'))).toBe(14);
+  it('cuenta el dia corriente dentro de la quincena', () => {
+    expect(diaDeQuincena(q.inicioISO, q.finISO, B('2026-08-10T12:00:00.000Z'))).toBe(10);
   });
 
-  it('no pasa de 14 aunque la fecha se vaya de la quincena', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-09-15T12:00:00.000Z'))).toBe(14);
+  it('no pasa del largo real de la quincena', () => {
+    expect(diaDeQuincena(q.inicioISO, q.finISO, B('2026-09-20T12:00:00.000Z'))).toBe(15);
+    const segunda = limitesQuincena(B('2026-02-20T15:00:00.000Z')); // 13 dias
+    expect(diaDeQuincena(segunda.inicioISO, segunda.finISO, B('2026-06-01T12:00:00.000Z'))).toBe(13);
   });
 
-  it('da 0 antes de que la quincena arranque', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-08-09T12:00:00.000Z'))).toBe(0);
+  it('da 0 antes de que la quincena arranque y sin fechas', () => {
+    expect(diaDeQuincena(q.inicioISO, q.finISO, B('2026-07-30T12:00:00.000Z'))).toBe(0);
+    expect(diaDeQuincena('', '', new Date())).toBe(0);
   });
+});
 
-  it('da 0 sin fecha de inicio', () => {
-    expect(diaDeQuincena('', new Date())).toBe(0);
+describe('etiquetaRango', () => {
+  it('nunca muestra el formato de semana ISO', () => {
+    const q = limitesQuincena(B('2026-08-21T15:00:00.000Z'));
+    expect(etiquetaRango(q.inicioISO, q.finISO)).not.toMatch(/W\d/);
   });
 });

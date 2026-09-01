@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { paradaLiteFromParadaRuta, hidratarParadas, diasRestantesQuincena, diaDeQuincena } from './rutaSemanal.lib';
+import { paradaLiteFromParadaRuta, hidratarParadas, diasRestantesQuincena, diaDeQuincena, diasDeQuincena } from './rutaSemanal.lib';
 
 const PR = (id: string, barrio: string, visitado = false) => ({
   numeroGlobal: 1, numeroSegmento: 0, puntoId: id, lat: 4.6, lng: -74.07,
@@ -44,28 +44,50 @@ describe('hidratarParadas', () => {
 
 describe('diasRestantesQuincena', () => {
   it('cuenta dias desde ahora hasta el fin de la quincena', () => {
-    // fin 2026-07-27T04:59:59.999Z ; ahora miercoles 2026-07-22T15:00Z
-    expect(diasRestantesQuincena('2026-07-27T04:59:59.999Z', new Date('2026-07-22T15:00:00Z'))).toBe(5);
+    // Fin de la quincena del 1 al 15 de agosto; ahora el 10.
+    expect(diasRestantesQuincena('2026-08-16T04:59:59.999Z', new Date('2026-08-10T15:00:00Z'))).toBe(6);
   });
   it('retorna 0 cuando finISO esta en el pasado', () => {
-    expect(diasRestantesQuincena('2026-07-13T04:59:59.999Z', new Date('2026-07-20T10:00:00Z'))).toBe(0);
+    expect(diasRestantesQuincena('2026-08-16T04:59:59.999Z', new Date('2026-08-20T10:00:00Z'))).toBe(0);
+  });
+});
+
+// La quincena es de calendario, asi que su largo cambia con el mes. Estos
+// helpers no pueden asumir 14 dias.
+describe('diasDeQuincena', () => {
+  it('la primera quincena tiene 15 dias', () => {
+    expect(diasDeQuincena('2026-08-01T05:00:00.000Z', '2026-08-16T04:59:59.999Z')).toBe(15);
+  });
+  it('la segunda de un mes de 31 tiene 16', () => {
+    expect(diasDeQuincena('2026-08-16T05:00:00.000Z', '2026-09-01T04:59:59.999Z')).toBe(16);
+  });
+  it('la segunda de febrero comun tiene 13', () => {
+    expect(diasDeQuincena('2026-02-16T05:00:00.000Z', '2026-03-01T04:59:59.999Z')).toBe(13);
+  });
+  it('sin fechas da 0', () => {
+    expect(diasDeQuincena(null, null)).toBe(0);
+    expect(diasDeQuincena('2026-08-01T05:00:00.000Z', undefined)).toBe(0);
   });
 });
 
 describe('diaDeQuincena', () => {
-  const inicioISO = '2026-07-13T05:00:00.000Z';
+  // Quincena del 1 al 15 de agosto.
+  const inicioISO = '2026-08-01T05:00:00.000Z';
+  const finISO = '2026-08-16T04:59:59.999Z';
 
   it('el primer dia es 1', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-07-13T15:00:00Z'))).toBe(1);
+    expect(diaDeQuincena(inicioISO, finISO, new Date('2026-08-01T15:00:00Z'))).toBe(1);
   });
-  it('la segunda semana sigue contando (dia 9, no dia 2)', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-07-21T15:00:00Z'))).toBe(9);
+  it('cuenta el dia corriente', () => {
+    expect(diaDeQuincena(inicioISO, finISO, new Date('2026-08-09T15:00:00Z'))).toBe(9);
   });
-  it('no pasa de 14', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-08-30T15:00:00Z'))).toBe(14);
+  it('no pasa del largo real del periodo', () => {
+    expect(diaDeQuincena(inicioISO, finISO, new Date('2026-09-30T15:00:00Z'))).toBe(15);
+    // Segunda de febrero comun: 13 dias.
+    expect(diaDeQuincena('2026-02-16T05:00:00.000Z', '2026-03-01T04:59:59.999Z', new Date('2026-06-01T15:00:00Z'))).toBe(13);
   });
   it('0 antes de que arranque y 0 sin plan cargado', () => {
-    expect(diaDeQuincena(inicioISO, new Date('2026-07-12T15:00:00Z'))).toBe(0);
-    expect(diaDeQuincena(null, new Date())).toBe(0);
+    expect(diaDeQuincena(inicioISO, finISO, new Date('2026-07-31T15:00:00Z'))).toBe(0);
+    expect(diaDeQuincena(null, null, new Date())).toBe(0);
   });
 });

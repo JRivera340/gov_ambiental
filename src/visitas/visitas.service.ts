@@ -104,7 +104,7 @@ export class VisitasService {
     };
   }
 
-  // Desempeño de la quincena por gestor: un solo bloque de 14 días contra el
+  // Desempeño de la quincena por gestor: un solo bloque de calendario contra el
   // 100% de los puntos asignados. Antes se medía por semana con la mitad de los
   // puntos en cada una, y las visitas a la mitad que no tocaba no sumaban en
   // ningún lado (gestores que sí recorrieron sus puntos aparecían en 0%).

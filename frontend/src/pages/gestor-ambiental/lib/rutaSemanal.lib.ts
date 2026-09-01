@@ -2,7 +2,6 @@ import type { ParadaRuta } from './ruta.types';
 import type { ParadaLite, RutaSemanalDTO } from '../../../services/ambiental.service';
 
 const DAY = 86400000;
-const DIAS_QUINCENA = 14;
 
 export function paradaLiteFromParadaRuta(p: ParadaRuta): ParadaLite {
   return { puntoId: p.puntoId, lat: p.lat, lng: p.lng, barrio: p.barrio, visitado: p.visitado };
@@ -48,11 +47,26 @@ export function diasRestantesQuincena(finISO: string, ahora: Date): number {
   return Math.max(0, Math.ceil(ms / DAY));
 }
 
-// Día en curso de la quincena (1..14). 0 si todavía no arrancó o si no llegó
-// el plan. Espeja diaDeQuincena del backend (ciclo-quincenal.util.ts).
-export function diaDeQuincena(inicioISO: string | null | undefined, ahora: Date): number {
-  if (!inicioISO) return 0;
+// La quincena es de calendario (1 al 15, 16 al fin de mes), así que su largo
+// NO es fijo: 15 días la primera, y 13/14/15/16 la segunda según el mes. Se
+// deriva del rango que manda el backend en vez de asumir un número.
+export function diasDeQuincena(
+  inicioISO: string | null | undefined,
+  finISO: string | null | undefined,
+): number {
+  if (!inicioISO || !finISO) return 0;
+  return Math.round((new Date(finISO).getTime() - new Date(inicioISO).getTime() + 1) / DAY);
+}
+
+// Día en curso de la quincena (1..N). 0 si todavía no arrancó o si no llegó el
+// plan. Espeja diaDeQuincena del backend (ciclo-quincenal.util.ts).
+export function diaDeQuincena(
+  inicioISO: string | null | undefined,
+  finISO: string | null | undefined,
+  ahora: Date,
+): number {
+  if (!inicioISO || !finISO) return 0;
   const transcurrido = ahora.getTime() - new Date(inicioISO).getTime();
   if (transcurrido < 0) return 0;
-  return Math.min(DIAS_QUINCENA, Math.floor(transcurrido / DAY) + 1);
+  return Math.min(diasDeQuincena(inicioISO, finISO), Math.floor(transcurrido / DAY) + 1);
 }

@@ -58,7 +58,7 @@ export class RutasSemanalesService {
   ) {}
 
   // Plan de la quincena: el 100% de los puntos asignados al gestor, disponibles
-  // durante los 14 días.
+  // durante todo el periodo.
   //
   // Antes el ciclo eran dos semanas y cada punto caía en una mitad fija
   // (mitadDePunto), así que la ruta de una semana solo podía cubrir la mitad de
@@ -197,7 +197,7 @@ export class RutasSemanalesService {
       existente.segmentos = input.segmentos;
       existente.estado = 'en_progreso';
       // La quincena puede haber tomado el lugar de una ruta semanal vieja que
-      // arrancaba el mismo lunes: hay que estirar el fin a los 14 días.
+      // arrancaba el mismo día: hay que estirar el fin al de la quincena.
       existente.semanaFin = new Date(finISO);
       return this.repo.save(existente);
     }

@@ -24,7 +24,7 @@ export interface RutaSemanalDTO {
   updatedAt?: string;
 }
 
-/** La quincena en curso: 14 días corridos que cubren el 100% de los asignados. */
+/** La quincena en curso (1 al 15, o 16 al fin de mes): cubre el 100% de los asignados. */
 export interface QuincenaPlanDTO {
   /** Índice absoluto desde el lunes ancla. Identifica la quincena sin arrastrar fechas. */
   indice: number;

@@ -4,7 +4,7 @@ import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { RutaPolylineLayer } from './RutaPolylineLayer';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { EdgeDrawer } from '../../../components/shell/EdgeDrawer';
-import { diaDeQuincena, diasRestantesQuincena } from '../lib/rutaSemanal.lib';
+import { diaDeQuincena, diasDeQuincena, diasRestantesQuincena } from '../lib/rutaSemanal.lib';
 import { resumenQuincena } from '../lib/rutasQuincena';
 import type { QuincenaPlanDTO } from '../../../services/ambiental.service';
 
@@ -82,7 +82,8 @@ export const PlanificadorRutaView: React.FC = () => {
       : [4.5981, -74.0758];
 
   const ahora = new Date();
-  const dia = diaDeQuincena(quincena?.inicioISO, ahora);
+  const dia = diaDeQuincena(quincena?.inicioISO, quincena?.finISO, ahora);
+  const totalDias = diasDeQuincena(quincena?.inicioISO, quincena?.finISO);
   const arrancaLaQuincena = dia === 1;
   const diasRestantes = quincena ? diasRestantesQuincena(quincena.finISO, ahora) : null;
 
@@ -115,7 +116,7 @@ export const PlanificadorRutaView: React.FC = () => {
         </p>
         {diasRestantes !== null && (
           <p className="text-[11px] text-neutral-500 mt-1">
-            Día {dia} de 14 · quedan {diasRestantes} días
+            Día {dia} de {totalDias} · quedan {diasRestantes} días
           </p>
         )}
         {arrancaLaQuincena && (

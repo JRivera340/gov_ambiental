@@ -1,6 +1,6 @@
 import { RutasSemanalesService } from './rutas-semanales.service';
 import { RutaSemanal } from './entities/ruta-semanal.entity';
-import { limitesQuincena } from './lib/ciclo-quincenal.util';
+import { limitesQuincena, diasDeQuincena } from './lib/ciclo-quincenal.util';
 
 // El repo real recibe operadores de TypeORM (LessThan) en `where`; el mock los
 // reconoce por su forma para poder probar el historial sin base de datos.
@@ -100,19 +100,26 @@ describe('RutasSemanalesService.getPlanQuincena', () => {
 });
 
 describe('RutasSemanalesService', () => {
-  const ahora = new Date('2026-07-27T15:00:00.000Z');
+  // 20 de julio: segunda quincena de julio (16 al 31).
+  const ahora = new Date('2026-07-20T15:00:00.000Z');
 
-  it('crearRutaQuincena crea una ruta nueva en progreso, de 14 dias', async () => {
+  it('crearRutaQuincena crea una ruta nueva que abarca la quincena de calendario', async () => {
     const repo = makeRepo();
     const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
     const ruta = await service.crearRutaQuincena({ gestorId: 'g1', paradas: [], segmentos: [], ahora });
     expect(ruta.estado).toBe('en_progreso');
     expect(ruta.gestorId).toBe('g1');
+
+    const rango = limitesQuincena(ahora);
+    expect(ruta.semanaInicio.toISOString()).toBe(rango.inicioISO);
+    expect(ruta.semanaFin.toISOString()).toBe(rango.finISO);
+    // 20 de julio cae en la segunda quincena, y julio tiene 31: son 16 dias.
     const dias = (ruta.semanaFin.getTime() - ruta.semanaInicio.getTime() + 1) / 86400000;
-    expect(dias).toBe(14);
+    expect(dias).toBe(diasDeQuincena(rango.inicioISO, rango.finISO));
+    expect(dias).toBe(16);
   });
 
-  it('crearRutaQuincena en la segunda semana de la misma quincena recalcula en vez de duplicar', async () => {
+  it('crearRutaQuincena mas tarde en la misma quincena recalcula en vez de duplicar', async () => {
     const repo = makeRepo();
     const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
     const primera = await service.crearRutaQuincena({ gestorId: 'g1', paradas: [], segmentos: [], ahora });
@@ -120,10 +127,21 @@ describe('RutasSemanalesService', () => {
       gestorId: 'g1',
       paradas: [{ puntoId: 'p1', lat: 0, lng: 0, barrio: 'X', visitado: false }],
       segmentos: [],
-      ahora: new Date(ahora.getTime() + 7 * 86400000),
+      // 28 de julio: sigue siendo la quincena del 16 al 31.
+      ahora: new Date('2026-07-28T15:00:00.000Z'),
     });
     expect(segunda.id).toBe(primera.id);
     expect(segunda.paradas).toHaveLength(1);
+  });
+
+  it('crearRutaQuincena en la otra mitad del mes abre una ruta distinta', async () => {
+    const repo = makeRepo();
+    const service = new RutasSemanalesService(repo as any, puntosRepoStub as any, asignacionesServiceStub as any);
+    const segundaMitadJulio = await service.crearRutaQuincena({ gestorId: 'g1', paradas: [], segmentos: [], ahora });
+    const primeraMitadAgosto = await service.crearRutaQuincena({
+      gestorId: 'g1', paradas: [], segmentos: [], ahora: new Date('2026-08-03T15:00:00.000Z'),
+    });
+    expect(primeraMitadAgosto.id).not.toBe(segundaMitadJulio.id);
   });
 
   it('cancelarRuta rechaza si el que cancela no es el gestor dueno ni admin', async () => {
@@ -143,8 +161,8 @@ describe('RutasSemanalesService', () => {
 });
 
 describe('RutasSemanalesService.getHistorial', () => {
-  const quincenaVieja = new Date('2026-06-15T15:00:00.000Z');
-  const quincenaPasada = new Date('2026-07-27T15:00:00.000Z');
+  const quincenaVieja = new Date('2026-06-05T15:00:00.000Z');
+  const quincenaPasada = new Date('2026-07-20T15:00:00.000Z');
   const quincenaActual = new Date('2026-08-21T15:00:00.000Z');
 
   const parada = (puntoId: string, visitado: boolean) => ({
@@ -169,13 +187,14 @@ describe('RutasSemanalesService.getHistorial', () => {
     expect(historial[0].etiqueta).toMatch(/^Quincena del /);
   });
 
-  it('cada entrada abarca 14 dias aunque las rutas guardadas sean semanales', async () => {
+  it('cada entrada abarca la quincena de calendario, aunque las rutas guardadas sean semanales', async () => {
     const service = nuevoService();
     await service.crearRutaQuincena({ gestorId: 'g1', paradas: [], segmentos: [], ahora: quincenaPasada });
 
     const [q] = await service.getHistorial('g1', 20, quincenaActual);
+    expect(q).toMatchObject(limitesQuincena(quincenaPasada));
     const dias = (new Date(q.finISO).getTime() - new Date(q.inicioISO).getTime() + 1) / 86400000;
-    expect(dias).toBe(14);
+    expect(dias).toBe(diasDeQuincena(q.inicioISO, q.finISO));
   });
 
   // El bug del panel: antes del ciclo quincenal se creaba una ruta por semana.
@@ -184,18 +203,19 @@ describe('RutasSemanalesService.getHistorial', () => {
     const repo = makeRepo();
     const service = new RutasSemanalesService(repo as any, { find: async () => [] } as any, asignacionesServiceStub as any);
     // Se simulan dos filas semanales, como las que dejo el modelo anterior.
+    // Dos lunes distintos, ambos dentro de la quincena del 16 al 31 de julio.
     await repo.save({
       gestorId: 'g1',
-      semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-03T04:59:59.999Z'),
+      semanaInicio: new Date('2026-07-20T05:00:00.000Z'),
+      semanaFin: new Date('2026-07-27T04:59:59.999Z'),
       estado: 'cerrada',
       paradas: [parada('p1', true), parada('p2', false)],
       segmentos: [], arrastre: [],
     } as any);
     await repo.save({
       gestorId: 'g1',
-      semanaInicio: new Date('2026-08-03T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-10T04:59:59.999Z'),
+      semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
+      semanaFin: new Date('2026-08-03T04:59:59.999Z'),
       estado: 'cerrada',
       paradas: [parada('p3', true)],
       segmentos: [], arrastre: [],
@@ -215,14 +235,14 @@ describe('RutasSemanalesService.getHistorial', () => {
     const service = new RutasSemanalesService(repo as any, { find: async () => [] } as any, asignacionesServiceStub as any);
     await repo.save({
       gestorId: 'g1',
-      semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-03T04:59:59.999Z'),
+      semanaInicio: new Date('2026-07-20T05:00:00.000Z'),
+      semanaFin: new Date('2026-07-27T04:59:59.999Z'),
       estado: 'cerrada', paradas: [parada('p1', false)], segmentos: [], arrastre: [],
     } as any);
     await repo.save({
       gestorId: 'g1',
-      semanaInicio: new Date('2026-08-03T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-10T04:59:59.999Z'),
+      semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
+      semanaFin: new Date('2026-08-03T04:59:59.999Z'),
       estado: 'cerrada', paradas: [parada('p1', true)], segmentos: [], arrastre: [],
     } as any);
 
@@ -240,8 +260,8 @@ describe('RutasSemanalesService.getHistorial', () => {
     const service = new RutasSemanalesService(repo as any, { find: async () => puntos } as any, asignacionesServiceStub as any);
     await repo.save({
       gestorId: 'g1',
-      semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-10T04:59:59.999Z'),
+      semanaInicio: new Date('2026-07-20T05:00:00.000Z'),
+      semanaFin: new Date('2026-08-01T04:59:59.999Z'),
       estado: 'cerrada',
       paradas: [parada('p1', true), parada('p2', false)],
       segmentos: [], arrastre: [],

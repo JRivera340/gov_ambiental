@@ -7,7 +7,7 @@ import type { QuincenaPlanDTO } from '../../../services/ambiental.service';
 // Visita), que se armaban sobre TODOS los puntos asignados sin coincidir con lo
 // que el backend medía. También reemplaza al reparto en dos semanas: ese
 // obligaba al gestor a esperar a la semana siguiente para tocar la otra mitad
-// de sus puntos. La quincena es un bloque único de 14 días con el 100% de los
+// de sus puntos. La quincena es un bloque único de calendario con el 100% de los
 // asignados, y es contra eso que se mide el cumplimiento.
 
 export function getParadasDeQuincena(paradas: ParadaRuta[], quincena: QuincenaPlanDTO): ParadaRuta[] {

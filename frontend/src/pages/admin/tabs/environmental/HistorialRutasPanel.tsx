@@ -186,7 +186,7 @@ export const HistorialRutasPanel: React.FC<Props> = ({ gestorId, nombre, onVolve
             </h2>
           </div>
           <p className="text-[11px] text-neutral-500 mt-1">
-            Una entrada por quincena de 14 días. La quincena en curso se ve en Desempeño.
+            Una entrada por quincena (del 1 al 15 y del 16 al fin de mes). La quincena en curso se ve en Desempeño.
           </p>
         </div>
 

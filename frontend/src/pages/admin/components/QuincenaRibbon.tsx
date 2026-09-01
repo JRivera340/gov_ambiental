@@ -1,29 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ambientalService, type ResumenDesempenoDTO } from '../../../services/ambiental.service';
 import { formatRangoQuincena } from '../../gestor-ambiental/lib/rangoLabel';
+import { diaDeQuincena, diasDeQuincena } from '../../gestor-ambiental/lib/rutaSemanal.lib';
 
 // Franja de la quincena — la pieza de cabecera del panel.
 //
-// Todo el módulo se organiza alrededor de la quincena: 14 días corridos en los
-// que cada gestor tiene que recorrer el 100% de sus puntos. Esta franja muestra
-// ese periodo completo: qué día va, cuánto se lleva visitado y cuánto falta.
+// Todo el módulo se organiza alrededor de la quincena de calendario — del 1 al
+// 15 y del 16 al fin de mes — en la que cada gestor tiene que recorrer el 100%
+// de sus puntos. Esta franja muestra el periodo completo: qué día va, cuánto se
+// lleva visitado y cuánto falta.
 //
-// Antes eran dos barras, una por semana, porque el ciclo repartía los puntos en
-// mitades. Ese reparto ya no existe: una sola barra de 14 días.
+// El largo NO es fijo: 15 días la primera quincena, y 13 a 16 la segunda según
+// el mes. La barra dibuja una celda por día real del periodo, así que en
+// febrero se ve más corta que en agosto. Nada acá asume 14.
 //
 // Fuente: GET /visitas/desempeno (el mismo agregado que consume el panel de
 // Desempeño, así los dos no pueden contradecirse).
-
-const DIAS_QUINCENA = 14;
-const DIA_MS = 86400000;
-
-/** Día de la quincena en curso (1..14). 0 si todavía no arrancó. */
-function diaDeQuincena(inicioISO: string, ahora = new Date()): number {
-  if (!inicioISO) return 0;
-  const transcurrido = ahora.getTime() - new Date(inicioISO).getTime();
-  if (transcurrido < 0) return 0;
-  return Math.min(DIAS_QUINCENA, Math.floor(transcurrido / DIA_MS) + 1);
-}
 
 export const QuincenaRibbon: React.FC = () => {
   const [resumen, setResumen] = useState<ResumenDesempenoDTO | null>(null);
@@ -37,17 +29,18 @@ export const QuincenaRibbon: React.FC = () => {
     return () => { cancelado = true; };
   }, []);
 
-  const dia = resumen ? diaDeQuincena(resumen.quincenaInicioISO) : 0;
-  const diasRestantes = dia > 0 ? DIAS_QUINCENA - dia : null;
+  const totalDias = resumen ? diasDeQuincena(resumen.quincenaInicioISO, resumen.quincenaFinISO) : 0;
+  const dia = resumen ? diaDeQuincena(resumen.quincenaInicioISO, resumen.quincenaFinISO, new Date()) : 0;
+  const diasRestantes = dia > 0 ? totalDias - dia : null;
   const pctTotal = resumen && resumen.targetTotal > 0
     ? Math.round((resumen.actualTotal / resumen.targetTotal) * 100)
     : 0;
 
   // El avance esperado a esta altura de la quincena. Sirve de referencia: una
-  // barra al 40% no dice nada si no se sabe que va el día 12 de 14.
+  // barra al 40% no dice nada si no se sabe que va el día 12 de 15.
   const pctEsperado = useMemo(
-    () => (dia > 0 ? Math.round((dia / DIAS_QUINCENA) * 100) : 0),
-    [dia],
+    () => (dia > 0 && totalDias > 0 ? Math.round((dia / totalDias) * 100) : 0),
+    [dia, totalDias],
   );
   const atrasado = dia > 0 && pctTotal < pctEsperado - 10;
 
@@ -63,7 +56,7 @@ export const QuincenaRibbon: React.FC = () => {
         </p>
         {dia > 0 && (
           <p className="text-[11px] text-neutral-500 mt-0.5">
-            Día <span className="tabular font-bold text-neutral-700">{dia}</span> de {DIAS_QUINCENA}
+            Día <span className="tabular font-bold text-neutral-700">{dia}</span> de {totalDias}
             {diasRestantes !== null && diasRestantes > 0 && (
               <span className="text-neutral-400"> · quedan {diasRestantes}</span>
             )}
@@ -71,7 +64,7 @@ export const QuincenaRibbon: React.FC = () => {
         )}
       </div>
 
-      {/* Barra de los 14 días */}
+      {/* Barra del periodo: una celda por día real */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2 mb-1.5">
           <span className="text-[11px] font-semibold text-neutral-600">
@@ -86,8 +79,8 @@ export const QuincenaRibbon: React.FC = () => {
         </div>
 
         {/* Una celda por día: se ve de un vistazo cuánto queda de plazo. */}
-        <div className="flex gap-[3px] h-2.5" aria-label={`Día ${dia} de ${DIAS_QUINCENA}`}>
-          {Array.from({ length: DIAS_QUINCENA }, (_, i) => {
+        <div className="flex gap-[3px] h-2.5" aria-label={`Día ${dia} de ${totalDias}`}>
+          {Array.from({ length: totalDias }, (_, i) => {
             const numeroDia = i + 1;
             const transcurrido = numeroDia <= dia;
             const esHoy = numeroDia === dia;
@@ -107,7 +100,7 @@ export const QuincenaRibbon: React.FC = () => {
           })}
         </div>
 
-        {/* Cumplimiento sobre esa misma escala de 14 días. */}
+        {/* Cumplimiento sobre esa misma escala de días. */}
         <div className="relative h-2.5 rounded-full bg-neutral-200/70 overflow-hidden shadow-inner mt-1.5">
           <div
             className="h-full rounded-full transition-[width] duration-700 ease-out"

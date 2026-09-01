@@ -95,7 +95,7 @@ export const PerfilGestorView: React.FC = () => {
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [visitados, user]);
 
-  // Visitados de la quincena en curso según el backend (los 14 días reales),
+  // Visitados de la quincena en curso según el backend (el periodo real),
   // no una ventana de 7 días rodantes como antes.
   const visitadosQuincenaIds = useMemo(
     () => new Set(quincena?.visitados ?? []),

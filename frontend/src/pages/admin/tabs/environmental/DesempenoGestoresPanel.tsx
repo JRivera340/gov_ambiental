@@ -150,7 +150,7 @@ export const DesempenoGestoresPanel: React.FC = () => {
                 </div>
               </div>
 
-              {/* Una sola barra: los 14 días son un bloque único y el gestor
+              {/* Una sola barra: la quincena es un bloque único y el gestor
                   tiene todos sus puntos disponibles durante todo el periodo. */}
               <div>
                 <div className="w-full h-2.5 rounded-full bg-neutral-200/70 overflow-hidden shadow-inner">
