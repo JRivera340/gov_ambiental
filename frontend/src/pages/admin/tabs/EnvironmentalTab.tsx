@@ -606,7 +606,7 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
           </div>
 
           {/* Análisis: un panel por vez, en vez de tres tarjetas apiladas */}
-          <div className="glass-panel rounded-2xl p-3.5 flex-1 min-h-[420px] flex flex-col">
+          <div className="glass-panel rounded-2xl p-3.5 flex-1 min-h-[420px] xl:min-h-0 flex flex-col">
             <div className="flex items-center gap-1 mb-3 shrink-0">
               {PANELES.map(p => {
                 const activo = p.key === panelDerecho;

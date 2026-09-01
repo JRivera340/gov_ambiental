@@ -76,7 +76,10 @@ export const PieChart: React.FC<PieChartProps> = ({
   }
 
   return (
-    <div className={`flex ${hideLegend ? 'items-center justify-center' : 'flex-col md:flex-row items-center gap-3'}`} style={{ width: '100%', height: '100%' }}>
+    <div
+      className={`flex min-h-0 ${hideLegend ? 'items-center justify-center' : 'flex-col md:flex-row items-center gap-3'}`}
+      style={{ width: '100%', height: '100%', minHeight: 0 }}
+    >
       <div className="flex-shrink-0 flex items-center justify-center">
         <svg width={size} height={size} viewBox="0 0 240 240" className="drop-shadow-sm">
           {segments.map((seg, idx) => {
@@ -125,7 +128,7 @@ export const PieChart: React.FC<PieChartProps> = ({
         </svg>
       </div>
       {!hideLegend && (
-        <div className="flex-1 space-y-1 py-1 w-full overflow-y-auto thin-scrollbar">
+        <div className="flex-1 min-h-0 space-y-1 py-1 w-full overflow-y-auto thin-scrollbar">
           {segments.map((seg) => (
             <div key={seg.cat} className="flex items-center justify-between p-1.5 bg-neutral-50 rounded-lg">
               <div className="flex items-center gap-1.5">
