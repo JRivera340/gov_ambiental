@@ -1,8 +1,8 @@
 import type { ParadaRuta } from './ruta.types';
 import type { ParadaLite, RutaSemanalDTO } from '../../../services/ambiental.service';
 
-const BOGOTA_OFFSET_MS = 5 * 3600000;
 const DAY = 86400000;
+const DIAS_QUINCENA = 14;
 
 export function paradaLiteFromParadaRuta(p: ParadaRuta): ParadaLite {
   return { puntoId: p.puntoId, lat: p.lat, lng: p.lng, barrio: p.barrio, visitado: p.visitado };
@@ -43,12 +43,16 @@ export function hidratarParadas(dto: RutaSemanalDTO, puntos: ParadaRuta[]): Para
   });
 }
 
-export function diasRestantesSemana(finISO: string, ahora: Date): number {
+export function diasRestantesQuincena(finISO: string, ahora: Date): number {
   const ms = new Date(finISO).getTime() - ahora.getTime();
   return Math.max(0, Math.ceil(ms / DAY));
 }
 
-export function esLunesBogota(ahora: Date): boolean {
-  const bogota = new Date(ahora.getTime() - BOGOTA_OFFSET_MS);
-  return bogota.getUTCDay() === 1;
+// Día en curso de la quincena (1..14). 0 si todavía no arrancó o si no llegó
+// el plan. Espeja diaDeQuincena del backend (ciclo-quincenal.util.ts).
+export function diaDeQuincena(inicioISO: string | null | undefined, ahora: Date): number {
+  if (!inicioISO) return 0;
+  const transcurrido = ahora.getTime() - new Date(inicioISO).getTime();
+  if (transcurrido < 0) return 0;
+  return Math.min(DIAS_QUINCENA, Math.floor(transcurrido / DAY) + 1);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { paradaLiteFromParadaRuta, hidratarParadas, diasRestantesSemana, esLunesBogota } from './rutaSemanal.lib';
+import { paradaLiteFromParadaRuta, hidratarParadas, diasRestantesQuincena, diaDeQuincena } from './rutaSemanal.lib';
 
 const PR = (id: string, barrio: string, visitado = false) => ({
   numeroGlobal: 1, numeroSegmento: 0, puntoId: id, lat: 4.6, lng: -74.07,
@@ -42,27 +42,30 @@ describe('hidratarParadas', () => {
   });
 });
 
-describe('diasRestantesSemana', () => {
-  it('cuenta días desde ahora hasta el fin (Bogotá)', () => {
-    // fin domingo 2026-07-13T04:59:59.999Z ; ahora miércoles 2026-07-08T15:00Z
-    expect(diasRestantesSemana('2026-07-13T04:59:59.999Z', new Date('2026-07-08T15:00:00Z'))).toBe(5);
+describe('diasRestantesQuincena', () => {
+  it('cuenta dias desde ahora hasta el fin de la quincena', () => {
+    // fin 2026-07-27T04:59:59.999Z ; ahora miercoles 2026-07-22T15:00Z
+    expect(diasRestantesQuincena('2026-07-27T04:59:59.999Z', new Date('2026-07-22T15:00:00Z'))).toBe(5);
   });
-  it('retorna 0 cuando finISO está en el pasado', () => {
-    expect(diasRestantesSemana('2026-07-06T04:59:59.999Z', new Date('2026-07-10T10:00:00Z'))).toBe(0);
+  it('retorna 0 cuando finISO esta en el pasado', () => {
+    expect(diasRestantesQuincena('2026-07-13T04:59:59.999Z', new Date('2026-07-20T10:00:00Z'))).toBe(0);
   });
 });
 
-describe('esLunesBogota', () => {
-  it('true un lunes en horario Bogotá', () => {
-    expect(esLunesBogota(new Date('2026-07-06T15:00:00Z'))).toBe(true); // lunes 10:00 Bogotá
+describe('diaDeQuincena', () => {
+  const inicioISO = '2026-07-13T05:00:00.000Z';
+
+  it('el primer dia es 1', () => {
+    expect(diaDeQuincena(inicioISO, new Date('2026-07-13T15:00:00Z'))).toBe(1);
   });
-  it('false un domingo', () => {
-    expect(esLunesBogota(new Date('2026-07-12T15:00:00Z'))).toBe(false);
+  it('la segunda semana sigue contando (dia 9, no dia 2)', () => {
+    expect(diaDeQuincena(inicioISO, new Date('2026-07-21T15:00:00Z'))).toBe(9);
   });
-  it('false cuando es domingo en Bogotá a pesar del lunes UTC temprano', () => {
-    expect(esLunesBogota(new Date('2026-07-06T03:00:00Z'))).toBe(false); // domingo 22:00 Bogotá
+  it('no pasa de 14', () => {
+    expect(diaDeQuincena(inicioISO, new Date('2026-08-30T15:00:00Z'))).toBe(14);
   });
-  it('true cuando es lunes en Bogotá temprano', () => {
-    expect(esLunesBogota(new Date('2026-07-06T05:30:00Z'))).toBe(true); // lunes 00:30 Bogotá
+  it('0 antes de que arranque y 0 sin plan cargado', () => {
+    expect(diaDeQuincena(inicioISO, new Date('2026-07-12T15:00:00Z'))).toBe(0);
+    expect(diaDeQuincena(null, new Date())).toBe(0);
   });
 });

@@ -1,9 +1,11 @@
 import { isoWeekOf, isoWeekLabel } from './plan-semanal.util';
 
-// `splitAlternado` e `isoWeekParity` se eliminaron con el ciclo de 2 semanas:
-// el reparto ahora es por punto (mitadDePunto) y el índice del ciclo se cuenta
-// desde un lunes ancla, porque la paridad de la semana ISO se rompía en los
-// años de 53 semanas. Ver ciclo-semanal.util.spec.ts.
+// `splitAlternado` e `isoWeekParity` se eliminaron: ya no hay reparto de
+// puntos por semana. La quincena se cuenta desde un lunes ancla, porque la
+// aritmética sobre el número de semana ISO se rompía en los años de 53
+// semanas. Ver ciclo-quincenal.util.spec.ts.
+//
+// isoWeekLabel sigue vivo: es el dato de auditoría de cada visita.
 describe('plan-semanal.util', () => {
   describe('isoWeekOf / isoWeekLabel', () => {
     it('label tiene formato YYYY-Www', () => {

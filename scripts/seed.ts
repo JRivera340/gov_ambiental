@@ -1,18 +1,85 @@
 import 'dotenv/config';
 import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { getEnv } from '../src/config/env';
-import { PuntoResiduo, EstadoPunto } from '../src/puntos/entities/punto-residuo.entity';
+import { PuntoResiduo, EstadoPunto, ResiduoEntry } from '../src/puntos/entities/punto-residuo.entity';
 import { Proceso, ProcessStatus } from '../src/procesos/entities/proceso.entity';
 import { PuntoAsignacion } from '../src/asignaciones/entities/punto-asignacion.entity';
 import { RutaSemanal } from '../src/rutas-semanales/entities/ruta-semanal.entity';
-import { limitesSemana } from '../src/rutas-semanales/lib/ruta-semanal.util';
-import { TEST_IDENTITIES } from '../src/config/test-identities';
+import { limitesQuincena } from '../src/rutas-semanales/lib/ciclo-quincenal.util';
+import { UserEntity } from '../src/users/entities/user.entity';
+import { Role } from '../src/common/enums/role.enum';
 
-// Seed rico para que quien reciba este repo pueda usar TODO el módulo con
-// datos ficticios: puntos en cada estado del ciclo de vida (para practicar
-// enviar/aprobar/rechazar/corregir), un proceso, una asignación y una ruta
-// semanal — no solo un registro suelto.
+// Seed para el entregable de donación: crea usuarios de prueba (login propio,
+// con contraseña) y ~30 puntos ficticios en distintos estados, con barrios y
+// coordenadas reales de Santa Fe (dato público, no personal) pero SIN ningún
+// dato de persona real — nombres, correos y observaciones son todos
+// inventados. Ver docs/README.md para las credenciales.
+export const PASSWORD_DE_PRUEBA = 'Ambiental2026!';
+
+const BARRIOS_SEED = [
+  'LAS CRUCES', 'LAS AGUAS', 'LA CANDELARIA', 'LA MACARENA', 'LOURDES',
+  'SAN BERNARDO', 'LA PERSEVERANCIA', 'LAS NIEVES', 'EL DORADO', 'SAMPER',
+  'GIRARDOT', 'LA MERCED', 'BOSQUE IZQUIERDO', 'PARQUE NACIONAL', 'LOS LACHES',
+];
+
+const TIPOS_RESIDUO = ['RESIDUOS_ORDINARIOS', 'RESIDUOS_VOLUMINOSOS', 'ESCOMBROS', 'RESIDUOS_ORGANICOS', 'PLANTAS'];
+const QUIEN_DISPUSO = ['COMUNIDAD', 'ESTABLECIMIENTOS_COMERCIALES', 'VOLQUETAS', 'HABITANTES_DE_CALLE', 'OTROS_NO_SE_CONOCE'];
+const ENTIDADES_SEED = ['UAESP', 'Promoambiental', 'Alcaldía Local de Santa Fé', 'IVC'];
+const OBSERVACIONES_SEED = [
+  'Acumulación recurrente sobre el andén, cerca de la esquina.',
+  'Escombros de una obra vecina, sin identificar responsable directo.',
+  'Punto crítico histórico del sector, ya reportado antes.',
+  'Residuos mezclados con material vegetal de poda.',
+  'Zona de difícil acceso para el vehículo recolector.',
+  'Se observa acumulación creciente en las últimas semanas.',
+  'Cerca de un colegio, requiere atención prioritaria.',
+  'Reportado por la comunidad a través de la línea de atención.',
+];
+
+function rand<T>(arr: T[], seed: number): T {
+  return arr[seed % arr.length];
+}
+
+// 30 coordenadas verificadas con point-in-polygon contra el KMZ real de la
+// localidad Santa Fe (frontend/public/boundaries/KMZ_Sectores_Catastrales_SF_2026.kmz,
+// mismo algoritmo de frontend/src/utils/boundaryValidation.ts) — no son un
+// bounding box aproximado, las 30 caen efectivamente dentro del polígono.
+// Dato público (coordenadas geográficas), no de ninguna persona.
+const COORDENADAS_SANTA_FE: [number, number][] = [
+  [4.571468, -74.018109], [4.597436, -74.043508], [4.593376, -74.038645],
+  [4.616399, -74.064062], [4.60715, -74.021301], [4.617322, -74.013451],
+  [4.603422, -74.036287], [4.595858, -74.032386], [4.59804, -74.060054],
+  [4.619574, -74.055135], [4.603519, -74.057755], [4.61746, -74.050748],
+  [4.580696, -74.006947], [4.591731, -74.015436], [4.637781, -74.02212],
+  [4.611029, -74.006311], [4.618991, -73.994918], [4.58196, -74.029352],
+  [4.584864, -73.997132], [4.619055, -74.023673], [4.617028, -74.023506],
+  [4.633174, -74.018622], [4.593229, -74.046877], [4.586059, -74.002557],
+  [4.642424, -74.026186], [4.582145, -74.000331], [4.608113, -74.019315],
+  [4.616739, -74.063156], [4.583278, -74.067833], [4.575099, -74.031552],
+];
+
+function coordCercaDeSantaFe(seed: number): { lat: number; lng: number } {
+  const [lat, lng] = COORDENADAS_SANTA_FE[seed % COORDENADAS_SANTA_FE.length];
+  return { lat, lng };
+}
+
+function crearResiduo(seed: number, recogido: boolean): ResiduoEntry {
+  return {
+    id: randomUUID(),
+    tipoResiduo: rand(TIPOS_RESIDUO, seed) as any,
+    quienDispuso: rand(QUIEN_DISPUSO, seed + 1) as any,
+    dateTime: new Date().toISOString(),
+    percibeOlores: seed % 3 === 0,
+    percibeVectores: seed % 4 === 0,
+    areaLinealMetros: 2 + (seed % 10),
+    observaciones: rand(OBSERVACIONES_SEED, seed + 2),
+    photos: [`photos/seed/residuo-${seed}.jpg`],
+    recogido,
+    ...(recogido ? { fechaRecogida: new Date().toISOString(), photosRecogida: [`photos/seed/residuo-${seed}-recogido.jpg`] } : {}),
+  } as ResiduoEntry;
+}
 
 async function seed() {
   const env = getEnv();
@@ -23,8 +90,8 @@ async function seed() {
     username: env.DB_USERNAME,
     password: env.DB_PASSWORD,
     database: env.DB_DATABASE,
-    synchronize: true,
-    entities: [PuntoResiduo, Proceso, PuntoAsignacion, RutaSemanal],
+    synchronize: false,
+    entities: [PuntoResiduo, Proceso, PuntoAsignacion, RutaSemanal, UserEntity],
   });
 
   await dataSource.initialize();
@@ -32,6 +99,7 @@ async function seed() {
   const procesoRepo = dataSource.getRepository(Proceso);
   const asignacionRepo = dataSource.getRepository(PuntoAsignacion);
   const rutaRepo = dataSource.getRepository(RutaSemanal);
+  const userRepo = dataSource.getRepository(UserEntity);
 
   const existentes = await puntoRepo.count();
   if (existentes > 0) {
@@ -40,180 +108,104 @@ async function seed() {
     return;
   }
 
-  const gestor = TEST_IDENTITIES.GESTOR_AMBIENTAL;
-  const validador = TEST_IDENTITIES.VALIDADOR_AMBIENTAL;
-  const ahora = new Date();
+  // ── Usuarios de prueba (ficticios, login propio) ──
+  const passwordHash = await bcrypt.hash(PASSWORD_DE_PRUEBA, 10);
+  const usuarios = [
+    { id: randomUUID(), name: 'Admin', lastname: 'De Prueba', email: 'admin@ejemplo.local', role: Role.ADMIN },
+    { id: randomUUID(), name: 'Validador', lastname: 'De Prueba', email: 'validador@ejemplo.local', role: Role.VALIDADOR_AMBIENTAL },
+    { id: randomUUID(), name: 'Gestor', lastname: 'Uno', email: 'gestor1@ejemplo.local', role: Role.GESTOR_AMBIENTAL },
+    { id: randomUUID(), name: 'Gestor', lastname: 'Dos', email: 'gestor2@ejemplo.local', role: Role.GESTOR_AMBIENTAL },
+    { id: randomUUID(), name: 'Gestor', lastname: 'Tres', email: 'gestor3@ejemplo.local', role: Role.GESTOR_AMBIENTAL },
+  ];
+  for (const u of usuarios) {
+    await userRepo.save(userRepo.create({ ...u, passwordHash, active: true }));
+  }
+  const admin = usuarios[0];
+  const validador = usuarios[1];
+  const gestores = usuarios.slice(2);
 
+  // ── Proceso de ejemplo ──
   const proceso = await procesoRepo.save(
     procesoRepo.create({
-      nombre: 'Proceso de prueba — recolección barrio ficticio',
-      descripcion: 'Proceso de ejemplo para ver el seguimiento de varios puntos agrupados.',
-      createdByUserId: gestor.id,
+      nombre: 'Proceso de prueba — recolección zona centro',
+      descripcion: 'Proceso ficticio de ejemplo para ver el seguimiento de varios puntos agrupados.',
+      createdByUserId: gestores[0].id,
       status: ProcessStatus.EN_SEGUIMIENTO,
     }),
   );
 
-  const puntoBorrador = await puntoRepo.save(
-    puntoRepo.create({
-      createdByUserId: gestor.id,
-      status: EstadoPunto.BORRADOR,
-      dateTime: ahora,
-      lat: 4.596389,
-      lng: -74.076111,
-      barrio: 'Barrio de prueba 1',
-      photos: ['photos/seed/borrador.jpg'],
-      results: 'Punto recién detectado, todavía sin enviar a validación.',
-      entidadResponsable: 'ALCALDIA_LOCAL',
-      residuos: [
-        {
-          id: randomUUID(),
-          tipoResiduo: 'ESCOMBROS',
-          quienDispuso: 'COMUNIDAD',
-          dateTime: ahora.toISOString(),
-          percibeOlores: false,
-          percibeVectores: false,
-          areaLinealMetros: 3,
-          photos: ['photos/seed/residuo1.jpg'],
-          recogido: false,
-        },
-      ],
-    }),
-  );
+  // ── 30 puntos en estados variados ──
+  const ESTADOS_CICLO: EstadoPunto[] = [
+    EstadoPunto.BORRADOR, EstadoPunto.ENVIADA, EstadoPunto.APROBADA, EstadoPunto.RECHAZADA, EstadoPunto.PUBLICADA,
+  ];
+  const TOTAL_PUNTOS = 30;
+  const puntosCreados: PuntoResiduo[] = [];
+  let pointNumberSeq = 1;
 
-  const puntoEnviada = await puntoRepo.save(
-    puntoRepo.create({
-      createdByUserId: gestor.id,
-      status: EstadoPunto.ENVIADA,
-      dateTime: ahora,
-      lat: 4.598,
-      lng: -74.08,
-      barrio: 'Barrio de prueba 2',
-      photos: ['photos/seed/enviada.jpg'],
-      results: 'Punto enviado, esperando revisión del validador.',
-      entidadResponsable: 'ALCALDIA_LOCAL',
-      entidadesAcompanantes: ['POLICIA'],
-      residuos: [
-        {
-          id: randomUUID(),
-          tipoResiduo: 'RESIDUOS_VOLUMINOSOS',
-          quienDispuso: 'ESTABLECIMIENTOS_COMERCIALES',
-          dateTime: ahora.toISOString(),
-          percibeOlores: true,
-          percibeVectores: false,
-          areaLinealMetros: 8,
-          photos: ['photos/seed/residuo2.jpg'],
-          recogido: false,
-        },
-      ],
-    }),
-  );
+  for (let i = 0; i < TOTAL_PUNTOS; i++) {
+    const status = rand(ESTADOS_CICLO, i);
+    const gestor = rand(gestores, i);
+    const { lat, lng } = coordCercaDeSantaFe(i);
+    const barrio = rand(BARRIOS_SEED, i);
+    const esPublicada = status === EstadoPunto.PUBLICADA;
+    const esValidada = status === EstadoPunto.APROBADA || status === EstadoPunto.PUBLICADA || status === EstadoPunto.RECHAZADA;
 
-  const puntoRechazada = await puntoRepo.save(
-    puntoRepo.create({
-      createdByUserId: gestor.id,
-      status: EstadoPunto.RECHAZADA,
-      dateTime: ahora,
-      lat: 4.601,
-      lng: -74.07,
-      barrio: 'Barrio de prueba 3',
-      photos: ['photos/seed/rechazada.jpg'],
-      results: 'Punto rechazado — falta evidencia clara.',
-      validatorUserId: validador.id,
-      validatedAt: ahora,
-      validationNotes: 'La foto no muestra bien el área afectada, por favor subir una más clara.',
-      residuos: [
-        {
-          id: randomUUID(),
-          tipoResiduo: 'PLANTAS',
-          quienDispuso: 'OTROS_NO_SE_CONOCE',
-          dateTime: ahora.toISOString(),
-          percibeOlores: false,
-          percibeVectores: true,
-          areaLinealMetros: 2,
-          photos: ['photos/seed/residuo3.jpg'],
-          recogido: false,
-        },
-      ],
-    }),
-  );
+    const residuos = [
+      crearResiduo(i, esPublicada && i % 2 === 0),
+      ...(i % 3 === 0 ? [crearResiduo(i + 100, false)] : []),
+    ];
 
-  const puntoPublicada = await puntoRepo.save(
-    puntoRepo.create({
+    const punto = puntoRepo.create({
       createdByUserId: gestor.id,
-      status: EstadoPunto.PUBLICADA,
-      dateTime: ahora,
-      lat: 4.603,
-      lng: -74.065,
-      barrio: 'Barrio de prueba 4',
-      photos: ['photos/seed/publicada.jpg'],
-      results: 'Punto validado y publicado, con seguimiento parcial de recolección.',
-      entidadResponsable: 'ALCALDIA_LOCAL',
-      gestoresInvolucradosIds: [],
-      isGroupOperativo: false,
-      validatorUserId: validador.id,
-      validatedAt: ahora,
-      publishedAt: ahora,
-      pointNumber: 1,
-      processId: proceso.id,
-      residuos: [
-        {
-          id: randomUUID(),
-          tipoResiduo: 'RESIDUOS_ORDINARIOS',
-          quienDispuso: 'VOLQUETAS',
-          dateTime: ahora.toISOString(),
-          percibeOlores: false,
-          percibeVectores: false,
-          areaLinealMetros: 5,
-          photos: ['photos/seed/residuo4a.jpg'],
-          recogido: true,
-          fechaRecogida: ahora.toISOString(),
-          photosRecogida: ['photos/seed/residuo4a-recogido.jpg'],
-          recogidoByUserId: gestor.id,
-          recogidoByNombre: gestor.email,
-        },
-        {
-          id: randomUUID(),
-          tipoResiduo: 'ESCOMBROS',
-          quienDispuso: 'HABITANTES_DE_CALLE',
-          dateTime: ahora.toISOString(),
-          percibeOlores: true,
-          percibeVectores: true,
-          areaLinealMetros: 6,
-          photos: ['photos/seed/residuo4b.jpg'],
-          recogido: false,
-          notas: [
-            {
-              id: randomUUID(),
-              fecha: ahora.toISOString(),
-              autorId: gestor.id,
-              autorNombre: gestor.email,
-              texto: 'Pendiente coordinar recolección con volqueta.',
-            },
-          ],
-        },
-      ],
-    }),
-  );
+      status,
+      // El número de punto se asigna SIEMPRE al crear (igual que
+      // PuntosService.create() en producción) — no solo al publicar. Es el
+      // identificador visible del punto en toda la interfaz.
+      pointNumber: pointNumberSeq++,
+      dateTime: new Date(Date.now() - i * 6 * 3600 * 1000),
+      lat, lng, barrio,
+      photos: [`photos/seed/punto-${i}.jpg`],
+      results: `Punto de prueba #${i + 1} — ${barrio}, generado por el seed.`,
+      entidadResponsable: rand(ENTIDADES_SEED, i),
+      residuos,
+      ...(esValidada ? {
+        validatorUserId: validador.id,
+        validatedAt: new Date(Date.now() - i * 3 * 3600 * 1000),
+      } : {}),
+      ...(status === EstadoPunto.RECHAZADA ? {
+        validationNotes: 'Rechazado en el seed: falta evidencia fotográfica clara del punto.',
+      } : {}),
+      ...(esPublicada ? {
+        publishedAt: new Date(Date.now() - i * 2 * 3600 * 1000),
+        processId: i % 5 === 0 ? proceso.id : undefined,
+      } : {}),
+    });
+    puntosCreados.push(await puntoRepo.save(punto));
+  }
 
-  const todosLosPuntos = [puntoBorrador, puntoEnviada, puntoRechazada, puntoPublicada];
-  for (const punto of todosLosPuntos) {
+  // ── Asignaciones repartidas entre los 3 gestores de prueba ──
+  for (let i = 0; i < puntosCreados.length; i++) {
+    const gestor = rand(gestores, i);
     await asignacionRepo.save(
-      asignacionRepo.create({ puntoResiduoId: punto.id, gestorId: gestor.id, updatedByUserId: null }),
+      asignacionRepo.create({ puntoResiduoId: puntosCreados[i].id, gestorId: gestor.id, updatedByUserId: null }),
     );
   }
 
-  const { inicioISO, finISO } = limitesSemana(ahora);
+  // ── 2 rutas: una cerrada (quincena pasada, alimenta el historial) y una
+  //    activa (quincena en curso) ──
+  const ahora = new Date();
+  const quincenaPasada = new Date(ahora.getTime() - 14 * 86400000);
+
+  const { inicioISO: inicioActualISO, finISO: finActualISO } = limitesQuincena(ahora);
+  const puntosQuincenaActiva = puntosCreados.slice(0, 6);
   await rutaRepo.save(
     rutaRepo.create({
-      gestorId: gestor.id,
-      semanaInicio: new Date(inicioISO),
-      semanaFin: new Date(finISO),
+      gestorId: gestores[0].id,
+      semanaInicio: new Date(inicioActualISO),
+      semanaFin: new Date(finActualISO),
       estado: 'en_progreso',
-      paradas: todosLosPuntos.map((p) => ({
-        puntoId: p.id,
-        lat: p.lat,
-        lng: p.lng,
-        barrio: p.barrio,
+      paradas: puntosQuincenaActiva.map((p) => ({
+        puntoId: p.id, lat: p.lat, lng: p.lng, barrio: p.barrio,
         visitado: p.status === EstadoPunto.PUBLICADA,
       })),
       segmentos: [],
@@ -221,16 +213,32 @@ async function seed() {
     }),
   );
 
+  const { inicioISO: inicioPasadaISO, finISO: finPasadaISO } = limitesQuincena(quincenaPasada);
+  const puntosQuincenaCerrada = puntosCreados.slice(6, 12);
+  await rutaRepo.save(
+    rutaRepo.create({
+      gestorId: gestores[1].id,
+      semanaInicio: new Date(inicioPasadaISO),
+      semanaFin: new Date(finPasadaISO),
+      estado: 'completada',
+      paradas: puntosQuincenaCerrada.map((p) => ({
+        puntoId: p.id, lat: p.lat, lng: p.lng, barrio: p.barrio,
+        visitado: true,
+      })),
+      segmentos: [],
+      arrastre: [],
+    }),
+  );
+
   console.log('[SEED] Listo:');
+  console.log(`  - ${usuarios.length} usuarios de prueba (contraseña real, ficticios)`);
   console.log(`  - 1 proceso ("${proceso.nombre}")`);
-  console.log(`  - 4 puntos: BORRADOR, ENVIADA, RECHAZADA, PUBLICADA (con residuos en distintos estados)`);
-  console.log(`  - 4 asignaciones (todas al gestor de prueba)`);
-  console.log(`  - 1 ruta semanal en progreso con los 4 puntos como paradas`);
+  console.log(`  - ${TOTAL_PUNTOS} puntos en estados variados (borrador/enviada/aprobada/rechazada/publicada)`);
+  console.log(`  - ${puntosCreados.length} asignaciones repartidas entre 3 gestores`);
+  console.log('  - 2 rutas semanales (1 activa, 1 completada)');
   console.log('');
-  console.log('  Identidades de prueba (usar con "npm run token:test <ROL>"):');
-  console.log(`  - GESTOR_AMBIENTAL: ${gestor.email}`);
-  console.log(`  - VALIDADOR_AMBIENTAL: ${validador.email}`);
-  console.log(`  - ADMIN: ${TEST_IDENTITIES.ADMIN.email}`);
+  console.log(`  Login de prueba (contraseña igual para todos: "${PASSWORD_DE_PRUEBA}"):`);
+  for (const u of usuarios) console.log(`  - ${u.role}: ${u.email}`);
 
   await dataSource.destroy();
 }

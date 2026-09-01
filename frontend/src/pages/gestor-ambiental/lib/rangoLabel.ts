@@ -7,7 +7,7 @@ const MESES = [
 
 // Etiquetas de rango de fechas para el frontend.
 //
-// El backend ya manda `etiqueta` en cada semana del plan y del desempeño —
+// El backend ya manda `etiqueta` en el plan y en el desempeño —
 // usar ese campo cuando exista. Esto es para lo que solo trae fechas sueltas
 // (rutas guardadas, rango del ciclo completo).
 //
@@ -34,13 +34,8 @@ export function formatRango(inicioISO: string, finISO: string): string {
   return `${dI} al ${dF} de ${mI}`;
 }
 
-/** "Semana del 17 al 23 de agosto" — mismo formato que arma el backend. */
-export function formatRangoSemana(inicioISO: string, finISO: string): string {
-  return `Semana del ${formatRango(inicioISO, finISO)}`;
-}
-
-/** "Del 17 al 30 de agosto" — el ciclo completo de dos semanas. */
-export function formatRangoCiclo(inicioISO: string, finISO: string): string {
+/** "Quincena del 10 al 23 de agosto" — mismo formato que arma el backend. */
+export function formatRangoQuincena(inicioISO: string, finISO: string): string {
   if (!inicioISO || !finISO) return '';
-  return `Del ${formatRango(inicioISO, finISO)}`;
+  return `Quincena del ${formatRango(inicioISO, finISO)}`;
 }

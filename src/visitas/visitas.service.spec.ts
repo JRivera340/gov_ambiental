@@ -1,8 +1,8 @@
 import { VisitasService } from './visitas.service';
-import { semanasDelCiclo } from '../rutas-semanales/lib/ciclo-semanal.util';
+import { limitesQuincena } from '../rutas-semanales/lib/ciclo-quincenal.util';
 
 const AHORA = new Date('2026-08-21T15:00:00.000Z');
-const [SEM_ACTUAL, SEM_SIGUIENTE] = semanasDelCiclo(AHORA);
+const QUINCENA = limitesQuincena(AHORA);
 
 // El repo real resuelve getIdsVisitadosEnRango con un query builder; acá se
 // simula filtrando el store en memoria por gestor y rango de fechas.
@@ -47,15 +47,18 @@ const makeRepo = () => {
   };
 };
 
-// p1 (emergencia) y p2 caen en la semana en curso; p3 en la siguiente.
+// p1 está en emergencia; p2 y p3 son regulares. Los tres entran en la misma
+// quincena: ya no hay reparto en mitades.
 const rutasStub = {
-  getPlanCiclo: async (gestorId: string) => ({
+  getPlanQuincena: async (gestorId: string) => ({
     gestorId,
     asignados: 4,
-    semanas: [
-      { ...SEM_ACTUAL, esActual: true, emergencia: ['p1'], regular: ['p2'], planificados: ['p1', 'p2'] },
-      { ...SEM_SIGUIENTE, esActual: false, emergencia: [], regular: ['p3'], planificados: ['p3'] },
-    ],
+    quincena: {
+      ...QUINCENA,
+      emergencia: ['p1'],
+      regular: ['p2', 'p3'],
+      planificados: ['p1', 'p2', 'p3'],
+    },
   }),
 };
 
@@ -79,32 +82,39 @@ describe('VisitasService', () => {
     expect(visita.semanaISO).toMatch(/^\d{4}-W\d{2}$/);
   });
 
-  it('cuenta cada punto en la semana del ciclo a la que pertenece', async () => {
+  it('cuenta las visitas contra el total de puntos de la quincena', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     await service.registrarVisita('p1', 'g1', AHORA);
 
-    const resumen = await service.getResumenDesempeno('g1', AHORA);
-    const [actual, siguiente] = resumen.gestores[0].semanas;
-    expect(actual.planificados).toBe(2);
-    expect(actual.visitados).toBe(1);
-    expect(actual.pct).toBe(50);
-    expect(siguiente.visitados).toBe(0);
+    const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
+    expect(gestor.planificados).toBe(3);
+    expect(gestor.visitados).toBe(1);
+    expect(gestor.pct).toBe(33);
   });
 
-  // El bug que motivó el rediseño: el gestor adelantaba trabajo sobre puntos
-  // de la otra mitad y ese avance no sumaba en ninguna parte (aparecía 0%).
-  it('una visita adelantada a un punto de la semana siguiente suma en ESA semana, no se pierde', async () => {
+  // El bug que motivó el rediseño: con el ciclo de dos semanas, el gestor
+  // recorría puntos de la mitad que no le tocaba y ese avance no sumaba en
+  // ninguna parte (aparecía 0%). Con la quincena única todo punto asignado
+  // cuenta, se visite el día que se visite.
+  it('cuenta las visitas de las dos semanas de la quincena por igual', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    await service.registrarVisita('p3', 'g1', AHORA);
+    // Una en la primera semana y otra en la segunda.
+    await service.registrarVisita('p2', 'g1', new Date(QUINCENA.inicioISO));
+    await service.registrarVisita('p3', 'g1', new Date(new Date(QUINCENA.inicioISO).getTime() + 9 * 86400000));
 
-    const resumen = await service.getResumenDesempeno('g1', AHORA);
-    const [actual, siguiente] = resumen.gestores[0].semanas;
-    expect(actual.visitados).toBe(0);
-    expect(siguiente.visitados).toBe(1);
-    expect(siguiente.pct).toBe(100);
-    expect(resumen.gestores[0].visitasFueraDePlan).toBe(0);
+    const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
+    expect(gestor.visitados).toBe(2);
+    expect(gestor.visitasFueraDePlan).toBe(0);
+  });
+
+  it('no cuenta visitas de una quincena anterior', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    await service.registrarVisita('p1', 'g1', new Date(new Date(QUINCENA.inicioISO).getTime() - 86400000));
+
+    expect((await service.getResumenDesempeno('g1', AHORA)).gestores[0].visitados).toBe(0);
   });
 
   it('varias visitas al mismo punto cuentan una sola vez', async () => {
@@ -113,8 +123,7 @@ describe('VisitasService', () => {
     await service.registrarVisita('p2', 'g1', AHORA);
     await service.registrarVisita('p2', 'g1', AHORA);
 
-    const resumen = await service.getResumenDesempeno('g1', AHORA);
-    expect(resumen.gestores[0].semanas[0].visitados).toBe(1);
+    expect((await service.getResumenDesempeno('g1', AHORA)).gestores[0].visitados).toBe(1);
   });
 
   it('las visitas a puntos fuera del plan se reportan aparte y no inflan el pct', async () => {
@@ -122,12 +131,13 @@ describe('VisitasService', () => {
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     await service.registrarVisita('p9', 'g1', AHORA);
 
-    const resumen = await service.getResumenDesempeno('g1', AHORA);
-    expect(resumen.gestores[0].visitasFueraDePlan).toBe(1);
-    expect(resumen.gestores[0].semanas[0].visitados).toBe(0);
+    const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
+    expect(gestor.visitasFueraDePlan).toBe(1);
+    expect(gestor.visitados).toBe(0);
+    expect(gestor.pct).toBe(0);
   });
 
-  it('los totales suman las dos semanas del ciclo', async () => {
+  it('los totales suman a todos los gestores', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     await service.registrarVisita('p1', 'g1', AHORA);
@@ -138,16 +148,24 @@ describe('VisitasService', () => {
     expect(resumen.actualTotal).toBe(2);
   });
 
-  it('expone el rango del ciclo con etiquetas legibles, sin formato de semana ISO', async () => {
+  it('expone el rango de la quincena con etiqueta legible, sin formato de semana ISO', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     const resumen = await service.getResumenDesempeno('g1', AHORA);
-    expect(resumen.cicloInicioISO).toBe(SEM_ACTUAL.inicioISO);
-    expect(resumen.cicloFinISO).toBe(SEM_SIGUIENTE.finISO);
-    for (const semana of resumen.gestores[0].semanas) {
-      expect(semana.etiqueta).toMatch(/^Semana del /);
-      expect(semana.etiqueta).not.toMatch(/W\d/);
-    }
+    expect(resumen.quincenaInicioISO).toBe(QUINCENA.inicioISO);
+    expect(resumen.quincenaFinISO).toBe(QUINCENA.finISO);
+    expect(resumen.etiqueta).toMatch(/^Quincena del /);
+    expect(resumen.etiqueta).not.toMatch(/W\d/);
+  });
+
+  it('getPlanConVisitas marca los puntos ya visitados de la quincena', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    await service.registrarVisita('p2', 'g1', AHORA);
+
+    const plan = await service.getPlanConVisitas('g1', AHORA);
+    expect(plan.quincena.visitados).toEqual(['p2']);
+    expect(plan.quincena.planificados).toHaveLength(3);
   });
 
   it('getResumenDesempeno filtra por gestorId cuando se pasa', async () => {
@@ -176,8 +194,8 @@ describe('VisitasService', () => {
 
     const resumen = await service.getResumenDesempeno(undefined, AHORA);
     expect(resumen.gestores).toHaveLength(0);
-    // Aun sin gestores, el ciclo tiene que venir informado para la UI.
-    expect(resumen.cicloInicioISO).toBe(SEM_ACTUAL.inicioISO);
+    // Aun sin gestores, la quincena tiene que venir informada para la UI.
+    expect(resumen.quincenaInicioISO).toBe(QUINCENA.inicioISO);
   });
 
   it('eliminarDePunto borra las visitas del punto (no quedan huerfanas)', async () => {

@@ -4,29 +4,28 @@ import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { RutaPolylineLayer } from './RutaPolylineLayer';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { EdgeDrawer } from '../../../components/shell/EdgeDrawer';
-import { esLunesBogota, diasRestantesSemana } from '../lib/rutaSemanal.lib';
-import { resumenSemana, type SlotRuta } from '../lib/rutasCiclo';
-import type { SemanaPlanDTO } from '../../../services/ambiental.service';
+import { diaDeQuincena, diasRestantesQuincena } from '../lib/rutaSemanal.lib';
+import { resumenQuincena } from '../lib/rutasQuincena';
+import type { QuincenaPlanDTO } from '../../../services/ambiental.service';
 
-interface SemanaCardProps {
-  semana: SemanaPlanDTO;
+interface QuincenaCardProps {
+  quincena: QuincenaPlanDTO;
   disabled: boolean;
   loading: boolean;
   onClick: () => void;
 }
 
-// Una tarjeta por semana del ciclo. Antes había tres modos (Completa /
-// Emergencia / Sin Visita) armados sobre todos los puntos asignados: el gestor
-// podía recorrer puntos de la semana que no le tocaba y esas visitas no
-// contaban. Ahora solo se planifica una de las dos semanas reales del ciclo.
-const SemanaCard: React.FC<SemanaCardProps> = ({ semana, disabled, loading, onClick }) => {
-  const { total, visitados, pendientes, emergencias, pct } = resumenSemana(semana);
-  const color = semana.esActual ? '#2563eb' : '#64748b';
+// Una sola tarjeta: la quincena en curso, con el 100% de los puntos asignados.
+// Antes había dos tarjetas, una por semana del ciclo, y el gestor no podía
+// planificar los puntos de la semana siguiente hasta que esa semana llegara.
+const QuincenaCard: React.FC<QuincenaCardProps> = ({ quincena, disabled, loading, onClick }) => {
+  const { total, visitados, pendientes, emergencias, pct } = resumenQuincena(quincena);
+  const color = '#2563eb';
 
   return (
     <div className="p-3 rounded-2xl border border-neutral-200 shadow-sm bg-white">
       <div className="flex items-center justify-between mb-1 gap-2">
-        <p className="text-xs font-bold text-neutral-800">{semana.etiqueta}</p>
+        <p className="text-xs font-bold text-neutral-800">{quincena.etiqueta}</p>
         <span
           className="text-[11px] font-black px-2 py-0.5 rounded-full shrink-0"
           style={{ background: `${color}1a`, color }}
@@ -34,9 +33,6 @@ const SemanaCard: React.FC<SemanaCardProps> = ({ semana, disabled, loading, onCl
           {total}
         </span>
       </div>
-      <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color }}>
-        {semana.esActual ? 'En curso' : 'Siguiente'}
-      </p>
       <p className="text-[11px] text-neutral-500 mb-1">
         {visitados} de {total} visitados · {pendientes} por visitar
       </p>
@@ -63,21 +59,20 @@ export const PlanificadorRutaView: React.FC = () => {
     puntosParaRuta,
     calcularRuta,
     descartarRutaActiva,
-    semanaFinISO,
     rutaActiva,
     setViewMode,
-    plan,
+    quincena,
   } = useGestorAmbientalCtx();
 
-  const [calculando, setCalculando] = useState<SlotRuta | null>(null);
+  const [calculando, setCalculando] = useState(false);
   const hayRutaActiva = !!rutaActiva && rutaActiva.estado === 'en_progreso';
 
-  const handleCalcular = async (slot: SlotRuta) => {
-    setCalculando(slot);
+  const handleCalcular = async () => {
+    setCalculando(true);
     try {
-      await calcularRuta(slot);
+      await calcularRuta();
     } finally {
-      setCalculando(null);
+      setCalculando(false);
     }
   };
 
@@ -86,8 +81,10 @@ export const PlanificadorRutaView: React.FC = () => {
       ? [puntosParaRuta[0].lat, puntosParaRuta[0].lng]
       : [4.5981, -74.0758];
 
-  const esLunes = esLunesBogota(new Date());
-  const diasRestantes = semanaFinISO ? diasRestantesSemana(semanaFinISO, new Date()) : null;
+  const ahora = new Date();
+  const dia = diaDeQuincena(quincena?.inicioISO, ahora);
+  const arrancaLaQuincena = dia === 1;
+  const diasRestantes = quincena ? diasRestantesQuincena(quincena.finISO, ahora) : null;
 
   const sidebarContent = (
     <>
@@ -118,13 +115,13 @@ export const PlanificadorRutaView: React.FC = () => {
         </p>
         {diasRestantes !== null && (
           <p className="text-[11px] text-neutral-500 mt-1">
-            Semana: quedan {diasRestantes} días
+            Día {dia} de 14 · quedan {diasRestantes} días
           </p>
         )}
-        {esLunes && (
+        {arrancaLaQuincena && (
           <div className="mt-2 p-2 rounded-xl bg-blue-50 border border-blue-100">
             <p className="text-[11px] font-bold text-blue-700">
-              Es lunes — arma la ruta de la semana
+              Empieza la quincena — armá la ruta
             </p>
             <p className="text-[10px] text-blue-600">
               {puntosParaRuta.length} puntos pendientes en tu zona
@@ -138,7 +135,7 @@ export const PlanificadorRutaView: React.FC = () => {
           <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100">
             <p className="text-[11px] font-bold text-blue-700 mb-0.5">Ya tienes una ruta activa</p>
             <p className="text-[10px] text-blue-600 mb-2">
-              No podés calcular una ruta nueva hasta finalizar, cancelar, o que se cierre sola (fin de semana o todos los puntos visitados).
+              No podés calcular una ruta nueva hasta finalizar, cancelar, o que se cierre sola (fin de la quincena o todos los puntos visitados).
             </p>
             <button
               onClick={() => setViewMode('ruta-activa')}
@@ -151,16 +148,15 @@ export const PlanificadorRutaView: React.FC = () => {
       )}
 
       <div className="p-4 flex flex-col gap-3">
-        {!plan && <p className="text-[11px] text-neutral-400">Cargando el plan del ciclo…</p>}
-        {plan?.semanas.map((semana, i) => (
-          <SemanaCard
-            key={semana.inicioISO}
-            semana={semana}
-            disabled={hayRutaActiva || semana.planificados.length === 0 || calculando !== null}
-            loading={calculando === (i as SlotRuta)}
-            onClick={() => handleCalcular(i as SlotRuta)}
+        {!quincena && <p className="text-[11px] text-neutral-400">Cargando el plan de la quincena…</p>}
+        {quincena && (
+          <QuincenaCard
+            quincena={quincena}
+            disabled={hayRutaActiva || quincena.planificados.length === 0 || calculando}
+            loading={calculando}
+            onClick={handleCalcular}
           />
-        ))}
+        )}
       </div>
     </>
   );

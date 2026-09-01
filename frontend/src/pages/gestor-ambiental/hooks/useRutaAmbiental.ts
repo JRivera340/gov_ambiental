@@ -11,8 +11,8 @@ import {
   buildSegmentos, getUnvisitedActivityIds,
 } from '../lib/ruta';
 import { nearestNeighborRoute } from '../lib/geo';
-import { getParadasDeSemana, type SlotRuta } from '../lib/rutasCiclo';
-import { ambientalService, type RutaSemanalDTO, type PlanCicloDTO } from '../../../services/ambiental.service';
+import { getParadasDeQuincena } from '../lib/rutasQuincena';
+import { ambientalService, type RutaSemanalDTO, type PlanQuincenaDTO } from '../../../services/ambiental.service';
 import { paradaLiteFromParadaRuta, hidratarParadas } from '../lib/rutaSemanal.lib';
 
 type RutaUser = { id: string; name: string; lastname?: string } | null;
@@ -48,9 +48,9 @@ export function useRutaAmbiental(
   setViewMode: Dispatch<SetStateAction<ViewMode>>,
   setToast?: ToastSetter,
 ) {
-  // La ruta de la semana se guarda como DTO crudo y la ruta activa se deriva
+  // La ruta de la quincena se guarda como DTO crudo y la ruta activa se deriva
   // de él en cada render. Antes se armaba una sola vez, en el fetch inicial,
-  // cuando todavía no habían llegado ni las actividades ni el plan del ciclo:
+  // cuando todavía no habían llegado ni las actividades ni el plan:
   // las paradas quedaban con `visitado: false` para siempre y los segmentos
   // mostraban 0% aunque el gestor ya hubiera visitado media ruta.
   const [rutaDto, setRutaDto] = useState<RutaSemanalDTO | null>(null);
@@ -63,18 +63,17 @@ export function useRutaAmbiental(
   );
   const [historialRutaSeleccionada, setHistorialRutaSeleccionada] = useState<RutaActiva | null>(null);
   const [puntosAsignados, setPuntosAsignados] = useState<string[]>([]);
-  const [plan, setPlan] = useState<PlanCicloDTO | null>(null);
+  const [plan, setPlan] = useState<PlanQuincenaDTO | null>(null);
   const [rutaSemanalId, setRutaSemanalId] = useState<string | null>(null);
   const [arrastreIds, setArrastreIds] = useState<string[]>([]);
-  const [semanaFinISO, setSemanaFinISO] = useState<string | null>(null);
 
-  // El plan del ciclo trae, además del reparto en dos semanas, qué puntos ya
+  // El plan de la quincena trae el 100% de los puntos asignados y cuáles ya
   // están visitados. Es la única fuente de "visitado": antes cada pantalla lo
   // deducía por su cuenta (unas por ultimoSeguimientoAt, otras por autoría de
   // residuo) y los números no coincidían entre sí ni con el backend.
   const recargarPlan = useCallback(async () => {
     try {
-      setPlan(await ambientalService.getPlanCiclo());
+      setPlan(await ambientalService.getPlanQuincena());
     } catch {
       setPlan(null);
     }
@@ -90,14 +89,11 @@ export function useRutaAmbiental(
     return () => { vivo = false; };
   }, [user, recargarPlan]);
 
-  const semanaEnCurso = plan?.semanas[0] ?? null;
-  const semanaSiguiente = plan?.semanas[1] ?? null;
+  const quincena = plan?.quincena ?? null;
 
-  // Visitados de todo el ciclo: un punto visitado cuenta como tal aunque
-  // pertenezca a la semana siguiente.
   const visitadosIds = useMemo(
-    () => new Set((plan?.semanas ?? []).flatMap((s) => s.visitados)),
-    [plan],
+    () => new Set(quincena?.visitados ?? []),
+    [quincena],
   );
 
   // ── Puntos candidatos para la ruta ─────────────────────────────
@@ -162,7 +158,7 @@ export function useRutaAmbiental(
   }, [puntosParaRuta]);
 
   // Ruta activa derivada: se recalcula cada vez que cambian los puntos (o sea,
-  // cada vez que llega el plan del ciclo o el gestor marca un seguimiento), así
+  // cada vez que llega el plan o el gestor marca un seguimiento), así
   // el progreso de los segmentos siempre refleja lo que ya visitó.
   const rutaActiva = useMemo<RutaActiva | null>(() => {
     if (!rutaDto || rutaDto.estado !== 'en_progreso') return null;
@@ -173,16 +169,15 @@ export function useRutaAmbiental(
   useEffect(() => {
     let vivo = true;
     if (!user) return;
-    Promise.all([ambientalService.getRutaSemanal(), ambientalService.getArrastre()])
+    Promise.all([ambientalService.getRutaQuincena(), ambientalService.getArrastre()])
       .then(([dto, arr]) => {
         if (!vivo) return;
         setArrastreIds(arr);
         if (dto) {
           setRutaSemanalId(dto.id);
-          setSemanaFinISO(dto.semanaFin ?? null);
           setRutaDto(dto);
           if (dto.estado !== 'en_progreso') {
-            // No es una ruta en curso (se cerró sola al pasar la semana, o
+            // No es una ruta en curso (se cerró sola al pasar la quincena, o
             // quedó cancelada) y el frontend nunca la movió a historial —
             // se registra ahora con la hora real de cierre, sin mostrarla
             // como activa.
@@ -209,24 +204,23 @@ export function useRutaAmbiental(
     setViewMode('planificador-ruta');
   }, []);
 
-  // Se planifica una de las dos semanas del ciclo (0 = en curso, 1 = siguiente).
-  // Antes se elegía entre tres modos armados sobre todos los puntos asignados,
-  // y el gestor podía recorrer una semana que no le tocaba sin que contara.
-  const calcularRuta = useCallback(async (slot: SlotRuta) => {
+  // Se planifica la quincena entera. Antes había que elegir una de las dos
+  // semanas del ciclo, y la mitad de los puntos quedaba fuera de alcance hasta
+  // que pasara la semana.
+  const calcularRuta = useCallback(async () => {
     if (!user) return;
     if (rutaActiva && rutaActiva.estado === 'en_progreso') {
       if (setToast) setToast({ message: 'Ya tenés una ruta activa — finalizala o cancelala antes de calcular una nueva', type: 'info' });
       setViewMode('ruta-activa');
       return;
     }
-    const semana = plan?.semanas[slot];
-    if (!semana) {
-      if (setToast) setToast({ message: 'No se pudo cargar el plan de la semana', type: 'error' });
+    if (!quincena) {
+      if (setToast) setToast({ message: 'No se pudo cargar el plan de la quincena', type: 'error' });
       return;
     }
-    const candidatos = getParadasDeSemana(puntosParaRuta, semana).filter((p) => !p.visitado);
+    const candidatos = getParadasDeQuincena(puntosParaRuta, quincena).filter((p) => !p.visitado);
     if (candidatos.length === 0) {
-      if (setToast) setToast({ message: 'No quedan puntos por visitar en esta semana', type: 'info' });
+      if (setToast) setToast({ message: 'No quedan puntos por visitar en esta quincena', type: 'info' });
       return;
     }
     const origen = await new Promise<{ lat: number; lng: number }>((resolve) => {
@@ -243,21 +237,19 @@ export function useRutaAmbiental(
     const rutaOrdenada = nearestNeighborRoute(origen, candidatos).map((p, idx) => ({ ...p, numeroGlobal: idx + 1 }));
     const segmentos = buildSegmentos(rutaOrdenada);
     try {
-      const dto = await ambientalService.crearRutaSemana(
+      const dto = await ambientalService.crearRutaQuincena(
         rutaOrdenada.map(paradaLiteFromParadaRuta),
         segmentos,
-        semana.inicioISO,
       );
       setRutaSemanalId(dto.id);
-      setSemanaFinISO(dto.semanaFin ?? null);
       setRutaDto(dto);
       setRutaCerradaId(null);
       setViewMode('ruta-activa');
     } catch (error) {
-      console.error('Error al crear la ruta de la semana:', error);
-      if (setToast) setToast({ message: 'No se pudo crear la ruta de la semana', type: 'error' });
+      console.error('Error al crear la ruta de la quincena:', error);
+      if (setToast) setToast({ message: 'No se pudo crear la ruta de la quincena', type: 'error' });
     }
-  }, [user, puntosParaRuta, setToast, rutaActiva, plan]);
+  }, [user, puntosParaRuta, setToast, rutaActiva, quincena]);
 
   const entrarSegmento = useCallback((segId: 'A' | 'B') => {
     setActiveSegmento(segId);
@@ -278,7 +270,7 @@ export function useRutaAmbiental(
     if (!rutaActiva || !user) return;
     if (rutaSemanalId) {
       try {
-        await ambientalService.cancelarRutaSemana(rutaSemanalId);
+        await ambientalService.cancelarRutaQuincena(rutaSemanalId);
       } catch (error) {
         console.error('Error al cancelar la ruta en el servidor:', error);
         if (setToast) setToast({ message: 'No se pudo cancelar la ruta en el servidor', type: 'error' });
@@ -318,12 +310,10 @@ export function useRutaAmbiental(
     puntosParaRuta,
     puntosAsignados,
     plan,
-    semanaEnCurso,
-    semanaSiguiente,
+    quincena,
     recargarPlan,
     rutaSemanalId,
     arrastreIds,
-    semanaFinISO,
     iniciarPlanificacion,
     calcularRuta,
     entrarSegmento,

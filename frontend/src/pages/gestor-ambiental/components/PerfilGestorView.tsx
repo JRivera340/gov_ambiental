@@ -5,7 +5,7 @@ import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { BarrioCoberturaBars } from './BarrioCoberturaBars';
-import { PlanSemanalCard } from './PlanSemanalCard';
+import { PlanQuincenaCard } from './PlanQuincenaCard';
 import { BoundaryLayer } from '../../../components/BoundaryLayer';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 
@@ -30,7 +30,7 @@ export const PerfilGestorView: React.FC = () => {
   // nuevo / nota, hechos por este gestor). Antes se derivaba en el cliente de
   // la autoría de los residuos, que ignoraba las notas por completo.
   const visitadosIds = useMemo(
-    () => new Set((plan?.semanas ?? []).flatMap(s => s.visitados)),
+    () => new Set(plan?.quincena.visitados ?? []),
     [plan]
   );
 
@@ -39,7 +39,7 @@ export const PerfilGestorView: React.FC = () => {
     [misPuntos, visitadosIds]
   );
 
-  const semanaEnCurso = plan?.semanas[0] ?? null;
+  const quincena = plan?.quincena ?? null;
 
   const stats = useMemo(() => {
     let identificados = 0;
@@ -95,11 +95,11 @@ export const PerfilGestorView: React.FC = () => {
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [visitados, user]);
 
-  // Visitados de la semana en curso según el backend (semana ISO real de
-  // lunes a domingo), no una ventana de 7 días rodantes como antes.
-  const visitadosSemanaIds = useMemo(
-    () => new Set(semanaEnCurso?.visitados ?? []),
-    [semanaEnCurso]
+  // Visitados de la quincena en curso según el backend (los 14 días reales),
+  // no una ventana de 7 días rodantes como antes.
+  const visitadosQuincenaIds = useMemo(
+    () => new Set(quincena?.visitados ?? []),
+    [quincena]
   );
 
   // "A tu cargo" = asignados, no creados por vos: un gestor que recibió puntos
@@ -148,10 +148,10 @@ export const PerfilGestorView: React.FC = () => {
       <div className="p-4 md:p-6 max-w-6xl mx-auto w-full flex flex-col gap-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-4 border border-neutral-100">
-            <p className="text-[10px] text-neutral-500 font-medium mb-1">Puntos visitados esta semana</p>
-            <p className="text-xl font-black" style={{ color: '#2563eb' }}>{visitadosSemanaIds.size}</p>
+            <p className="text-[10px] text-neutral-500 font-medium mb-1">Puntos visitados en la quincena</p>
+            <p className="text-xl font-black" style={{ color: '#2563eb' }}>{visitadosQuincenaIds.size}</p>
             <p className="text-[10px] text-neutral-400 mt-0.5">
-              de {semanaEnCurso?.planificados.length ?? 0} planificados · {semanaEnCurso?.etiqueta ?? ''}
+              de {quincena?.planificados.length ?? 0} planificados · {quincena?.etiqueta ?? ''}
             </p>
           </div>
           {[
@@ -169,7 +169,7 @@ export const PerfilGestorView: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           {/* Columna principal — mapa + actividad reciente */}
           <div className="flex flex-col gap-6 w-full md:col-span-2">
-            <PlanSemanalCard activities={acumulacion} onVerPunto={openActivity} />
+            <PlanQuincenaCard activities={acumulacion} onVerPunto={openActivity} />
 
             <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-neutral-100">
@@ -196,7 +196,7 @@ export const PerfilGestorView: React.FC = () => {
                       <Marker
                         key={a.id}
                         position={[a.lat, a.lng]}
-                        icon={createColorIcon(color, visitadosSemanaIds.has(a.id))}
+                        icon={createColorIcon(color, visitadosQuincenaIds.has(a.id))}
                       />
                     );
                   })}
