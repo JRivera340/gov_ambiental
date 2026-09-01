@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
-import { RutaSemanal } from './entities/ruta-semanal.entity';
+import { RutaSemanal, type EstadoRuta } from './entities/ruta-semanal.entity';
 import type { ParadaLite } from './lib/paradas.types';
 import { semanaVencida, calcularArrastre } from './lib/ruta-semanal.util';
 import { limitesQuincena, type RangoQuincena } from './lib/ciclo-quincenal.util';
@@ -27,6 +27,24 @@ export type PlanQuincena = {
   gestorId: string;
   asignados: number;
   quincena: QuincenaPlan;
+};
+
+// Una quincena del historial, con las rutas que cayeron dentro ya fusionadas.
+export type ParadaHistorial = ParadaLite & { pointNumber: number | null };
+
+export type QuincenaHistorial = {
+  indice: number;
+  inicioISO: string;
+  finISO: string;
+  etiqueta: string;
+  // Las rutas reales que cayeron en la quincena. Antes del ciclo quincenal se
+  // creaba una ruta por semana, así que una quincena vieja trae dos.
+  rutas: { id: string; estado: EstadoRuta; inicioISO: string; finISO: string; cerradaISO: string }[];
+  paradas: ParadaHistorial[];
+  planificados: number;
+  visitados: number;
+  pendientes: number;
+  pct: number;
 };
 
 @Injectable()
@@ -95,14 +113,79 @@ export class RutasSemanalesService {
   // Rutas cerradas de quincenas anteriores. Es la fuente del historial: el
   // frontend del gestor guardaba su historial en localStorage, así que el admin
   // no podía verlo — esto lee la tabla, que siempre tuvo el dato completo.
-  async getHistorial(gestorId: string, limite = 20, ahora = new Date()): Promise<RutaSemanal[]> {
+  async getHistorial(gestorId: string, limite = 20, ahora = new Date()): Promise<QuincenaHistorial[]> {
     await this.cerrarQuincenasVencidas(ahora);
     const { inicioISO } = limitesQuincena(ahora);
-    return this.repo.find({
+    const filas = await this.repo.find({
       where: { gestorId, semanaInicio: LessThan(new Date(inicioISO)) },
       order: { semanaInicio: 'DESC' },
-      take: Math.min(Math.max(limite, 1), 100),
     });
+
+    // Se agrupa por la quincena a la que pertenece cada fila, no por la fila en
+    // sí. Las rutas creadas antes del ciclo quincenal duran 7 días: mostradas de
+    // a una se veían como semanas, que es justo lo que el panel no debe mostrar.
+    // Dos rutas semanales de la misma quincena se fusionan en una sola entrada.
+    const porQuincena = new Map<number, QuincenaHistorial>();
+    for (const fila of filas) {
+      const rango = limitesQuincena(new Date(fila.semanaInicio));
+      let entrada = porQuincena.get(rango.indice);
+      if (!entrada) {
+        entrada = {
+          indice: rango.indice,
+          inicioISO: rango.inicioISO,
+          finISO: rango.finISO,
+          etiqueta: rango.etiqueta,
+          rutas: [],
+          paradas: [],
+          planificados: 0,
+          visitados: 0,
+          pendientes: 0,
+          pct: 0,
+        };
+        porQuincena.set(rango.indice, entrada);
+      }
+      entrada.rutas.push({
+        id: fila.id,
+        estado: fila.estado,
+        inicioISO: new Date(fila.semanaInicio).toISOString(),
+        finISO: new Date(fila.semanaFin).toISOString(),
+        cerradaISO: new Date(fila.updatedAt ?? fila.semanaFin).toISOString(),
+      });
+      entrada.paradas.push(...((fila.paradas ?? []) as ParadaHistorial[]));
+    }
+
+    const quincenas = Array.from(porQuincena.values())
+      .sort((a, b) => b.indice - a.indice)
+      .slice(0, Math.min(Math.max(limite, 1), 100));
+
+    // El número de punto no se guarda en la ruta (paradas solo tiene puntoId,
+    // coordenadas y barrio), pero es como el supervisor identifica un punto en
+    // el mapa. Se resuelve acá, de una sola consulta para todas las quincenas.
+    const idsPuntos = [...new Set(quincenas.flatMap((q) => q.paradas.map((p) => p.puntoId)))];
+    const puntos = idsPuntos.length > 0 ? await this.puntosRepo.find({ where: { id: In(idsPuntos) } }) : [];
+    const numeroPorId = new Map(puntos.map((p) => [p.id, p.pointNumber ?? null]));
+
+    for (const q of quincenas) {
+      // Un punto puede aparecer en las dos rutas de la quincena. Cuenta una vez
+      // y basta con que lo hayan visitado en cualquiera de ellas.
+      const porPunto = new Map<string, ParadaHistorial>();
+      for (const parada of q.paradas) {
+        const previa = porPunto.get(parada.puntoId);
+        if (previa) previa.visitado = previa.visitado || parada.visitado;
+        else porPunto.set(parada.puntoId, { ...parada, pointNumber: numeroPorId.get(parada.puntoId) ?? null });
+      }
+      q.paradas = Array.from(porPunto.values()).sort((a, b) => {
+        // Sin visitar primero: es lo que el supervisor necesita ver.
+        if (a.visitado !== b.visitado) return Number(a.visitado) - Number(b.visitado);
+        return (a.pointNumber ?? 0) - (b.pointNumber ?? 0);
+      });
+      q.planificados = q.paradas.length;
+      q.visitados = q.paradas.filter((p) => p.visitado).length;
+      q.pendientes = q.planificados - q.visitados;
+      q.pct = q.planificados > 0 ? Math.round((q.visitados / q.planificados) * 100) : 0;
+    }
+
+    return quincenas;
   }
 
   async crearRutaQuincena(input: CrearRutaInput): Promise<RutaSemanal> {

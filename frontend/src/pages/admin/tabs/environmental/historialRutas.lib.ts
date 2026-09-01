@@ -1,63 +1,48 @@
-import type { RutaSemanalDTO } from '../../../../services/ambiental.service';
+import type { QuincenaHistorialDTO } from '../../../../services/ambiental.service';
 
-// Resumen de una ruta cerrada para el historial del admin.
+// Ayudas del historial de rutas del admin.
 //
-// El historial del gestor vive en localStorage (lib/ruta.ts), así que el admin
-// no podía verlo. Acá se arma desde la fila de `ruta_semanal`, que siempre tuvo
-// el dato completo: paradas congeladas al crear la ruta, `visitado` marcado
-// durante el recorrido y `arrastre` calculado al cerrarse la quincena.
+// El agregado por quincena lo arma el backend (GET /rutas-semanales/historial):
+// agrupa las rutas por la quincena a la que pertenecen y fusiona sus paradas.
+// Eso importa para los datos viejos — antes del ciclo quincenal se creaba una
+// ruta por semana, y mostradas de a una las cards decían "Quincena del 17 al
+// 23", que son 7 días. Acá solo quedan los cálculos de presentación.
 
-export type RutaResumen = {
-  id: string;
-  inicioISO: string;
-  finISO: string;
-  estado: RutaSemanalDTO['estado'];
-  /** Momento real de cierre o cancelación; cae al fin de la quincena si falta. */
-  cerradaISO: string;
-  planificados: number;
-  visitados: number;
-  pct: number;
-  /** Puntos que quedaron sin visitar al cerrarse. */
-  pendientes: number;
-};
+/** Estado a mostrar para la quincena, derivado de las rutas que la componen. */
+export function estadoQuincena(q: QuincenaHistorialDTO): 'cerrada' | 'cancelada' | 'parcial' | 'sin_ruta' {
+  if (q.rutas.length === 0) return 'sin_ruta';
+  if (q.rutas.every((r) => r.estado === 'cancelada')) return 'cancelada';
+  // Alguna cancelada y alguna no: la quincena se trabajó a medias.
+  if (q.rutas.some((r) => r.estado === 'cancelada')) return 'parcial';
+  return 'cerrada';
+}
 
-export function resumirRuta(dto: RutaSemanalDTO): RutaResumen {
-  const paradas = dto.paradas ?? [];
-  const visitados = paradas.filter((p) => p.visitado).length;
-  // `arrastre` solo se calcula cuando la quincena se cierra sola. Para una ruta
-  // cancelada a mitad de camino se deriva de las paradas, o el panel mostraría
-  // 0 pendientes en rutas que quedaron a medias.
-  const pendientes = dto.arrastre?.length
-    ? dto.arrastre.length
-    : paradas.length - visitados;
-  return {
-    id: dto.id,
-    inicioISO: dto.semanaInicio,
-    finISO: dto.semanaFin,
-    estado: dto.estado,
-    cerradaISO: dto.updatedAt ?? dto.semanaFin,
-    planificados: paradas.length,
-    visitados,
-    pct: paradas.length > 0 ? Math.round((visitados / paradas.length) * 100) : 0,
-    pendientes,
-  };
+/** Fecha real de cierre de la quincena: la más tardía de sus rutas. */
+export function cierreQuincena(q: QuincenaHistorialDTO): string {
+  if (q.rutas.length === 0) return q.finISO;
+  return q.rutas.reduce(
+    (ultima, r) => (new Date(r.cerradaISO).getTime() > new Date(ultima).getTime() ? r.cerradaISO : ultima),
+    q.rutas[0].cerradaISO,
+  );
 }
 
 /** Acumulado de todo el historial, para la cabecera del panel. */
-export function totalesHistorial(rutas: RutaResumen[]): {
+export function totalesHistorial(quincenas: QuincenaHistorialDTO[]): {
   quincenas: number;
   planificados: number;
   visitados: number;
   pct: number;
   canceladas: number;
 } {
-  const planificados = rutas.reduce((t, r) => t + r.planificados, 0);
-  const visitados = rutas.reduce((t, r) => t + r.visitados, 0);
+  const planificados = quincenas.reduce((t, q) => t + q.planificados, 0);
+  const visitados = quincenas.reduce((t, q) => t + q.visitados, 0);
   return {
-    quincenas: rutas.length,
+    quincenas: quincenas.length,
     planificados,
     visitados,
+    // Se acumula sobre los totales, no se promedian porcentajes: una quincena
+    // de 2 puntos no puede pesar lo mismo que una de 40.
     pct: planificados > 0 ? Math.round((visitados / planificados) * 100) : 0,
-    canceladas: rutas.filter((r) => r.estado === 'cancelada').length,
+    canceladas: quincenas.filter((q) => estadoQuincena(q) === 'cancelada').length,
   };
 }

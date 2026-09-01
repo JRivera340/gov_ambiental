@@ -1,60 +1,74 @@
 import { describe, it, expect } from 'vitest';
-import { resumirRuta, totalesHistorial } from './historialRutas.lib';
-import type { RutaSemanalDTO } from '../../../../services/ambiental.service';
+import { estadoQuincena, cierreQuincena, totalesHistorial } from './historialRutas.lib';
+import type { QuincenaHistorialDTO } from '../../../../services/ambiental.service';
 
-const parada = (puntoId: string, visitado: boolean) => ({
-  puntoId, lat: 0, lng: 0, barrio: 'X', visitado,
-});
-
-const dto = (over: Partial<RutaSemanalDTO> = {}): RutaSemanalDTO => ({
+const ruta = (over: Partial<QuincenaHistorialDTO['rutas'][0]> = {}): QuincenaHistorialDTO['rutas'][0] => ({
   id: 'r1',
-  gestorId: 'g1',
-  semanaInicio: '2026-07-13T05:00:00.000Z',
-  semanaFin: '2026-07-27T04:59:59.999Z',
   estado: 'cerrada',
-  paradas: [parada('p1', true), parada('p2', true), parada('p3', false)],
-  segmentos: [],
-  arrastre: ['p3'],
+  inicioISO: '2026-07-13T05:00:00.000Z',
+  finISO: '2026-07-20T04:59:59.999Z',
+  cerradaISO: '2026-07-20T04:59:59.999Z',
   ...over,
 });
 
-describe('resumirRuta', () => {
-  it('cuenta visitados y porcentaje sobre las paradas de la ruta', () => {
-    const r = resumirRuta(dto());
-    expect(r.planificados).toBe(3);
-    expect(r.visitados).toBe(2);
-    expect(r.pct).toBe(67);
+const quincena = (over: Partial<QuincenaHistorialDTO> = {}): QuincenaHistorialDTO => ({
+  indice: 67,
+  inicioISO: '2026-07-13T05:00:00.000Z',
+  finISO: '2026-07-27T04:59:59.999Z',
+  etiqueta: 'Quincena del 13 al 26 de julio',
+  rutas: [ruta()],
+  paradas: [],
+  planificados: 3,
+  visitados: 2,
+  pendientes: 1,
+  pct: 67,
+  ...over,
+});
+
+describe('estadoQuincena', () => {
+  it('cerrada cuando ninguna ruta fue cancelada', () => {
+    expect(estadoQuincena(quincena())).toBe('cerrada');
   });
 
-  it('usa el arrastre como pendientes cuando la quincena se cerro sola', () => {
-    expect(resumirRuta(dto()).pendientes).toBe(1);
+  it('cancelada solo si TODAS las rutas lo estan', () => {
+    expect(estadoQuincena(quincena({ rutas: [ruta({ estado: 'cancelada' })] }))).toBe('cancelada');
   });
 
-  it('deriva los pendientes de las paradas cuando no hay arrastre (ruta cancelada)', () => {
-    const r = resumirRuta(dto({ estado: 'cancelada', arrastre: [] }));
-    expect(r.pendientes).toBe(1);
+  // Con rutas semanales viejas, una quincena puede tener una cancelada y otra no.
+  it('parcial cuando una ruta se cancelo y la otra no', () => {
+    const q = quincena({ rutas: [ruta({ id: 'a', estado: 'cancelada' }), ruta({ id: 'b', estado: 'cerrada' })] });
+    expect(estadoQuincena(q)).toBe('parcial');
   });
 
-  it('usa updatedAt como fecha de cierre y cae al fin de la quincena si falta', () => {
-    expect(resumirRuta(dto({ updatedAt: '2026-07-25T18:00:00.000Z' })).cerradaISO)
-      .toBe('2026-07-25T18:00:00.000Z');
-    expect(resumirRuta(dto()).cerradaISO).toBe('2026-07-27T04:59:59.999Z');
+  it('sin_ruta cuando la quincena no tiene rutas', () => {
+    expect(estadoQuincena(quincena({ rutas: [] }))).toBe('sin_ruta');
+  });
+});
+
+describe('cierreQuincena', () => {
+  it('toma la fecha de cierre mas tardia de las rutas', () => {
+    const q = quincena({
+      rutas: [
+        ruta({ id: 'a', cerradaISO: '2026-07-20T10:00:00.000Z' }),
+        ruta({ id: 'b', cerradaISO: '2026-07-26T18:00:00.000Z' }),
+      ],
+    });
+    expect(cierreQuincena(q)).toBe('2026-07-26T18:00:00.000Z');
   });
 
-  it('no divide por cero en una ruta sin paradas', () => {
-    const r = resumirRuta(dto({ paradas: [], arrastre: [] }));
-    expect(r.pct).toBe(0);
-    expect(r.pendientes).toBe(0);
+  it('cae al fin de la quincena si no hay rutas', () => {
+    const q = quincena({ rutas: [] });
+    expect(cierreQuincena(q)).toBe(q.finISO);
   });
 });
 
 describe('totalesHistorial', () => {
-  it('acumula sobre todas las quincenas, no promedia porcentajes', () => {
-    const rutas = [
-      resumirRuta(dto()),
-      resumirRuta(dto({ id: 'r2', paradas: [parada('p4', true)], arrastre: [] })),
+  it('acumula sobre los totales, no promedia porcentajes', () => {
+    const quincenas = [
+      quincena({ planificados: 3, visitados: 2 }),
+      quincena({ indice: 68, planificados: 1, visitados: 1 }),
     ];
-    const t = totalesHistorial(rutas);
+    const t = totalesHistorial(quincenas);
     expect(t.quincenas).toBe(2);
     expect(t.planificados).toBe(4);
     expect(t.visitados).toBe(3);
@@ -62,8 +76,11 @@ describe('totalesHistorial', () => {
   });
 
   it('cuenta las canceladas aparte', () => {
-    const rutas = [resumirRuta(dto()), resumirRuta(dto({ id: 'r2', estado: 'cancelada' }))];
-    expect(totalesHistorial(rutas).canceladas).toBe(1);
+    const quincenas = [
+      quincena(),
+      quincena({ indice: 68, rutas: [ruta({ estado: 'cancelada' })] }),
+    ];
+    expect(totalesHistorial(quincenas).canceladas).toBe(1);
   });
 
   it('historial vacio no rompe', () => {

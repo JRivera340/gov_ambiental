@@ -45,6 +45,28 @@ export interface PlanQuincenaDTO {
   quincena: QuincenaPlanDTO;
 }
 
+export interface ParadaHistorialDTO {
+  puntoId: string;
+  lat: number;
+  lng: number;
+  barrio: string;
+  visitado: boolean;
+  pointNumber: number | null;
+}
+/** Una quincena cerrada del historial, con sus rutas ya fusionadas. */
+export interface QuincenaHistorialDTO {
+  indice: number;
+  inicioISO: string;
+  finISO: string;
+  etiqueta: string;
+  rutas: { id: string; estado: RutaSemanalDTO['estado']; inicioISO: string; finISO: string; cerradaISO: string }[];
+  paradas: ParadaHistorialDTO[];
+  planificados: number;
+  visitados: number;
+  pendientes: number;
+  pct: number;
+}
+
 export interface DesempenoGestorDTO {
   gestorId: string;
   asignados: number;
@@ -105,8 +127,8 @@ export const ambientalService = {
   },
   // Rutas de quincenas ya cerradas. Sin gestorId trae las propias; el admin
   // pasa el id del gestor que está mirando.
-  async getHistorialRutas(gestorId?: string, limit = 20): Promise<RutaSemanalDTO[]> {
-    const { data } = await api.get<RutaSemanalDTO[]>('/rutas-semanales/historial', {
+  async getHistorialRutas(gestorId?: string, limit = 20): Promise<QuincenaHistorialDTO[]> {
+    const { data } = await api.get<QuincenaHistorialDTO[]>('/rutas-semanales/historial', {
       params: { ...(gestorId ? { gestorId } : {}), limit },
     });
     return Array.isArray(data) ? data : [];
