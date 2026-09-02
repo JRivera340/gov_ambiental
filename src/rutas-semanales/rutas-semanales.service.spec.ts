@@ -169,12 +169,15 @@ describe('RutasSemanalesService.getHistorial', () => {
     puntoId, lat: 0, lng: 0, barrio: 'X', visitado,
   });
 
-  const nuevoService = (puntos: any[] = []) =>
+  // El universo de la quincena son los puntos ASIGNADOS al gestor.
+  const conAsignados = (puntos: any[], repo = makeRepo()) =>
     new RutasSemanalesService(
-      makeRepo() as any,
+      repo as any,
       { find: async () => puntos } as any,
-      asignacionesServiceStub as any,
+      { getPuntosDeGestor: async () => puntos.map((p) => p.id) } as any,
     );
+
+  const nuevoService = () => conAsignados([]);
 
   it('agrupa por quincena, de la mas reciente a la mas vieja', async () => {
     const service = nuevoService();
@@ -197,80 +200,77 @@ describe('RutasSemanalesService.getHistorial', () => {
     expect(dias).toBe(diasDeQuincena(q.inicioISO, q.finISO));
   });
 
-  // El bug del panel: antes del ciclo quincenal se creaba una ruta por semana.
-  // Mostradas de a una, las cards decian "Quincena del 17 al 23" — 7 dias.
-  it('fusiona en una sola quincena las dos rutas semanales viejas que caen dentro', async () => {
+  // Antes se medía contra las paradas congeladas de la ruta. La ruta se arma
+  // solo con lo que faltaba en ese momento, así que un gestor adelantado
+  // terminaba con una ruta de rezagados y una quincena en 13% pese a haber
+  // recorrido casi todo su territorio.
+  it('el universo son los puntos asignados, no las paradas de la ruta', async () => {
     const repo = makeRepo();
-    const service = new RutasSemanalesService(repo as any, { find: async () => [] } as any, asignacionesServiceStub as any);
-    // Se simulan dos filas semanales, como las que dejo el modelo anterior.
+    const asignados = [puntoSano(1), puntoSano(2), puntoSano(3)];
+    const service = conAsignados(asignados, repo);
+    // La ruta se armó con un solo punto rezagado.
+    await service.crearRutaQuincena({
+      gestorId: 'g1', paradas: [parada('p3', false)], segmentos: [], ahora: quincenaPasada,
+    });
+
+    const [q] = await service.getHistorial('g1', 20, quincenaActual);
+    expect(q.planificados).toBe(3);
+    expect(q.paradas.map((p) => p.puntoId)).toEqual(['p1', 'p2', 'p3']);
+  });
+
+  it('las rutas quedan como contexto: varias semanales caen en la misma quincena', async () => {
+    const repo = makeRepo();
+    const service = conAsignados([puntoSano(1)], repo);
     // Dos lunes distintos, ambos dentro de la quincena del 16 al 31 de julio.
     await repo.save({
       gestorId: 'g1',
       semanaInicio: new Date('2026-07-20T05:00:00.000Z'),
       semanaFin: new Date('2026-07-27T04:59:59.999Z'),
-      estado: 'cerrada',
-      paradas: [parada('p1', true), parada('p2', false)],
-      segmentos: [], arrastre: [],
+      estado: 'cerrada', paradas: [parada('p1', true)], segmentos: [], arrastre: [],
     } as any);
     await repo.save({
       gestorId: 'g1',
       semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
       semanaFin: new Date('2026-08-03T04:59:59.999Z'),
-      estado: 'cerrada',
-      paradas: [parada('p3', true)],
-      segmentos: [], arrastre: [],
+      estado: 'cerrada', paradas: [parada('p1', false)], segmentos: [], arrastre: [],
     } as any);
 
     const historial = await service.getHistorial('g1', 20, quincenaActual);
     expect(historial).toHaveLength(1);
     expect(historial[0].rutas).toHaveLength(2);
-    expect(historial[0].planificados).toBe(3);
-    expect(historial[0].visitados).toBe(2);
-    expect(historial[0].pendientes).toBe(1);
-    expect(historial[0].pct).toBe(67);
+    // El punto asignado aparece una sola vez, sin importar en cuántas rutas esté.
+    expect(historial[0].paradas).toHaveLength(1);
   });
 
-  it('un punto repetido en las dos rutas cuenta una vez, y basta con visitarlo en una', async () => {
+  it('deja el visitado en falso: lo completa VisitasService contra las visitas reales', async () => {
     const repo = makeRepo();
-    const service = new RutasSemanalesService(repo as any, { find: async () => [] } as any, asignacionesServiceStub as any);
-    await repo.save({
-      gestorId: 'g1',
-      semanaInicio: new Date('2026-07-20T05:00:00.000Z'),
-      semanaFin: new Date('2026-07-27T04:59:59.999Z'),
-      estado: 'cerrada', paradas: [parada('p1', false)], segmentos: [], arrastre: [],
-    } as any);
-    await repo.save({
-      gestorId: 'g1',
-      semanaInicio: new Date('2026-07-27T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-03T04:59:59.999Z'),
-      estado: 'cerrada', paradas: [parada('p1', true)], segmentos: [], arrastre: [],
-    } as any);
+    const service = conAsignados([puntoSano(1)], repo);
+    await service.crearRutaQuincena({
+      gestorId: 'g1', paradas: [parada('p1', true)], segmentos: [], ahora: quincenaPasada,
+    });
 
     const [q] = await service.getHistorial('g1', 20, quincenaActual);
-    expect(q.planificados).toBe(1);
-    expect(q.visitados).toBe(1);
-  });
-
-  it('lista los puntos con su numero, los no visitados primero', async () => {
-    const repo = makeRepo();
-    const puntos = [
-      { id: 'p1', pointNumber: 7 },
-      { id: 'p2', pointNumber: 3 },
-    ];
-    const service = new RutasSemanalesService(repo as any, { find: async () => puntos } as any, asignacionesServiceStub as any);
-    await repo.save({
-      gestorId: 'g1',
-      semanaInicio: new Date('2026-07-20T05:00:00.000Z'),
-      semanaFin: new Date('2026-08-01T04:59:59.999Z'),
-      estado: 'cerrada',
-      paradas: [parada('p1', true), parada('p2', false)],
-      segmentos: [], arrastre: [],
-    } as any);
-
-    const [q] = await service.getHistorial('g1', 20, quincenaActual);
-    expect(q.paradas.map((p) => p.puntoId)).toEqual(['p2', 'p1']);
     expect(q.paradas[0].visitado).toBe(false);
-    expect(q.paradas.find((p) => p.puntoId === 'p1')!.pointNumber).toBe(7);
+    expect(q.visitados).toBe(0);
+    expect(q.pendientes).toBe(1);
+  });
+
+  it('lista los puntos ordenados por numero, con su pointNumber', async () => {
+    const repo = makeRepo();
+    const service = conAsignados([puntoSano(7), puntoSano(3)], repo);
+    await service.crearRutaQuincena({ gestorId: 'g1', paradas: [], segmentos: [], ahora: quincenaPasada });
+
+    const [q] = await service.getHistorial('g1', 20, quincenaActual);
+    expect(q.paradas.map((p) => p.pointNumber)).toEqual([3, 7]);
+  });
+
+  it('un gestor sin asignaciones no rompe', async () => {
+    const service = nuevoService();
+    await service.crearRutaQuincena({ gestorId: 'g1', paradas: [], segmentos: [], ahora: quincenaPasada });
+
+    const [q] = await service.getHistorial('g1', 20, quincenaActual);
+    expect(q.planificados).toBe(0);
+    expect(q.pct).toBe(0);
   });
 
   it('no incluye la quincena en curso', async () => {

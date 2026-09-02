@@ -49,7 +49,31 @@ const makeRepo = () => {
 
 // p1 está en emergencia; p2 y p3 son regulares. Los tres entran en la misma
 // quincena: ya no hay reparto en mitades.
+const quincenaHistorial = {
+  indice: 48637,
+  inicioISO: '2026-07-16T05:00:00.000Z',
+  finISO: '2026-08-01T04:59:59.999Z',
+  etiqueta: 'Quincena del 16 al 31 de julio',
+  rutas: [{
+    id: 'r1', estado: 'cerrada' as const,
+    inicioISO: '2026-07-20T05:00:00.000Z',
+    finISO: '2026-07-27T04:59:59.999Z',
+    cerradaISO: '2026-07-27T04:59:59.999Z',
+  }],
+  // Universo: los puntos asignados, todos sin visitar hasta que se cruce.
+  paradas: [
+    { puntoId: 'p1', lat: 0, lng: 0, barrio: 'X', visitado: false, pointNumber: 1 },
+    { puntoId: 'p2', lat: 0, lng: 0, barrio: 'X', visitado: false, pointNumber: 2 },
+    { puntoId: 'p3', lat: 0, lng: 0, barrio: 'X', visitado: false, pointNumber: 3 },
+  ],
+  planificados: 3,
+  visitados: 0,
+  pendientes: 3,
+  pct: 0,
+};
+
 const rutasStub = {
+  getHistorial: async () => [JSON.parse(JSON.stringify(quincenaHistorial))],
   getPlanQuincena: async (gestorId: string) => ({
     gestorId,
     asignados: 4,
@@ -206,5 +230,41 @@ describe('VisitasService', () => {
 
     await service.eliminarDePunto('p1');
     expect(repo.store.map((v) => v.puntoResiduoId)).toEqual(['p2']);
+  });
+
+  // El historial se mide contra los puntos asignados y las visitas reales del
+  // rango, no contra el flag congelado de la ruta.
+  it('getHistorialConVisitas marca los puntos visitados dentro del rango', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    // Dentro de la quincena del 16 al 31 de julio.
+    await service.registrarVisita('p1', 'g1', new Date('2026-07-22T15:00:00.000Z'));
+    await service.registrarVisita('p3', 'g1', new Date('2026-07-30T15:00:00.000Z'));
+
+    const [q] = await service.getHistorialConVisitas('g1', 20, AHORA);
+    expect(q.planificados).toBe(3);
+    expect(q.visitados).toBe(2);
+    expect(q.pendientes).toBe(1);
+    expect(q.pct).toBe(67);
+  });
+
+  it('getHistorialConVisitas ignora visitas fuera del rango de la quincena', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    // Agosto: fuera de la quincena de julio.
+    await service.registrarVisita('p1', 'g1', new Date('2026-08-05T15:00:00.000Z'));
+
+    const [q] = await service.getHistorialConVisitas('g1', 20, AHORA);
+    expect(q.visitados).toBe(0);
+  });
+
+  it('getHistorialConVisitas pone los no visitados primero', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    await service.registrarVisita('p1', 'g1', new Date('2026-07-22T15:00:00.000Z'));
+
+    const [q] = await service.getHistorialConVisitas('g1', 20, AHORA);
+    expect(q.paradas[0].visitado).toBe(false);
+    expect(q.paradas[q.paradas.length - 1].puntoId).toBe('p1');
   });
 });

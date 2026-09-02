@@ -38,8 +38,11 @@ export type QuincenaHistorial = {
   finISO: string;
   etiqueta: string;
   // Las rutas reales que cayeron en la quincena. Antes del ciclo quincenal se
-  // creaba una ruta por semana, así que una quincena vieja trae dos.
+  // creaba una ruta por semana, así que una quincena vieja trae dos. Son
+  // contexto: el cumplimiento NO se mide contra ellas.
   rutas: { id: string; estado: EstadoRuta; inicioISO: string; finISO: string; cerradaISO: string }[];
+  // Todos los puntos asignados al gestor. `visitado` lo completa VisitasService
+  // contra las visitas reales del rango.
   paradas: ParadaHistorial[];
   planificados: number;
   visitados: number;
@@ -113,6 +116,16 @@ export class RutasSemanalesService {
   // Rutas cerradas de quincenas anteriores. Es la fuente del historial: el
   // frontend del gestor guardaba su historial en localStorage, así que el admin
   // no podía verlo — esto lee la tabla, que siempre tuvo el dato completo.
+  // Quincenas cerradas del gestor.
+  //
+  // El cumplimiento se mide contra los puntos ASIGNADOS al gestor, no contra
+  // las paradas de la ruta que armó. La ruta se construye solo con los puntos
+  // que faltaban en ese instante, así que medir contra ella castiga justo al
+  // gestor que ya venía adelantado: quedaba una ruta de 18 rezagados y su
+  // quincena figuraba en 13% aunque hubiera recorrido 71 puntos.
+  //
+  // Las visitas las cruza VisitasService (este módulo no puede depender de él
+  // sin cerrar un ciclo en Nest); acá se arma el universo y el contexto.
   async getHistorial(gestorId: string, limite = 20, ahora = new Date()): Promise<QuincenaHistorial[]> {
     await this.cerrarQuincenasVencidas(ahora);
     const { inicioISO } = limitesQuincena(ahora);
@@ -121,10 +134,8 @@ export class RutasSemanalesService {
       order: { semanaInicio: 'DESC' },
     });
 
-    // Se agrupa por la quincena a la que pertenece cada fila, no por la fila en
-    // sí. Las rutas creadas antes del ciclo quincenal duran 7 días: mostradas de
-    // a una se veían como semanas, que es justo lo que el panel no debe mostrar.
-    // Dos rutas semanales de la misma quincena se fusionan en una sola entrada.
+    // Qué quincenas mostrar sale de las rutas que el gestor llegó a armar. Las
+    // rutas semanales viejas caen de a dos (o tres) en la misma quincena.
     const porQuincena = new Map<number, QuincenaHistorial>();
     for (const fila of filas) {
       const rango = limitesQuincena(new Date(fila.semanaInicio));
@@ -151,38 +162,32 @@ export class RutasSemanalesService {
         finISO: new Date(fila.semanaFin).toISOString(),
         cerradaISO: new Date(fila.updatedAt ?? fila.semanaFin).toISOString(),
       });
-      entrada.paradas.push(...((fila.paradas ?? []) as ParadaHistorial[]));
     }
 
     const quincenas = Array.from(porQuincena.values())
       .sort((a, b) => b.indice - a.indice)
       .slice(0, Math.min(Math.max(limite, 1), 100));
+    if (quincenas.length === 0) return [];
 
-    // El número de punto no se guarda en la ruta (paradas solo tiene puntoId,
-    // coordenadas y barrio), pero es como el supervisor identifica un punto en
-    // el mapa. Se resuelve acá, de una sola consulta para todas las quincenas.
-    const idsPuntos = [...new Set(quincenas.flatMap((q) => q.paradas.map((p) => p.puntoId)))];
-    const puntos = idsPuntos.length > 0 ? await this.puntosRepo.find({ where: { id: In(idsPuntos) } }) : [];
-    const numeroPorId = new Map(puntos.map((p) => [p.id, p.pointNumber ?? null]));
+    const asignadosIds = await this.asignacionesService.getPuntosDeGestor(gestorId);
+    const puntos = asignadosIds.length > 0
+      ? await this.puntosRepo.find({ where: { id: In(asignadosIds) } })
+      : [];
+    const paradasBase: ParadaHistorial[] = [...puntos]
+      .sort((a, b) => (a.pointNumber ?? 0) - (b.pointNumber ?? 0))
+      .map((p) => ({
+        puntoId: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        barrio: p.barrio,
+        visitado: false,
+        pointNumber: p.pointNumber ?? null,
+      }));
 
     for (const q of quincenas) {
-      // Un punto puede aparecer en las dos rutas de la quincena. Cuenta una vez
-      // y basta con que lo hayan visitado en cualquiera de ellas.
-      const porPunto = new Map<string, ParadaHistorial>();
-      for (const parada of q.paradas) {
-        const previa = porPunto.get(parada.puntoId);
-        if (previa) previa.visitado = previa.visitado || parada.visitado;
-        else porPunto.set(parada.puntoId, { ...parada, pointNumber: numeroPorId.get(parada.puntoId) ?? null });
-      }
-      q.paradas = Array.from(porPunto.values()).sort((a, b) => {
-        // Sin visitar primero: es lo que el supervisor necesita ver.
-        if (a.visitado !== b.visitado) return Number(a.visitado) - Number(b.visitado);
-        return (a.pointNumber ?? 0) - (b.pointNumber ?? 0);
-      });
+      q.paradas = paradasBase.map((p) => ({ ...p }));
       q.planificados = q.paradas.length;
-      q.visitados = q.paradas.filter((p) => p.visitado).length;
-      q.pendientes = q.planificados - q.visitados;
-      q.pct = q.planificados > 0 ? Math.round((q.visitados / q.planificados) * 100) : 0;
+      q.pendientes = q.planificados;
     }
 
     return quincenas;

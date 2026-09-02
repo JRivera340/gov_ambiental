@@ -106,12 +106,15 @@ export class VisitasService {
 
   // Historial de quincenas cerradas con el cumplimiento REAL.
   //
-  // `paradas[].visitado` de la tabla de rutas no sirve para esto: se escribe una
-  // sola vez, al crear la ruta —cuando el gestor todavía no visitó nada— y nunca
-  // se actualiza. El historial mostraba entonces 0% en quincenas que el gestor
-  // había recorrido entera, contradiciendo al panel de Desempeño, que sí mide
-  // contra visitas_punto. Acá se recalcula cada parada contra las visitas del
-  // rango de la quincena, que es la misma fuente que usa getResumenDesempeno.
+  // El universo son los puntos asignados al gestor (lo arma getHistorial) y acá
+  // se marca cuáles visitó dentro del rango de cada quincena, con la misma
+  // fuente que usa getResumenDesempeno: la tabla visitas_punto, que registra
+  // las tres acciones de seguimiento (marcar recogido, agregar residuo, agregar
+  // nota).
+  //
+  // `paradas[].visitado` de la tabla de rutas no sirve: se escribe una sola vez,
+  // al crear la ruta —cuando el gestor todavía no visitó nada— y nunca se
+  // actualiza.
   async getHistorialConVisitas(gestorId: string, limite = 20, ahora = new Date()): Promise<QuincenaHistorial[]> {
     const quincenas = await this.rutasSemanalesService.getHistorial(gestorId, limite, ahora);
 

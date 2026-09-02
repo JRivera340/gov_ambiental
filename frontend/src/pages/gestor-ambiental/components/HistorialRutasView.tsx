@@ -43,7 +43,7 @@ const RutaHistorialCard: React.FC<RutaHistorialCardProps> = ({ ruta, onVer }) =>
             )}
           </div>
           <p className="text-[11px] text-neutral-500">
-            {ruta.totalPuntos} planificados · {ruta.puntosVencidos} vencidos
+            {ruta.totalPuntos} puntos asignados
           </p>
         </div>
       </div>

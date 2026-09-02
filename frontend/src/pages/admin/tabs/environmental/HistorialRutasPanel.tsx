@@ -10,9 +10,13 @@ import { estadoQuincena, cierreQuincena, totalesHistorial, agruparPorMes } from 
 // Historial de rutas de un gestor — quincenas ya cerradas, agrupadas por mes.
 //
 // Se abre desde la card del gestor en Desempeño, que muestra solo la quincena
-// en curso. Los datos salen de GET /visitas/historial, que cruza las rutas
-// guardadas con las visitas reales: el flag `visitado` de la tabla de rutas se
-// congela al crear la ruta y mostraba 0% en quincenas ya recorridas.
+// en curso. Los datos salen de GET /visitas/historial: el universo son los
+// puntos ASIGNADOS al gestor y lo visitado sale de visitas_punto.
+//
+// Antes se medía contra las paradas de la ruta, que se arma solo con los puntos
+// pendientes en ese instante: un gestor que ya venía adelantado terminaba con
+// una ruta de rezagados y su quincena figuraba en 13% pese a haber recorrido
+// todo su territorio.
 //
 // Cada mes trae sus dos quincenas (1-15 y 16-fin) más el acumulado del mes, que
 // es la unidad de control que pidió la Alcaldía.
@@ -131,10 +135,10 @@ const QuincenaCard: React.FC<{
 
       <div className="flex items-center gap-4 text-[10px] text-neutral-500 tabular border-t border-neutral-200/70 pt-2">
         <span>
-          <span className="font-bold text-neutral-700">{quincena.visitados}</span> de {quincena.planificados} visitados
+          <span className="font-bold text-neutral-700">{quincena.visitados}</span> de {quincena.planificados} asignados visitados
         </span>
         {quincena.pendientes > 0 && (
-          <span title="Puntos que quedaron sin visitar al cerrarse la quincena.">
+          <span title="Puntos asignados que no recibieron ningún seguimiento en la quincena.">
             <span className="font-bold text-primary-600">{quincena.pendientes}</span> sin visitar
           </span>
         )}
