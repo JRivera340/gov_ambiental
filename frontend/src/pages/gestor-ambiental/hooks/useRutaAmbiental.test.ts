@@ -4,10 +4,6 @@ import { renderHook, act } from '@testing-library/react';
 
 vi.mock('../lib/ruta', () => ({
   clearRutaActiva: vi.fn(),
-  addToHistorial: vi.fn(),
-  cancelarRutaAndAddToHistorial: vi.fn(),
-  getHistorialRutas: vi.fn(() => []),
-  deleteFromHistorial: vi.fn(),
   buildSegmentos: vi.fn(() => [
     { id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' },
   ]),
@@ -79,7 +75,6 @@ const dtoConParada = (overrides: any = {}) => ({
 describe('useRutaAmbiental', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (ruta.getHistorialRutas as any).mockReturnValue([]);
     (ruta.buildSegmentos as any).mockReturnValue([
       { id: 'A', paradas: [{ puntoId: 'x', visitado: false }], estado: 'pendiente' },
     ]);
@@ -102,27 +97,26 @@ describe('useRutaAmbiental', () => {
     expect(setViewMode).toHaveBeenCalledWith('ruta-activa');
   });
 
-  it('finalizarRuta archiva, limpia y va al historial', async () => {
+  it('finalizarRuta limpia y va al historial', async () => {
     const { result, setViewMode } = setup(dtoConParada());
     await waitFor(() => { expect(result.current.rutaActiva).not.toBeNull(); });
     act(() => result.current.finalizarRuta());
-    expect(ruta.addToHistorial).toHaveBeenCalledWith(expect.objectContaining({ estado: 'finalizada' }));
     expect(ruta.clearRutaActiva).toHaveBeenCalledWith('g1');
     expect(result.current.rutaActiva).toBeNull();
     expect(setViewMode).toHaveBeenCalledWith('historial-rutas');
   });
 
-  it('cancelarRuta sincroniza con el backend, usa el helper de cancelación y limpia', async () => {
+  it('cancelarRuta sincroniza con el backend y limpia', async () => {
     const { result, setViewMode } = setup(dtoConParada());
     await waitFor(() => { expect(result.current.rutaActiva).not.toBeNull(); });
     await act(async () => { await result.current.cancelarRuta(); });
-    expect(ruta.cancelarRutaAndAddToHistorial).toHaveBeenCalled();
+    expect(ambientalService.cancelarRutaQuincena).toHaveBeenCalled();
     expect(ruta.clearRutaActiva).toHaveBeenCalledWith('g1');
     expect(result.current.rutaActiva).toBeNull();
     expect(setViewMode).toHaveBeenCalledWith('historial-rutas');
   });
 
-  it('cancelarRuta no toca el historial local si el backend falla', async () => {
+  it('cancelarRuta no limpia la ruta activa si el backend falla', async () => {
     const { result } = setup();
     await waitFor(() => { expect(result.current.plan).not.toBeNull(); });
     await act(async () => { await result.current.calcularRuta(); });
@@ -131,16 +125,47 @@ describe('useRutaAmbiental', () => {
 
     await act(async () => { await result.current.cancelarRuta(); });
 
-    expect(ruta.cancelarRutaAndAddToHistorial).not.toHaveBeenCalled();
+    expect(ruta.clearRutaActiva).not.toHaveBeenCalled();
     expect(result.current.rutaActiva).not.toBeNull();
   });
 
-  it('eliminarRutaHistorial borra del historial y recarga', () => {
+  // El historial ya no se arma en el cliente: sale de GET /visitas/historial,
+  // el mismo endpoint que consume el panel del admin. Antes se guardaba en
+  // localStorage y se rehidrataba con los visitados de la quincena en curso,
+  // así que una quincena vieja podía figurar completada por trabajo hecho
+  // despues — y no coincidia con lo que veia el supervisor.
+  it('el historial sale del backend, no de localStorage', async () => {
+    vi.mocked(ambientalService.getHistorialRutas).mockResolvedValueOnce([
+      {
+        indice: 48638,
+        inicioISO: '2026-08-01T05:00:00.000Z',
+        finISO: '2026-08-16T04:59:59.999Z',
+        etiqueta: 'Quincena del 1 al 15 de agosto',
+        rutas: [{
+          id: 'r-ago', estado: 'cerrada',
+          inicioISO: '2026-08-01T05:00:00.000Z',
+          finISO: '2026-08-16T04:59:59.999Z',
+          cerradaISO: '2026-08-16T04:59:59.999Z',
+        }],
+        paradas: [
+          { puntoId: 'p1', lat: 4, lng: -74, barrio: 'B', visitado: true, pointNumber: 1 },
+          { puntoId: 'p2', lat: 4, lng: -74, barrio: 'B', visitado: false, pointNumber: 2 },
+        ],
+        planificados: 2, visitados: 1, pendientes: 1, pct: 50,
+      },
+    ]);
     const { result } = setup();
-    act(() => result.current.eliminarRutaHistorial('r1'));
-    expect(ruta.deleteFromHistorial).toHaveBeenCalledWith('g1', 'r1');
-    expect(ruta.getHistorialRutas).toHaveBeenCalled();
+    await waitFor(() => { expect(result.current.historialRutas).toHaveLength(1); });
+
+    const [quincena] = result.current.historialRutas;
+    expect(quincena.id).toBe('quincena-48638');
+    expect(quincena.totalPuntos).toBe(2);
+    // El punto no visitado en agosto sigue sin visitar, aunque el gestor lo
+    // tenga visitado en la quincena en curso.
+    const paradas = quincena.segmentos.flatMap((seg) => seg.paradas);
+    expect(paradas.filter((pt) => pt.visitado)).toHaveLength(1);
   });
+
 
   it('hidrata la ruta activa desde el backend al montar', async () => {
     vi.mocked(ambientalService.getRutaQuincena).mockResolvedValueOnce({
@@ -168,7 +193,6 @@ describe('useRutaAmbiental', () => {
       expect(result.current.rutaSemanalId).toBe('rs-cancelada');
     });
     expect(result.current.rutaActiva).toBeNull();
-    expect(ruta.cancelarRutaAndAddToHistorial).toHaveBeenCalled();
   });
 
   it('reconstruye segmentos desde las paradas hidratadas, no desde dto.segmentos congelado', async () => {

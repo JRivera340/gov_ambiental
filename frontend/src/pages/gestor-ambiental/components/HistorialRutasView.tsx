@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import type { RutaActiva } from '../lib/ruta.types';
 
-// Las rutas viejas del historial (guardadas en localStorage) pueden tener un
-// tercer segmento 'C', de cuando la ruta se partia en bloques de 25.
+// El historial viene del servidor: un bloque por quincena. Las entradas viejas
+// de localStorage podían tener un tercer segmento 'C', de cuando la ruta se
+// partia en bloques de 25 — el color se deja por si queda alguna en pantalla.
 const SEGMENT_COLORS: Record<string, string> = {
   A: '#2563eb', B: '#16a34a', C: '#7c3aed',
 };
@@ -13,10 +14,9 @@ const SEGMENT_COLORS: Record<string, string> = {
 interface RutaHistorialCardProps {
   ruta: RutaActiva;
   onVer: (ruta: RutaActiva) => void;
-  onDelete: (ruta: RutaActiva) => void;
 }
 
-const RutaHistorialCard: React.FC<RutaHistorialCardProps> = ({ ruta, onVer, onDelete }) => {
+const RutaHistorialCard: React.FC<RutaHistorialCardProps> = ({ ruta, onVer }) => {
   const visitados = ruta.segmentos.flatMap(s => s.paradas).filter(p => p.visitado).length;
   const porcentaje = ruta.totalPuntos > 0 ? Math.round((visitados / ruta.totalPuntos) * 100) : 0;
   const isCancelada = ruta.estado === 'cancelada';
@@ -46,15 +46,6 @@ const RutaHistorialCard: React.FC<RutaHistorialCardProps> = ({ ruta, onVer, onDe
             {ruta.totalPuntos} planificados · {ruta.puntosVencidos} vencidos
           </p>
         </div>
-        <button
-          onClick={() => onDelete(ruta)}
-          className="text-neutral-300 hover:text-red-500 transition-colors"
-          title="Eliminar del historial"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
       </div>
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
@@ -93,18 +84,7 @@ const RutaHistorialCard: React.FC<RutaHistorialCardProps> = ({ ruta, onVer, onDe
 };
 
 export const HistorialRutasView: React.FC = () => {
-  const { historialRutas, verHistorialRuta, eliminarRutaHistorial, setViewMode } =
-    useGestorAmbientalCtx();
-  const [confirmDelete, setConfirmDelete] = useState<RutaActiva | null>(null);
-
-  const handleDelete = (ruta: RutaActiva) => {
-    const visitados = ruta.segmentos.flatMap(s => s.paradas).filter(p => p.visitado).length;
-    if (visitados > 0) {
-      setConfirmDelete(ruta);
-    } else {
-      eliminarRutaHistorial(ruta.id);
-    }
-  };
+  const { historialRutas, verHistorialRuta, setViewMode } = useGestorAmbientalCtx();
 
   const finalizadas = historialRutas.filter(r => r.estado !== 'cancelada');
   const canceladas = historialRutas.filter(r => r.estado === 'cancelada');
@@ -123,7 +103,7 @@ export const HistorialRutasView: React.FC = () => {
           </button>
           <div>
             <h2 className="text-base font-black text-neutral-900">Historial de Rutas</h2>
-            <p className="text-[11px] text-neutral-400">{historialRutas.length} rutas guardadas</p>
+            <p className="text-[11px] text-neutral-400">{historialRutas.length} quincenas cerradas</p>
           </div>
         </div>
       </div>
@@ -131,8 +111,8 @@ export const HistorialRutasView: React.FC = () => {
       <div className="p-4 md:p-6 flex flex-col gap-3 max-w-2xl">
         {historialRutas.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-sm text-neutral-400 font-medium">No hay rutas guardadas todavía</p>
-            <p className="text-xs text-neutral-300 mt-1">Las rutas finalizadas aparecerán aquí</p>
+            <p className="text-sm text-neutral-400 font-medium">Todavía no cerraste ninguna quincena</p>
+            <p className="text-xs text-neutral-300 mt-1">Al terminar la quincena en curso aparecerá acá</p>
           </div>
         )}
         {finalizadas.length > 0 && (
@@ -142,7 +122,7 @@ export const HistorialRutasView: React.FC = () => {
             </h3>
             <div className="flex flex-col gap-3">
               {finalizadas.map(ruta => (
-                <RutaHistorialCard key={ruta.id} ruta={ruta} onVer={verHistorialRuta} onDelete={handleDelete} />
+                <RutaHistorialCard key={ruta.id} ruta={ruta} onVer={verHistorialRuta} />
               ))}
             </div>
           </div>
@@ -154,39 +134,13 @@ export const HistorialRutasView: React.FC = () => {
             </h3>
             <div className="flex flex-col gap-3">
               {canceladas.map(ruta => (
-                <RutaHistorialCard key={ruta.id} ruta={ruta} onVer={verHistorialRuta} onDelete={handleDelete} />
+                <RutaHistorialCard key={ruta.id} ruta={ruta} onVer={verHistorialRuta} />
               ))}
             </div>
           </div>
         )}
       </div>
 
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm mx-4">
-            <h3 className="text-sm font-black text-neutral-900 mb-2">Eliminar ruta</h3>
-            <p className="text-xs text-neutral-600 mb-4">
-              Esta ruta tiene{' '}
-              {confirmDelete.segmentos.flatMap(s => s.paradas).filter(p => p.visitado).length}{' '}
-              puntos visitados registrados. ¿Seguro que deseas eliminarla del historial? Esta acción no se puede deshacer.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => { eliminarRutaHistorial(confirmDelete.id); setConfirmDelete(null); }}
-                className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-all"
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

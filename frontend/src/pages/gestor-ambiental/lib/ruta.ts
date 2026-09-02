@@ -42,10 +42,6 @@ function activeKey(gestorId: string) {
   return `ambiental_ruta_activa_${gestorId}`;
 }
 
-function historialKey(gestorId: string) {
-  return `ambiental_historial_rutas_${gestorId}`;
-}
-
 // La ruta activa ya no se cachea en localStorage: se deriva de la fila de la
 // semana del backend y se rehidrata contra los puntos actuales del gestor
 // (ver useRutaAmbiental). `clearRutaActiva` se conserva para limpiar la clave
@@ -54,50 +50,9 @@ export function clearRutaActiva(gestorId: string): void {
   localStorage.removeItem(activeKey(gestorId));
 }
 
-export function getHistorialRutas(gestorId: string): RutaActiva[] {
-  try {
-    const raw = localStorage.getItem(historialKey(gestorId));
-    return raw ? (JSON.parse(raw) as RutaActiva[]) : [];
-  } catch {
-    return [];
-  }
-}
 
-// Id propio de la entrada de historial — distinto del id de `RutaSemanal`
-// (que es uno por gestor+semana). Reusar ese id causaba que, al finalizar o
-// cancelar varias veces la misma semana, todas las entradas de historial
-// colisionaran en el mismo id y `deleteFromHistorial` borrara varias a la vez.
-function generarIdHistorial(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return `hist_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
-export function addToHistorial(ruta: RutaActiva, fechaCierre = new Date().toISOString()): void {
-  const historial = getHistorialRutas(ruta.gestorId);
-  historial.unshift({ ...ruta, id: generarIdHistorial(), estado: 'finalizada', fechaCierre });
-  localStorage.setItem(historialKey(ruta.gestorId), JSON.stringify(historial));
-}
-
-export function cancelarRutaAndAddToHistorial(ruta: RutaActiva, fechaCierre = new Date().toISOString()): void {
-  const historial = getHistorialRutas(ruta.gestorId);
-  historial.unshift({ ...ruta, id: generarIdHistorial(), estado: 'cancelada', fechaCierre });
-  localStorage.setItem(historialKey(ruta.gestorId), JSON.stringify(historial));
-}
-
-export function getUnvisitedActivityIds(gestorId: string): Set<string> {
-  const historial = getHistorialRutas(gestorId);
-  const ids = new Set<string>();
-  for (const ruta of historial) {
-    for (const seg of ruta.segmentos) {
-      for (const p of seg.paradas) {
-        if (!p.visitado) ids.add(p.puntoId);
-      }
-    }
-  }
-  return ids;
-}
-
-export function deleteFromHistorial(gestorId: string, rutaId: string): void {
-  const historial = getHistorialRutas(gestorId).filter(r => r.id !== rutaId);
-  localStorage.setItem(historialKey(gestorId), JSON.stringify(historial));
-}
+// El historial de rutas tampoco vive más acá. Se guardaba en localStorage y se
+// rehidrataba con los puntos visitados de la quincena EN CURSO, así que una
+// quincena vieja aparecía completada por trabajo hecho después y no coincidía
+// con el panel del admin. Ahora las dos pantallas leen GET /visitas/historial,
+// y el arrastre de pendientes sale de GET /rutas-semanales/arrastre/mine.

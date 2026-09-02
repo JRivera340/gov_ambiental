@@ -5,13 +5,10 @@ import type { ViewMode } from '../lib/constants';
 import type { ParadaRuta, RutaActiva } from '../lib/ruta.types';
 import { getResiduos, isPuntoEmergencia } from '../lib/residuos';
 import { diasDesdeUltimoToque } from '../lib/visitado';
-import {
-  clearRutaActiva,
-  addToHistorial, cancelarRutaAndAddToHistorial, getHistorialRutas, deleteFromHistorial,
-  buildSegmentos, getUnvisitedActivityIds,
-} from '../lib/ruta';
+import { clearRutaActiva, buildSegmentos } from '../lib/ruta';
 import { nearestNeighborRoute } from '../lib/geo';
 import { getParadasDeQuincena } from '../lib/rutasQuincena';
+import { rutasDesdeHistorial } from '../lib/historialQuincena';
 import { ambientalService, type RutaSemanalDTO, type PlanQuincenaDTO } from '../../../services/ambiental.service';
 import { paradaLiteFromParadaRuta, hidratarParadas } from '../lib/rutaSemanal.lib';
 
@@ -58,9 +55,14 @@ export function useRutaAmbiental(
   // en memoria para el historial, pero no debe volver a mostrarse como activa.
   const [rutaCerradaId, setRutaCerradaId] = useState<string | null>(null);
   const [activeSegmento, setActiveSegmento] = useState<'A' | 'B' | null>(null);
-  const [historialRutas, setHistorialRutas] = useState<RutaActiva[]>(() =>
-    user ? getHistorialRutas(user.id) : []
-  );
+  // Historial servido por el backend (GET /visitas/historial), no localStorage.
+  //
+  // El historial local se rehidrataba con los puntos visitados de la quincena
+  // EN CURSO, así que una ruta de agosto figuraba completada si el gestor había
+  // visitado esos puntos en septiembre — y no coincidía con el panel del admin,
+  // que cuenta las visitas dentro del rango real de cada quincena. Ahora las dos
+  // pantallas leen lo mismo.
+  const [historialRutas, setHistorialRutas] = useState<RutaActiva[]>([]);
   const [historialRutaSeleccionada, setHistorialRutaSeleccionada] = useState<RutaActiva | null>(null);
   const [puntosAsignados, setPuntosAsignados] = useState<string[]>([]);
   const [plan, setPlan] = useState<PlanQuincenaDTO | null>(null);
@@ -79,6 +81,14 @@ export function useRutaAmbiental(
     }
   }, []);
 
+  const recargarHistorial = useCallback(async () => {
+    try {
+      setHistorialRutas(rutasDesdeHistorial(await ambientalService.getHistorialRutas()));
+    } catch {
+      setHistorialRutas([]);
+    }
+  }, []);
+
   useEffect(() => {
     let vivo = true;
     if (!user) return;
@@ -86,8 +96,9 @@ export function useRutaAmbiental(
       .then(ps => { if (vivo) setPuntosAsignados(ps); })
       .catch(() => { if (vivo) setPuntosAsignados([]); });
     recargarPlan();
+    recargarHistorial();
     return () => { vivo = false; };
-  }, [user, recargarPlan]);
+  }, [user, recargarPlan, recargarHistorial]);
 
   const quincena = plan?.quincena ?? null;
 
@@ -98,7 +109,10 @@ export function useRutaAmbiental(
 
   // ── Puntos candidatos para la ruta ─────────────────────────────
   const puntosParaRuta = useMemo((): ParadaRuta[] => {
-    const pendientesAnteriores = user ? getUnvisitedActivityIds(user.id) : new Set<string>();
+    // Puntos que quedaron sin visitar en la quincena anterior. Salen del
+    // backend (GET /rutas-semanales/arrastre/mine): antes se derivaban del
+    // historial en localStorage, que ya no se escribe.
+    const pendientesAnteriores = new Set(arrastreIds);
     // La ruta se arma con TODOS los puntos asignados al gestor. Se filtra por
     // asignados primero (antes de ordenar), para no perder puntos por un corte
     // global; y se incluyen los ya recogidos (resto) para que el gestor pueda
@@ -150,7 +164,7 @@ export function useRutaAmbiental(
         pendienteAnterior: pendientesAnteriores.has(a.id),
       };
     });
-  }, [activities, user, puntosAsignados, visitadosIds]);
+  }, [activities, user, puntosAsignados, visitadosIds, arrastreIds]);
 
   const puntosRef = useRef(puntosParaRuta);
   useEffect(() => {
@@ -176,23 +190,6 @@ export function useRutaAmbiental(
         if (dto) {
           setRutaSemanalId(dto.id);
           setRutaDto(dto);
-          if (dto.estado !== 'en_progreso') {
-            // No es una ruta en curso (se cerró sola al pasar la quincena, o
-            // quedó cancelada) y el frontend nunca la movió a historial —
-            // se registra ahora con la hora real de cierre, sin mostrarla
-            // como activa.
-            const yaRegistrada = getHistorialRutas(user.id).some(h => h.fechaCreacion === dto.semanaInicio);
-            if (!yaRegistrada) {
-              const cerrada = reconstruirRutaActiva(dto, puntosRef.current);
-              const fechaCierre = dto.updatedAt ?? dto.semanaFin;
-              if (cerrada.estado === 'cancelada') {
-                cancelarRutaAndAddToHistorial(cerrada, fechaCierre);
-              } else {
-                addToHistorial(cerrada, fechaCierre);
-              }
-              setHistorialRutas(getHistorialRutas(user.id));
-            }
-          }
         }
       })
       .catch(() => {});
@@ -258,13 +255,13 @@ export function useRutaAmbiental(
 
   const finalizarRuta = useCallback(() => {
     if (!rutaActiva || !user) return;
-    const finalizada: RutaActiva = { ...rutaActiva, estado: 'finalizada' };
-    addToHistorial(finalizada);
     clearRutaActiva(user.id);
     setRutaCerradaId(rutaActiva.id);
-    setHistorialRutas(getHistorialRutas(user.id));
+    // La quincena en curso todavía no está en el historial —ese solo lista las
+    // cerradas—, pero se refresca igual para no dejar la lista vieja en pantalla.
+    recargarHistorial();
     setViewMode('historial-rutas');
-  }, [rutaActiva, user]);
+  }, [rutaActiva, user, recargarHistorial]);
 
   const cancelarRuta = useCallback(async () => {
     if (!rutaActiva || !user) return;
@@ -277,12 +274,11 @@ export function useRutaAmbiental(
         return;
       }
     }
-    cancelarRutaAndAddToHistorial(rutaActiva);
     clearRutaActiva(user.id);
     setRutaCerradaId(rutaActiva.id);
-    setHistorialRutas(getHistorialRutas(user.id));
+    recargarHistorial();
     setViewMode('historial-rutas');
-  }, [rutaActiva, user, rutaSemanalId, setToast]);
+  }, [rutaActiva, user, rutaSemanalId, setToast, recargarHistorial]);
 
   const descartarRutaActiva = useCallback(() => {
     if (!user) return;
@@ -295,12 +291,6 @@ export function useRutaAmbiental(
     setHistorialRutaSeleccionada(ruta);
     setViewMode('historial-ruta-detalle');
   }, []);
-
-  const eliminarRutaHistorial = useCallback((rutaId: string) => {
-    if (!user) return;
-    deleteFromHistorial(user.id, rutaId);
-    setHistorialRutas(getHistorialRutas(user.id));
-  }, [user]);
 
   return {
     rutaActiva,
@@ -321,6 +311,6 @@ export function useRutaAmbiental(
     cancelarRuta,
     descartarRutaActiva,
     verHistorialRuta,
-    eliminarRutaHistorial,
+    recargarHistorial,
   };
 }
