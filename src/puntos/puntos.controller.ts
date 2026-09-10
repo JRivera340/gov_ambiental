@@ -121,12 +121,12 @@ export class PuntosController {
     return this.puntosService.eliminarNota(id, body);
   }
 
-  @Post(':id/residuo-bitacora')
+  @Post(':id/bitacora')
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   agregarBitacora(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { residuoId: string; nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
+    @Body() body: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
   ) {
     return this.puntosService.agregarBitacora(req.user.userId, req.user.email, id, body);
   }

@@ -96,12 +96,11 @@ export const activityService = {
     return normalizeActivity(data);
   },
 
-  async agregarBitacoraResiduo(
+  async agregarBitacora(
     puntoId: string,
-    residuoId: string,
     data: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
   ): Promise<Activity> {
-    const { data: activity } = await api.post<Activity>(`/puntos/${puntoId}/residuo-bitacora`, { residuoId, ...data });
+    const { data: activity } = await api.post<Activity>(`/puntos/${puntoId}/bitacora`, data);
     return normalizeActivity(activity);
   },
 

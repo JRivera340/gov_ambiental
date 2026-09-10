@@ -315,12 +315,10 @@ export class PuntosService {
     userId: string,
     email: string,
     id: string,
-    body: { residuoId: string; nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
+    body: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
   ) {
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
-    const residuo = punto.residuos.find((r) => r.id === body.residuoId);
-    if (!residuo) throw new NotFoundException('Residuo no encontrado');
     const ahora = new Date();
     const entrada = {
       id: randomUUID(),
@@ -333,7 +331,7 @@ export class PuntosService {
       tipoResiduo: body.tipoResiduo,
       hora: body.hora,
     };
-    residuo.bitacora = [...(residuo.bitacora || []), entrada];
+    punto.bitacora = [...(punto.bitacora || []), entrada];
     punto.ultimoSeguimientoAt = ahora;
     const guardado = await this.repo.save(punto);
     await this.registrarVisitaSinRomper(id, userId, ahora);

@@ -20,6 +20,7 @@ import { AppShell } from '../../components/shell/AppShell';
 import { BottomSheet, type BottomSheetState } from '../../components/shell/BottomSheet';
 import { AMBIENTAL_NAV_ITEMS, AMBIENTAL_SECONDARY_ACTIONS, getActiveNavKey, type NavKey } from './lib/navConfig';
 import { HUB_URL } from '../../config/hub';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 // ════════════════════════════════════════════════════════════════
 // GestorAmbientalDashboard — orquestador liviano.
@@ -62,8 +63,20 @@ export const GestorAmbientalDashboard: React.FC = () => {
     activeSegmento,
   } = gad;
 
-  const [activeNavKey, setActiveNavKeyState] = React.useState<NavKey>('mapa');
+  const [activeNavKey, setActiveNavKeyState] = usePersistentState<NavKey>('gad_activeNavKey', 'mapa');
   const [sheetState, setSheetState] = React.useState<BottomSheetState>('collapsed');
+
+  // Al recargar la página, activeNavKey se restaura desde localStorage pero
+  // viewMode siempre arranca en 'general-map' — sincronizarlo una sola vez
+  // para que la pestaña visible al recargar sea la misma en la que estaba.
+  React.useEffect(() => {
+    if (activeNavKey === 'ruta') {
+      setViewMode(rutaActiva && rutaActiva.estado === 'en_progreso' ? 'ruta-activa' : 'planificador-ruta');
+    } else if (activeNavKey === 'perfil') {
+      setViewMode('perfil');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   React.useEffect(() => {
     if (activeNavKey === 'puntos') {

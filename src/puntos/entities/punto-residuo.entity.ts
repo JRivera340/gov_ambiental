@@ -55,7 +55,6 @@ export type ResiduoEntry = {
   recogidoByUserId?: string;
   recogidoByNombre?: string;
   notas?: ResiduoNota[];
-  bitacora?: ResiduoBitacoraEntry[];
 };
 
 @Entity('puntos_residuo')
@@ -151,6 +150,11 @@ export class PuntoResiduo {
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
   residuos!: ResiduoEntry[];
+
+  // Bitácora de actores del punto: personas que depositan residuos ahí,
+  // a nivel del punto completo, no de un residuo particular.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  bitacora!: ResiduoBitacoraEntry[];
 
   // Respuestas de la encuesta dinámica "Puntos de Acumulación de Residuos"
   // (frecuenciaAcumulacion, tipoZona, tipoSuelo, camarasPunto,

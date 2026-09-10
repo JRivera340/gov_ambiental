@@ -1,23 +1,21 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { Activity, ResiduoEntry } from '../../../types';
+import type { Activity } from '../../../types';
 import { activityService } from '../../../services/activity.service';
 import { tipoResiduoLabels } from '../lib/constants';
 import { RESIDUO_TIPOS } from '../../../types/residuoTipos';
 
-interface BitacoraResiduoModalProps {
-  residuo: ResiduoEntry;
-  puntoId: string;
+interface BitacoraPuntoModalProps {
+  activity: Activity;
   canAdd: boolean;
   onClose: () => void;
   onUpdated: (updated: Activity) => void;
   setToast: (t: { message: string; type: 'success' | 'error' | 'info' }) => void;
 }
 
-export const BitacoraResiduoModal: React.FC<BitacoraResiduoModalProps> = ({
-  residuo,
-  puntoId,
+export const BitacoraPuntoModal: React.FC<BitacoraPuntoModalProps> = ({
+  activity,
   canAdd,
   onClose,
   onUpdated,
@@ -30,14 +28,14 @@ export const BitacoraResiduoModal: React.FC<BitacoraResiduoModalProps> = ({
   const [hora, setHora] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const bitacora = residuo.bitacora || [];
+  const bitacora = activity.bitacora || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !cedula.trim() || !direccion.trim() || !tipoResiduo || !hora) return;
     setSaving(true);
     try {
-      const updated = await activityService.agregarBitacoraResiduo(puntoId, residuo.id, {
+      const updated = await activityService.agregarBitacora(activity.id, {
         nombrePersona: nombre.trim(),
         cedula: cedula.trim(),
         direccion: direccion.trim(),
@@ -51,7 +49,6 @@ export const BitacoraResiduoModal: React.FC<BitacoraResiduoModalProps> = ({
       setDireccion('');
       setTipoResiduo('');
       setHora('');
-      onClose();
     } catch (err: any) {
       setToast({ message: err?.response?.data?.message || 'Error al agregar a la bitácora', type: 'error' });
     } finally {
@@ -67,7 +64,7 @@ export const BitacoraResiduoModal: React.FC<BitacoraResiduoModalProps> = ({
           <div>
             <h2 className="text-lg font-black text-neutral-900 tracking-tight">Bitácora de Actores</h2>
             <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mt-0.5">
-              {tipoResiduoLabels[residuo.tipoResiduo] || residuo.tipoResiduo}
+              Punto · {activity.barrio}
             </p>
           </div>
           <button
@@ -156,7 +153,7 @@ export const BitacoraResiduoModal: React.FC<BitacoraResiduoModalProps> = ({
                 onClick={onClose}
                 className="w-full sm:w-auto px-5 py-3 rounded-xl text-sm font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-all"
               >
-                Cancelar
+                Cerrar
               </button>
               <button
                 type="submit"

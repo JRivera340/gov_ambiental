@@ -160,7 +160,6 @@ export interface ResiduoEntry {
   aprobado?: boolean;
   aprobadoAt?: string;
   notas?: ResiduoNota[];
-  bitacora?: ResiduoBitacoraEntry[];
 }
 
 export interface AmbientalPuntosAcumulacionData {
@@ -275,6 +274,10 @@ export interface Activity {
   // Este backend guarda `residuos` como columna propia de nivel superior
   // (no anidada en `operativoData` como en el monolito).
   residuos?: ResiduoEntry[];
+
+  // Bitácora de actores del punto (personas que depositan residuos ahí).
+  // Nivel de punto, no de un residuo particular.
+  bitacora?: ResiduoBitacoraEntry[];
 
   // Respuestas de la encuesta dinámica a nivel de punto (frecuenciaAcumulacion,
   // tipoZona, camarasPunto, identificacionGenerador, etc), keyed por el

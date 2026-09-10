@@ -15,7 +15,7 @@ import { usePersistentState } from '../hooks/usePersistentState';
 import { useAuthStore } from '../../../store/authStore';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { NotasResiduoModal } from './NotasResiduoModal';
-import { BitacoraResiduoModal } from './BitacoraResiduoModal';
+import { BitacoraPuntoModal } from './BitacoraPuntoModal';
 import type { ResiduoEntry } from '../../../types';
 
 interface ActivityDetailViewProps {
@@ -53,7 +53,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
   const [recogidosDesde, setRecogidosDesde] = usePersistentState<string>('gad_recDesde', '');
   const [recogidosHasta, setRecogidosHasta] = usePersistentState<string>('gad_recHasta', '');
   const [selectedResiduoForNota, setSelectedResiduoForNota] = useState<ResiduoEntry | null>(null);
-  const [selectedResiduoForBitacora, setSelectedResiduoForBitacora] = useState<ResiduoEntry | null>(null);
+  const [showBitacora, setShowBitacora] = useState(false);
 
   const user = useAuthStore((s) => s.user);
   const canAddNota = user?.role === 'GESTOR_AMBIENTAL' || user?.role === 'ADMIN';
@@ -98,17 +98,28 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
             Volver al Mapa
           </button>
-          {onShowActividades && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={onShowActividades}
-              className="flex items-center gap-2 bg-green-600/90 hover:bg-green-700 text-white px-3 py-2 rounded-xl shadow-md border border-green-500/50 transition-colors"
+              onClick={() => setShowBitacora(true)}
+              className="relative flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl shadow-md border border-slate-600/50 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
               <span className="text-[11px] font-bold uppercase tracking-wider">
-                {actividadesCount !== undefined ? `${actividadesCount} Actividades` : 'Ver Actividades'}
+                Bitácora de actores{activity.bitacora?.length ? ` (${activity.bitacora.length})` : ''}
               </span>
             </button>
-          )}
+            {onShowActividades && (
+              <button
+                onClick={onShowActividades}
+                className="flex items-center gap-2 bg-green-600/90 hover:bg-green-700 text-white px-3 py-2 rounded-xl shadow-md border border-green-500/50 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                <span className="text-[11px] font-bold uppercase tracking-wider">
+                  {actividadesCount !== undefined ? `${actividadesCount} Actividades` : 'Ver Actividades'}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Activity Header */}
@@ -449,7 +460,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                     return filteredPendientes.map((r, index) => {
                       const isOverdue = r.dateTime ? differenceInDays(new Date(), new Date(r.dateTime)) >= 4 : false;
                       const hasNotas = (r.notas?.length ?? 0) > 0;
-                      const hasBitacora = (r.bitacora?.length ?? 0) > 0;
                       const displayNombre = r.createdByNombre || activity.createdByNombre;
                       const cardColor = isOverdue
                         ? 'bg-orange-50 border-orange-300 hover:bg-orange-100/50'
@@ -480,8 +490,8 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                               )}
                             </div>
                           </div>
-                          {(hasNotas || hasBitacora || canAddNota) && (
-                            <div className="px-4 pb-3 pt-0 flex items-center flex-wrap gap-2 border-t border-amber-200/50 mt-0 pt-2">
+                          {(hasNotas || canAddNota) && (
+                            <div className="px-4 pb-3 pt-0 flex items-center gap-2 border-t border-amber-200/50 mt-0 pt-2">
                               {hasNotas && (
                                 <button
                                   onClick={() => setSelectedResiduoForNota(r as ResiduoEntry)}
@@ -498,15 +508,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                                 >
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                   Agregar nota
-                                </button>
-                              )}
-                              {(hasBitacora || canAddNota) && (
-                                <button
-                                  onClick={() => setSelectedResiduoForBitacora(r as ResiduoEntry)}
-                                  className="text-[10px] font-black text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-lg uppercase tracking-wider hover:bg-slate-50 hover:text-slate-800 transition-all flex items-center gap-1"
-                                >
-                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-                                  Bitácora de actores{hasBitacora ? ` (${r.bitacora!.length})` : ''}
                                 </button>
                               )}
                             </div>
@@ -550,7 +551,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                       <div className="space-y-3">
                         {filteredRecogidos.map((r, index) => {
                           const hasNotasRec = (r.notas?.length ?? 0) > 0;
-                          const hasBitacoraRec = (r.bitacora?.length ?? 0) > 0;
                           return (
                           <div key={r.id} className="rounded-2xl border border-green-200 bg-green-50 transition-all group">
                             <div
@@ -572,8 +572,8 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                               {r.fechaRecogida && <p className="text-xs text-green-600 font-bold">Recogido el {format(new Date(r.fechaRecogida), 'dd MMM yyyy')}</p>}
                               {r.recogidoByNombre && <p className="text-[11px] text-green-700/70 font-bold uppercase break-words">Por: {r.recogidoByNombre}</p>}
                             </div>
-                            {(hasNotasRec || hasBitacoraRec || canAddNota) && (
-                              <div className="px-3 pb-2 pt-0 flex items-center flex-wrap gap-1.5 border-t border-green-200/50 pt-2">
+                            {(hasNotasRec || canAddNota) && (
+                              <div className="px-3 pb-2 pt-0 flex items-center gap-1.5 border-t border-green-200/50 pt-2">
                                 {hasNotasRec && (
                                   <button
                                     onClick={() => setSelectedResiduoForNota(r as ResiduoEntry)}
@@ -592,16 +592,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                     Nota
-                                  </button>
-                                )}
-                                {(hasBitacoraRec || canAddNota) && (
-                                  <button
-                                    onClick={() => setSelectedResiduoForBitacora(r as ResiduoEntry)}
-                                    title={hasBitacoraRec ? `Bitácora de actores (${r.bitacora!.length})` : 'Bitácora de actores'}
-                                    className="relative text-slate-600 bg-white border border-slate-200 p-1.5 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1"
-                                  >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-                                    {hasBitacoraRec && <span className="text-[10px] font-black">{r.bitacora!.length}</span>}
                                   </button>
                                 )}
                               </div>
@@ -640,14 +630,12 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
         />
       )}
 
-      {selectedResiduoForBitacora && (
-        <BitacoraResiduoModal
-          residuo={selectedResiduoForBitacora}
-          puntoId={activity.id}
+      {showBitacora && (
+        <BitacoraPuntoModal
+          activity={activity}
           canAdd={canAddNota}
-          onClose={() => setSelectedResiduoForBitacora(null)}
+          onClose={() => setShowBitacora(false)}
           onUpdated={(updated) => {
-            setSelectedResiduoForBitacora(null);
             if (onActivityUpdated) onActivityUpdated(updated);
           }}
           setToast={setToast || (() => {})}
