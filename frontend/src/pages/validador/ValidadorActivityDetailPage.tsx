@@ -13,6 +13,8 @@ import { Loading } from '../../components/Loading';
 import type { Activity, ResiduoEntry, User } from '../../types';
 import { RESIDUO_TIPOS } from '../../types/residuoTipos';
 import { notificarPuntoEliminado } from '../../lib/puntosChannel';
+import { NotasResiduoModal } from '../gestor-ambiental/components/NotasResiduoModal';
+import { BitacoraPuntoModal } from '../gestor-ambiental/components/BitacoraPuntoModal';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -78,6 +80,11 @@ export const ValidadorActivityDetailPage: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [expandedPhoto, setExpandedPhoto] = useState<string | null>(null);
+  const [selectedResiduoForNota, setSelectedResiduoForNota] = useState<ResiduoEntry | null>(null);
+  const [showBitacora, setShowBitacora] = useState(false);
+  // El backend solo deja agregar notas/bitácora a GESTOR_AMBIENTAL y ADMIN —
+  // el validador puede verlas pero no agregar.
+  const canAddNota = isAdmin;
 
   const load = async () => {
     if (!id) return;
@@ -141,6 +148,12 @@ export const ValidadorActivityDetailPage: React.FC = () => {
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  // Adaptador: NotasResiduoModal / BitacoraPuntoModal esperan
+  // {message, type: 'success'|'error'|'info'}, esta página usa {msg, type}.
+  const setToastForModal = (t: { message: string; type: 'success' | 'error' | 'info' }) => {
+    showToast(t.message, t.type === 'error' ? 'error' : 'success');
   };
 
   const handleApprove = async () => {
@@ -246,6 +259,13 @@ export const ValidadorActivityDetailPage: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={() => setShowBitacora(true)}
+              className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl transition-colors text-[11px] font-bold uppercase tracking-wide"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+              Bitácora de actores{activity.bitacora?.length ? ` (${activity.bitacora.length})` : ''}
+            </button>
             <StatusBadge status={activity.status} />
             {creator && <span className="font-bold text-neutral-500">Reportado por: {creator.name} {creator.lastname}</span>}
             {soloLectura && <span className="text-neutral-400 italic">(Solo lectura)</span>}
@@ -294,6 +314,26 @@ export const ValidadorActivityDetailPage: React.FC = () => {
                       {r.photos && r.photos.length > 0 && (
                         <div className="flex gap-2 overflow-x-auto">
                           {r.photos.map((p, pi) => <Foto key={pi} photoKey={p} onClick={setExpandedPhoto} />)}
+                        </div>
+                      )}
+                      {((r.notas?.length ?? 0) > 0 || canAddNota) && (
+                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-amber-200/50">
+                          {(r.notas?.length ?? 0) > 0 && (
+                            <button
+                              onClick={() => setSelectedResiduoForNota(r)}
+                              className="text-[10px] font-black text-amber-700 bg-white border border-amber-200 px-2.5 py-1 rounded-lg uppercase tracking-wider hover:bg-amber-100 transition-colors"
+                            >
+                              Ver notas ({r.notas!.length})
+                            </button>
+                          )}
+                          {canAddNota && (
+                            <button
+                              onClick={() => setSelectedResiduoForNota(r)}
+                              className="text-[10px] font-black text-neutral-500 bg-white border border-neutral-200 px-2.5 py-1 rounded-lg uppercase tracking-wider hover:bg-neutral-50 hover:text-neutral-700 transition-colors"
+                            >
+                              Agregar nota
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -349,6 +389,26 @@ export const ValidadorActivityDetailPage: React.FC = () => {
                       <div className="flex gap-2">{(r.photosRecogida || []).slice(0, 2).map((p, pi) => <Foto key={pi} photoKey={p} onClick={setExpandedPhoto} />)}</div>
                     </div>
                   </div>
+                  {((r.notas?.length ?? 0) > 0 || canAddNota) && (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-emerald-200/50">
+                      {(r.notas?.length ?? 0) > 0 && (
+                        <button
+                          onClick={() => setSelectedResiduoForNota(r)}
+                          className="text-[10px] font-black text-emerald-700 bg-white border border-emerald-200 px-2.5 py-1 rounded-lg uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+                        >
+                          Ver notas ({r.notas!.length})
+                        </button>
+                      )}
+                      {canAddNota && (
+                        <button
+                          onClick={() => setSelectedResiduoForNota(r)}
+                          className="text-[10px] font-black text-neutral-500 bg-white border border-neutral-200 px-2.5 py-1 rounded-lg uppercase tracking-wider hover:bg-neutral-50 hover:text-neutral-700 transition-colors"
+                        >
+                          Agregar nota
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -523,6 +583,30 @@ export const ValidadorActivityDetailPage: React.FC = () => {
         <div className="fixed inset-0 z-[2000] bg-black/95 flex items-center justify-center p-4" onClick={() => setExpandedPhoto(null)}>
           <img src={expandedPhoto} alt="Zoom" className="max-w-full max-h-full object-contain rounded-2xl" />
         </div>
+      )}
+
+      {selectedResiduoForNota && (
+        <NotasResiduoModal
+          residuo={selectedResiduoForNota}
+          puntoId={activity.id}
+          canAdd={canAddNota}
+          onClose={() => setSelectedResiduoForNota(null)}
+          onUpdated={(updated) => {
+            setSelectedResiduoForNota(null);
+            setActivity(updated);
+          }}
+          setToast={setToastForModal}
+        />
+      )}
+
+      {showBitacora && (
+        <BitacoraPuntoModal
+          activity={activity}
+          canAdd={canAddNota}
+          onClose={() => setShowBitacora(false)}
+          onUpdated={(updated) => setActivity(updated)}
+          setToast={setToastForModal}
+        />
       )}
     </div>
   );
