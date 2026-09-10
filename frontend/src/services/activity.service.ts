@@ -86,14 +86,23 @@ export const activityService = {
     return normalizeActivity(activity);
   },
 
-  async agregarNotaResiduo(puntoId: string, residuoId: string, texto: string): Promise<Activity> {
-    const { data } = await api.post<Activity>(`/puntos/${puntoId}/residuo-nota`, { residuoId, texto });
+  async agregarNotaResiduo(puntoId: string, residuoId: string, texto: string, photos: string[]): Promise<Activity> {
+    const { data } = await api.post<Activity>(`/puntos/${puntoId}/residuo-nota`, { residuoId, texto, photos });
     return normalizeActivity(data);
   },
 
   async eliminarNotaResiduo(puntoId: string, residuoId: string, notaId: string): Promise<Activity> {
     const { data } = await api.delete<Activity>(`/puntos/${puntoId}/residuo-nota`, { data: { residuoId, notaId } });
     return normalizeActivity(data);
+  },
+
+  async agregarBitacoraResiduo(
+    puntoId: string,
+    residuoId: string,
+    data: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
+  ): Promise<Activity> {
+    const { data: activity } = await api.post<Activity>(`/puntos/${puntoId}/residuo-bitacora`, { residuoId, ...data });
+    return normalizeActivity(activity);
   },
 
   /**

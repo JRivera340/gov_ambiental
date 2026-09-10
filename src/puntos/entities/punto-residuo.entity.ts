@@ -21,6 +21,19 @@ export type ResiduoNota = {
   autorId: string;
   autorNombre: string;
   texto: string;
+  photos: string[];
+};
+
+export type ResiduoBitacoraEntry = {
+  id: string;
+  fecha: string;
+  autorId: string;
+  autorNombre: string;
+  nombrePersona: string;
+  cedula: string;
+  direccion: string;
+  tipoResiduo: string;
+  hora: string;
 };
 
 export type ResiduoEntry = {
@@ -42,6 +55,7 @@ export type ResiduoEntry = {
   recogidoByUserId?: string;
   recogidoByNombre?: string;
   notas?: ResiduoNota[];
+  bitacora?: ResiduoBitacoraEntry[];
 };
 
 @Entity('puntos_residuo')

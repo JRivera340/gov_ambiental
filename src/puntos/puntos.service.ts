@@ -275,13 +275,23 @@ export class PuntosService {
     }
   }
 
-  async agregarNota(userId: string, email: string, id: string, body: { residuoId: string; texto: string }) {
+  async agregarNota(userId: string, email: string, id: string, body: { residuoId: string; texto: string; photos: string[] }) {
+    if (!body.photos || body.photos.length === 0) {
+      throw new BadRequestException('La nota debe tener al menos una foto');
+    }
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
     const residuo = punto.residuos.find((r) => r.id === body.residuoId);
     if (!residuo) throw new NotFoundException('Residuo no encontrado');
     const ahora = new Date();
-    const nota = { id: randomUUID(), fecha: ahora.toISOString(), autorId: userId, autorNombre: email, texto: body.texto };
+    const nota = {
+      id: randomUUID(),
+      fecha: ahora.toISOString(),
+      autorId: userId,
+      autorNombre: email,
+      texto: body.texto,
+      photos: body.photos,
+    };
     residuo.notas = [...(residuo.notas || []), nota];
     // Dejar una nota es seguimiento igual que marcar recogido o agregar un
     // residuo: antes no tocaba este campo, así que la nota contaba como visita
@@ -299,6 +309,35 @@ export class PuntosService {
     if (!residuo) throw new NotFoundException('Residuo no encontrado');
     residuo.notas = (residuo.notas || []).filter((n) => n.id !== body.notaId);
     return this.repo.save(punto);
+  }
+
+  async agregarBitacora(
+    userId: string,
+    email: string,
+    id: string,
+    body: { residuoId: string; nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
+  ) {
+    const punto = await this.repo.findById(id);
+    if (!punto) throw new NotFoundException('Punto no encontrado');
+    const residuo = punto.residuos.find((r) => r.id === body.residuoId);
+    if (!residuo) throw new NotFoundException('Residuo no encontrado');
+    const ahora = new Date();
+    const entrada = {
+      id: randomUUID(),
+      fecha: ahora.toISOString(),
+      autorId: userId,
+      autorNombre: email,
+      nombrePersona: body.nombrePersona,
+      cedula: body.cedula,
+      direccion: body.direccion,
+      tipoResiduo: body.tipoResiduo,
+      hora: body.hora,
+    };
+    residuo.bitacora = [...(residuo.bitacora || []), entrada];
+    punto.ultimoSeguimientoAt = ahora;
+    const guardado = await this.repo.save(punto);
+    await this.registrarVisitaSinRomper(id, userId, ahora);
+    return guardado;
   }
 
   async mergeResiduos(parentId: string, childIdsRaw: string[]) {

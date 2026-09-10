@@ -124,6 +124,19 @@ export interface ResiduoNota {
   autorId: string;
   autorNombre: string;
   texto: string;
+  photos: string[];
+}
+
+export interface ResiduoBitacoraEntry {
+  id: string;
+  fecha: string;
+  autorId: string;
+  autorNombre: string;
+  nombrePersona: string;
+  cedula: string;
+  direccion: string;
+  tipoResiduo: string;
+  hora: string;
 }
 
 export interface ResiduoEntry {
@@ -147,6 +160,7 @@ export interface ResiduoEntry {
   aprobado?: boolean;
   aprobadoAt?: string;
   notas?: ResiduoNota[];
+  bitacora?: ResiduoBitacoraEntry[];
 }
 
 export interface AmbientalPuntosAcumulacionData {

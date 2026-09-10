@@ -286,7 +286,7 @@ describe('PuntosService — proyeccion publica', () => {
         createdByNombre: 'user1@ejemplo.com',
         recogidoByUserId: 'staff-1',
         recogidoByNombre: 'staff@ejemplo.com',
-        notas: [{ id: 'n1', fecha: new Date().toISOString(), autorId: 'user-1', autorNombre: 'user1@ejemplo.com', texto: 'nota interna' }],
+        notas: [{ id: 'n1', fecha: new Date().toISOString(), autorId: 'user-1', autorNombre: 'user1@ejemplo.com', texto: 'nota interna', photos: ['nota1.jpg'] }],
       },
     ],
     ultimoSeguimientoAt: new Date(),

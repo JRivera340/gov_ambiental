@@ -111,7 +111,7 @@ export class PuntosController {
 
   @Post(':id/residuo-nota')
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
-  agregarNota(@Req() req: any, @Param('id') id: string, @Body() body: { residuoId: string; texto: string }) {
+  agregarNota(@Req() req: any, @Param('id') id: string, @Body() body: { residuoId: string; texto: string; photos: string[] }) {
     return this.puntosService.agregarNota(req.user.userId, req.user.email, id, body);
   }
 
@@ -119,6 +119,16 @@ export class PuntosController {
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
   eliminarNota(@Param('id') id: string, @Body() body: { residuoId: string; notaId: string }) {
     return this.puntosService.eliminarNota(id, body);
+  }
+
+  @Post(':id/residuo-bitacora')
+  @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
+  agregarBitacora(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { residuoId: string; nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
+  ) {
+    return this.puntosService.agregarBitacora(req.user.userId, req.user.email, id, body);
   }
 
   @Post('merge')
