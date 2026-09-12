@@ -26,6 +26,19 @@ export type ResumenDesempeno = {
   actualTotal: number;
 };
 
+export const DIAS_REQUERIDOS_POR_MITAD = 4;
+
+export type ProgresoFrecuencia = {
+  // Días distintos de visita en la mitad de quincena que está corriendo AHORA
+  // — lo que el gestor necesita ver para saber si le falta volver esta semana.
+  diasMitadActual: number;
+  // Días distintos en la otra mitad (la que ya pasó o la que viene).
+  diasMitadRestante: number;
+  requerido: number;
+  cumpleMitadActual: boolean;
+  cumpleMitadRestante: boolean;
+};
+
 @Injectable()
 export class VisitasService {
   constructor(
@@ -105,12 +118,14 @@ export class VisitasService {
     return [inicio, corte, fin];
   }
 
-  // Ids de puntos que el gestor visitó con la frecuencia mínima exigida: al
-  // menos 4 días DISTINTOS de visita en CADA mitad de la quincena (no solo un
-  // toque inicial y nunca más — ese era el bug: un punto con una sola visita
-  // en toda la quincena salía "visitado" al 100%). Reemplaza a
-  // getIdsVisitadosEnRango en todo cálculo de cumplimiento.
-  async getIdsCumplenFrecuenciaEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
+  // Días distintos de visita por punto, separados por mitad de quincena.
+  // Compartido por getIdsCumplenFrecuenciaEnRango (decide "cumplido") y
+  // getProgresoFrecuencia (progreso crudo para mostrarle al gestor).
+  private async contarDiasPorMitad(
+    gestorId: string,
+    desdeISO: string,
+    hastaISO: string,
+  ): Promise<{ porPunto: Map<string, [Set<string>, Set<string>]>; corte: Date }> {
     const [inicio, corte, fin] = this.mitadesDeQuincena(desdeISO, hastaISO);
     const filas = await this.repo
       .createQueryBuilder('v')
@@ -121,7 +136,6 @@ export class VisitasService {
       .distinct(true)
       .getRawMany<{ puntoResiduoId: string; dia: Date }>();
 
-    const MIN_DIAS_POR_MITAD = 4;
     // puntoId -> [días distintos mitad 1, días distintos mitad 2]
     const porPunto = new Map<string, [Set<string>, Set<string>]>();
     for (const fila of filas) {
@@ -130,12 +144,48 @@ export class VisitasService {
       if (!porPunto.has(fila.puntoResiduoId)) porPunto.set(fila.puntoResiduoId, [new Set(), new Set()]);
       porPunto.get(fila.puntoResiduoId)![idxMitad].add(dia.toISOString());
     }
+    return { porPunto, corte };
+  }
 
+  // Ids de puntos que el gestor visitó con la frecuencia mínima exigida: al
+  // menos 4 días DISTINTOS de visita en CADA mitad de la quincena (no solo un
+  // toque inicial y nunca más — ese era el bug: un punto con una sola visita
+  // en toda la quincena salía "visitado" al 100%). Reemplaza a
+  // getIdsVisitadosEnRango en todo cálculo de cumplimiento.
+  async getIdsCumplenFrecuenciaEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
+    const { porPunto } = await this.contarDiasPorMitad(gestorId, desdeISO, hastaISO);
     const resultado = new Set<string>();
     for (const [puntoId, [mitad1, mitad2]] of porPunto) {
-      if (mitad1.size >= MIN_DIAS_POR_MITAD && mitad2.size >= MIN_DIAS_POR_MITAD) {
+      if (mitad1.size >= DIAS_REQUERIDOS_POR_MITAD && mitad2.size >= DIAS_REQUERIDOS_POR_MITAD) {
         resultado.add(puntoId);
       }
+    }
+    return resultado;
+  }
+
+  // Progreso crudo de frecuencia por punto, para mostrarle al gestor cuánto le
+  // falta en la ruta — no solo "visitado sí/no" al final, sino "vas 2 de 4
+  // esta semana" mientras la quincena sigue corriendo.
+  async getProgresoFrecuencia(
+    gestorId: string,
+    desdeISO: string,
+    hastaISO: string,
+    ahora = new Date(),
+  ): Promise<Map<string, ProgresoFrecuencia>> {
+    const { porPunto, corte } = await this.contarDiasPorMitad(gestorId, desdeISO, hastaISO);
+    const mitadActualIdx = ahora.getTime() < corte.getTime() ? 0 : 1;
+
+    const resultado = new Map<string, ProgresoFrecuencia>();
+    for (const [puntoId, mitades] of porPunto) {
+      const diasMitadActual = mitades[mitadActualIdx].size;
+      const diasMitadRestante = mitades[mitadActualIdx === 0 ? 1 : 0].size;
+      resultado.set(puntoId, {
+        diasMitadActual,
+        diasMitadRestante,
+        requerido: DIAS_REQUERIDOS_POR_MITAD,
+        cumpleMitadActual: diasMitadActual >= DIAS_REQUERIDOS_POR_MITAD,
+        cumpleMitadRestante: diasMitadRestante >= DIAS_REQUERIDOS_POR_MITAD,
+      });
     }
     return resultado;
   }
@@ -148,9 +198,24 @@ export class VisitasService {
     const plan = await this.rutasSemanalesService.getPlanQuincena(gestorId, ahora);
     const q = plan.quincena;
     const visitados = await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO);
+    const progresoPorPunto = await this.getProgresoFrecuencia(gestorId, q.inicioISO, q.finISO, ahora);
+    const progresoVisitas: Record<string, ProgresoFrecuencia> = {};
+    for (const puntoId of q.planificados) {
+      progresoVisitas[puntoId] = progresoPorPunto.get(puntoId) ?? {
+        diasMitadActual: 0,
+        diasMitadRestante: 0,
+        requerido: DIAS_REQUERIDOS_POR_MITAD,
+        cumpleMitadActual: false,
+        cumpleMitadRestante: false,
+      };
+    }
     return {
       ...plan,
-      quincena: { ...q, visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)) },
+      quincena: {
+        ...q,
+        visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)),
+        progresoVisitas,
+      },
     };
   }
 

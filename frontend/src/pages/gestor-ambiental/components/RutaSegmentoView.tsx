@@ -152,6 +152,11 @@ export const RutaSegmentoView: React.FC = () => {
                   {parada.diasVencido >= 4 && !parada.visitado && (
                     <p className="text-[10px] text-red-600 font-medium ml-6">{parada.diasVencido}d vencido</p>
                   )}
+                  {!parada.visitado && parada.requeridoPorMitad !== undefined && (
+                    <p className="text-[10px] text-neutral-500 ml-6">
+                      Visitas esta semana: {parada.diasMitadActual ?? 0}/{parada.requeridoPorMitad}
+                    </p>
+                  )}
                   {parada.visitado && parada.fechaVisita && (
                     <p className="text-[10px] text-green-600 ml-6">
                       {format(new Date(parada.fechaVisita), 'HH:mm', { locale: es })}
@@ -232,6 +237,11 @@ export const RutaSegmentoView: React.FC = () => {
               )}
               {!paradaSeleccionada.visitado && paradaSeleccionada.diasVencido >= 4 && (
                 <p className="text-[11px] text-red-600 font-medium">{paradaSeleccionada.diasVencido} días vencido</p>
+              )}
+              {!paradaSeleccionada.visitado && paradaSeleccionada.requeridoPorMitad !== undefined && (
+                <p className="text-[11px] text-neutral-500">
+                  Visitas esta semana: {paradaSeleccionada.diasMitadActual ?? 0}/{paradaSeleccionada.requeridoPorMitad}
+                </p>
               )}
               {paradaSeleccionada.tiposResiduo.length > 0 && (
                 <p className="text-[10px] text-neutral-500">

@@ -107,6 +107,8 @@ export function useRutaAmbiental(
     [quincena],
   );
 
+  const progresoVisitas = quincena?.progresoVisitas;
+
   // ── Puntos candidatos para la ruta ─────────────────────────────
   const puntosParaRuta = useMemo((): ParadaRuta[] => {
     // Puntos que quedaron sin visitar en la quincena anterior. Salen del
@@ -162,9 +164,11 @@ export function useRutaAmbiental(
         visitado: visitadosIds.has(a.id),
         diasSinSeguimiento: diasDesdeUltimoToque(ultimoSeguimientoAt, ahora),
         pendienteAnterior: pendientesAnteriores.has(a.id),
+        diasMitadActual: progresoVisitas?.[a.id]?.diasMitadActual ?? 0,
+        requeridoPorMitad: progresoVisitas?.[a.id]?.requerido ?? 4,
       };
     });
-  }, [activities, user, puntosAsignados, visitadosIds, arrastreIds]);
+  }, [activities, user, puntosAsignados, visitadosIds, arrastreIds, progresoVisitas]);
 
   const puntosRef = useRef(puntosParaRuta);
   useEffect(() => {

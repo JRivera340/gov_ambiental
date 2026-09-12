@@ -219,6 +219,24 @@ describe('VisitasService', () => {
     expect(plan.quincena.planificados).toHaveLength(3);
   });
 
+  it('getPlanConVisitas expone el progreso de frecuencia por punto', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    // AHORA cae en la primera mitad de la quincena. 2 días distintos ahí no
+    // alcanzan los 4 requeridos.
+    const inicio = new Date(QUINCENA.inicioISO).getTime();
+    await service.registrarVisita('p2', 'g1', new Date(inicio));
+    await service.registrarVisita('p2', 'g1', new Date(inicio + DIA_MS));
+
+    const plan = await service.getPlanConVisitas('g1', AHORA);
+    const progreso = plan.quincena.progresoVisitas!;
+    expect(progreso['p2'].diasMitadActual).toBe(2);
+    expect(progreso['p2'].requerido).toBe(4);
+    expect(progreso['p2'].cumpleMitadActual).toBe(false);
+    // Punto sin ninguna visita: progreso en cero, no undefined.
+    expect(progreso['p3'].diasMitadActual).toBe(0);
+  });
+
   it('getResumenDesempeno filtra por gestorId cuando se pasa', async () => {
     const repo = makeRepo();
     const soloDosGestores = {

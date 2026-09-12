@@ -38,6 +38,17 @@ export interface QuincenaPlanDTO {
   planificados: string[];
   /** Puntos ya visitados. Solo viene de GET /visitas/plan. */
   visitados: string[];
+  /** Progreso de frecuencia por punto (días distintos esta mitad vs. la otra). Solo viene de GET /visitas/plan. */
+  progresoVisitas?: Record<string, ProgresoFrecuenciaDTO>;
+}
+
+/** Progreso crudo de frecuencia de un punto dentro de la quincena en curso. */
+export interface ProgresoFrecuenciaDTO {
+  diasMitadActual: number;
+  diasMitadRestante: number;
+  requerido: number;
+  cumpleMitadActual: boolean;
+  cumpleMitadRestante: boolean;
 }
 export interface PlanQuincenaDTO {
   gestorId: string;
