@@ -75,11 +75,11 @@ export class VisitasService {
     return Array.from(ids);
   }
 
-  // Ids de puntos que el gestor visitó dentro de un rango de fechas.
-  //
-  // Se consulta por rango y no por igualdad de semanaISO a propósito: la
-  // quincena abarca dos semanas ISO, así que filtrar por semanaISO perdería la
-  // mitad de las visitas. semanaISO queda como dato de auditoría.
+  // Ids de puntos que el gestor visitó al menos una vez dentro de un rango de
+  // fechas (presencia cruda, sin exigir frecuencia). Ya no se usa para decidir
+  // "cumplido" en ningún tablero — un solo toque no basta, ver
+  // getIdsCumplenFrecuenciaEnRango — pero sigue sirviendo para detectar
+  // visitas a puntos fuera del plan (getResumenDesempeno).
   async getIdsVisitadosEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
     const filas = await this.repo
       .createQueryBuilder('v')
@@ -90,6 +90,56 @@ export class VisitasService {
     return new Set(filas.map((f) => f.puntoResiduoId));
   }
 
+  // Corta el rango de la quincena en dos mitades de calendario: la primera de
+  // 7 días, la segunda con el resto (6 a 9 días según el mes). No es semana
+  // ISO — la quincena ya es un bloque de calendario propio (ver
+  // ciclo-quincenal.util.ts), partirla así evita el bug que ya se dio acá una
+  // vez con el universo de puntos por semana (ver comentario en
+  // getResumenDesempeno): esto NO toca el universo de puntos, solo cuenta
+  // días de visita dentro de un punto que ya está en el plan.
+  private mitadesDeQuincena(desdeISO: string, hastaISO: string): [Date, Date, Date] {
+    const DIA_MS = 24 * 60 * 60 * 1000;
+    const inicio = new Date(desdeISO);
+    const fin = new Date(hastaISO);
+    const corte = new Date(inicio.getTime() + 7 * DIA_MS);
+    return [inicio, corte, fin];
+  }
+
+  // Ids de puntos que el gestor visitó con la frecuencia mínima exigida: al
+  // menos 4 días DISTINTOS de visita en CADA mitad de la quincena (no solo un
+  // toque inicial y nunca más — ese era el bug: un punto con una sola visita
+  // en toda la quincena salía "visitado" al 100%). Reemplaza a
+  // getIdsVisitadosEnRango en todo cálculo de cumplimiento.
+  async getIdsCumplenFrecuenciaEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
+    const [inicio, corte, fin] = this.mitadesDeQuincena(desdeISO, hastaISO);
+    const filas = await this.repo
+      .createQueryBuilder('v')
+      .select('v."puntoResiduoId"', 'puntoResiduoId')
+      .addSelect(`date_trunc('day', v.fecha)`, 'dia')
+      .where('v."gestorId" = :gestorId', { gestorId })
+      .andWhere('v.fecha BETWEEN :desde AND :hasta', { desde: inicio, hasta: fin })
+      .distinct(true)
+      .getRawMany<{ puntoResiduoId: string; dia: Date }>();
+
+    const MIN_DIAS_POR_MITAD = 4;
+    // puntoId -> [días distintos mitad 1, días distintos mitad 2]
+    const porPunto = new Map<string, [Set<string>, Set<string>]>();
+    for (const fila of filas) {
+      const dia = new Date(fila.dia);
+      const idxMitad = dia.getTime() < corte.getTime() ? 0 : 1;
+      if (!porPunto.has(fila.puntoResiduoId)) porPunto.set(fila.puntoResiduoId, [new Set(), new Set()]);
+      porPunto.get(fila.puntoResiduoId)![idxMitad].add(dia.toISOString());
+    }
+
+    const resultado = new Set<string>();
+    for (const [puntoId, [mitad1, mitad2]] of porPunto) {
+      if (mitad1.size >= MIN_DIAS_POR_MITAD && mitad2.size >= MIN_DIAS_POR_MITAD) {
+        resultado.add(puntoId);
+      }
+    }
+    return resultado;
+  }
+
   // Plan de la quincena con los puntos que el gestor ya visitó. Es lo que
   // consume la ruta y el perfil del gestor: una sola fuente de verdad sobre qué
   // está visitado, en vez de que cada pantalla lo dedujera por su cuenta (había
@@ -97,7 +147,7 @@ export class VisitasService {
   async getPlanConVisitas(gestorId: string, ahora = new Date()) {
     const plan = await this.rutasSemanalesService.getPlanQuincena(gestorId, ahora);
     const q = plan.quincena;
-    const visitados = await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+    const visitados = await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO);
     return {
       ...plan,
       quincena: { ...q, visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)) },
@@ -120,7 +170,7 @@ export class VisitasService {
 
     return Promise.all(
       quincenas.map(async (q) => {
-        const visitadosIds = await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+        const visitadosIds = await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO);
         const paradas = q.paradas.map((p) => ({ ...p, visitado: visitadosIds.has(p.puntoId) }));
         // Sin visitar primero: es lo que el supervisor necesita ver.
         paradas.sort((a, b) => {
@@ -153,14 +203,17 @@ export class VisitasService {
     for (const id of gestorIds) {
       const plan = await this.rutasSemanalesService.getPlanQuincena(id, ahora);
       const q = plan.quincena;
-      const visitadosIds = await this.getIdsVisitadosEnRango(id, q.inicioISO, q.finISO);
-      const visitados = q.planificados.filter((puntoId) => visitadosIds.has(puntoId)).length;
+      const cumpleFrecuenciaIds = await this.getIdsCumplenFrecuenciaEnRango(id, q.inicioISO, q.finISO);
+      const visitados = q.planificados.filter((puntoId) => cumpleFrecuenciaIds.has(puntoId)).length;
 
       // Visitas a puntos que ya no están en el plan (reasignados o sin
       // asignación): se muestran aparte para que ningún trabajo real quede
-      // invisible, pero no inflan el porcentaje.
+      // invisible, pero no inflan el porcentaje. Acá sí basta presencia cruda
+      // (no frecuencia) — es solo para no perder de vista trabajo hecho fuera
+      // del plan, no mide cumplimiento.
+      const visitadosIdsCrudo = await this.getIdsVisitadosEnRango(id, q.inicioISO, q.finISO);
       const enPlan = new Set(q.planificados);
-      const visitasFueraDePlan = [...visitadosIds].filter((puntoId) => !enPlan.has(puntoId)).length;
+      const visitasFueraDePlan = [...visitadosIdsCrudo].filter((puntoId) => !enPlan.has(puntoId)).length;
 
       gestores.push({
         gestorId: id,

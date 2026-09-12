@@ -3,9 +3,23 @@ import { limitesQuincena } from '../rutas-semanales/lib/ciclo-quincenal.util';
 
 const AHORA = new Date('2026-08-21T15:00:00.000Z');
 const QUINCENA = limitesQuincena(AHORA);
+const DIA_MS = 24 * 60 * 60 * 1000;
 
-// El repo real resuelve getIdsVisitadosEnRango con un query builder; acá se
-// simula filtrando el store en memoria por gestor y rango de fechas.
+// Registra 4 días distintos de visita en cada mitad de la quincena que
+// arranca en inicioISO — es lo mínimo para que un punto cuente como
+// "cumple frecuencia" con la regla nueva (4 días distintos por semana, en
+// las dos mitades de la quincena).
+async function visitarCumpliendoFrecuencia(service: VisitasService, puntoId: string, gestorId: string, inicioISO: string) {
+  const inicio = new Date(inicioISO).getTime();
+  for (let i = 0; i < 4; i++) await service.registrarVisita(puntoId, gestorId, new Date(inicio + i * DIA_MS));
+  for (let i = 8; i < 12; i++) await service.registrarVisita(puntoId, gestorId, new Date(inicio + i * DIA_MS));
+}
+
+// El repo real resuelve getIdsVisitadosEnRango/getIdsCumplenFrecuenciaEnRango
+// con un query builder; acá se simula filtrando el store en memoria por
+// gestor y rango de fechas, devolviendo una fila por visita con su día
+// truncado (ambos métodos leen puntoResiduoId; el de frecuencia además lee
+// "dia" para contar días distintos por mitad de quincena).
 const makeRepo = () => {
   const store: any[] = [];
   return {
@@ -25,21 +39,24 @@ const makeRepo = () => {
       const filtros: any = {};
       const qb: any = {
         select: () => qb,
+        addSelect: () => qb,
         where: (_: string, params: any) => { Object.assign(filtros, params); return qb; },
         andWhere: (_: string, params: any) => { Object.assign(filtros, params); return qb; },
+        distinct: () => qb,
         getRawMany: async () => {
           const desde = new Date(filtros.desde).getTime();
           const hasta = new Date(filtros.hasta).getTime();
-          const ids = new Set(
-            store
-              .filter((v) => v.gestorId === filtros.gestorId)
-              .filter((v) => {
-                const t = new Date(v.fecha).getTime();
-                return t >= desde && t <= hasta;
-              })
-              .map((v) => v.puntoResiduoId),
-          );
-          return [...ids].map((puntoResiduoId) => ({ puntoResiduoId }));
+          return store
+            .filter((v) => v.gestorId === filtros.gestorId)
+            .filter((v) => {
+              const t = new Date(v.fecha).getTime();
+              return t >= desde && t <= hasta;
+            })
+            .map((v) => {
+              const d = new Date(v.fecha);
+              const dia = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+              return { puntoResiduoId: v.puntoResiduoId, dia };
+            });
         },
       };
       return qb;
@@ -106,10 +123,22 @@ describe('VisitasService', () => {
     expect(visita.semanaISO).toMatch(/^\d{4}-W\d{2}$/);
   });
 
-  it('cuenta las visitas contra el total de puntos de la quincena', async () => {
+  // El bug reportado: un punto con una sola visita en toda la quincena
+  // (el gestor toma evidencia una vez y no vuelve) no puede salir "cumplido".
+  it('una sola visita en la quincena no cumple la frecuencia mínima', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     await service.registrarVisita('p1', 'g1', AHORA);
+
+    const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
+    expect(gestor.visitados).toBe(0);
+    expect(gestor.pct).toBe(0);
+  });
+
+  it('cumple la frecuencia con 4 días distintos de visita en cada mitad de la quincena', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    await visitarCumpliendoFrecuencia(service, 'p1', 'g1', QUINCENA.inicioISO);
 
     const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
     expect(gestor.planificados).toBe(3);
@@ -117,20 +146,27 @@ describe('VisitasService', () => {
     expect(gestor.pct).toBe(33);
   });
 
-  // El bug que motivó el rediseño: con el ciclo de dos semanas, el gestor
-  // recorría puntos de la mitad que no le tocaba y ese avance no sumaba en
-  // ninguna parte (aparecía 0%). Con la quincena única todo punto asignado
-  // cuenta, se visite el día que se visite.
-  it('cuenta las visitas de las dos semanas de la quincena por igual', async () => {
+  it('4 visitas el mismo día cuentan como un solo día, no alcanzan la frecuencia', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    // Una en la primera semana y otra en la segunda.
-    await service.registrarVisita('p2', 'g1', new Date(QUINCENA.inicioISO));
-    await service.registrarVisita('p3', 'g1', new Date(new Date(QUINCENA.inicioISO).getTime() + 9 * 86400000));
+    const inicio = new Date(QUINCENA.inicioISO).getTime();
+    // 4 visitas el mismo día en la primera mitad...
+    for (let i = 0; i < 4; i++) await service.registrarVisita('p1', 'g1', new Date(inicio));
+    // ...y 4 días distintos en la segunda mitad (esa sí cumple sola).
+    for (let i = 8; i < 12; i++) await service.registrarVisita('p1', 'g1', new Date(inicio + i * DIA_MS));
 
     const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
-    expect(gestor.visitados).toBe(2);
-    expect(gestor.visitasFueraDePlan).toBe(0);
+    expect(gestor.visitados).toBe(0);
+  });
+
+  it('4 días distintos en una sola mitad de la quincena no alcanzan: deben cumplirse las dos', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    const inicio = new Date(QUINCENA.inicioISO).getTime();
+    for (let i = 0; i < 4; i++) await service.registrarVisita('p1', 'g1', new Date(inicio + i * DIA_MS));
+
+    const gestor = (await service.getResumenDesempeno('g1', AHORA)).gestores[0];
+    expect(gestor.visitados).toBe(0);
   });
 
   it('no cuenta visitas de una quincena anterior', async () => {
@@ -139,15 +175,6 @@ describe('VisitasService', () => {
     await service.registrarVisita('p1', 'g1', new Date(new Date(QUINCENA.inicioISO).getTime() - 86400000));
 
     expect((await service.getResumenDesempeno('g1', AHORA)).gestores[0].visitados).toBe(0);
-  });
-
-  it('varias visitas al mismo punto cuentan una sola vez', async () => {
-    const repo = makeRepo();
-    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    await service.registrarVisita('p2', 'g1', AHORA);
-    await service.registrarVisita('p2', 'g1', AHORA);
-
-    expect((await service.getResumenDesempeno('g1', AHORA)).gestores[0].visitados).toBe(1);
   });
 
   it('las visitas a puntos fuera del plan se reportan aparte y no inflan el pct', async () => {
@@ -164,8 +191,8 @@ describe('VisitasService', () => {
   it('los totales suman a todos los gestores', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    await service.registrarVisita('p1', 'g1', AHORA);
-    await service.registrarVisita('p3', 'g1', AHORA);
+    await visitarCumpliendoFrecuencia(service, 'p1', 'g1', QUINCENA.inicioISO);
+    await visitarCumpliendoFrecuencia(service, 'p3', 'g1', QUINCENA.inicioISO);
 
     const resumen = await service.getResumenDesempeno('g1', AHORA);
     expect(resumen.targetTotal).toBe(3);
@@ -182,10 +209,10 @@ describe('VisitasService', () => {
     expect(resumen.etiqueta).not.toMatch(/W\d/);
   });
 
-  it('getPlanConVisitas marca los puntos ya visitados de la quincena', async () => {
+  it('getPlanConVisitas marca los puntos que cumplen la frecuencia en la quincena', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    await service.registrarVisita('p2', 'g1', AHORA);
+    await visitarCumpliendoFrecuencia(service, 'p2', 'g1', QUINCENA.inicioISO);
 
     const plan = await service.getPlanConVisitas('g1', AHORA);
     expect(plan.quincena.visitados).toEqual(['p2']);
@@ -234,12 +261,12 @@ describe('VisitasService', () => {
 
   // El historial se mide contra los puntos asignados y las visitas reales del
   // rango, no contra el flag congelado de la ruta.
-  it('getHistorialConVisitas marca los puntos visitados dentro del rango', async () => {
+  it('getHistorialConVisitas marca cumplida la frecuencia dentro del rango', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     // Dentro de la quincena del 16 al 31 de julio.
-    await service.registrarVisita('p1', 'g1', new Date('2026-07-22T15:00:00.000Z'));
-    await service.registrarVisita('p3', 'g1', new Date('2026-07-30T15:00:00.000Z'));
+    await visitarCumpliendoFrecuencia(service, 'p1', 'g1', quincenaHistorial.inicioISO);
+    await visitarCumpliendoFrecuencia(service, 'p3', 'g1', quincenaHistorial.inicioISO);
 
     const [q] = await service.getHistorialConVisitas('g1', 20, AHORA);
     expect(q.planificados).toBe(3);
@@ -261,7 +288,7 @@ describe('VisitasService', () => {
   it('getHistorialConVisitas pone los no visitados primero', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    await service.registrarVisita('p1', 'g1', new Date('2026-07-22T15:00:00.000Z'));
+    await visitarCumpliendoFrecuencia(service, 'p1', 'g1', quincenaHistorial.inicioISO);
 
     const [q] = await service.getHistorialConVisitas('g1', 20, AHORA);
     expect(q.paradas[0].visitado).toBe(false);

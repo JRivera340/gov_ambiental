@@ -109,7 +109,7 @@ export const DesempenoGestoresPanel: React.FC<Props> = ({ onVerPunto }) => {
         <div>
           <h2 className="font-display text-[14px] font-extrabold text-neutral-900 tracking-tight">Desempeño de gestores</h2>
           <p className="text-[11px] text-neutral-500 mt-0.5">
-            {quincena ? `${quincena.etiqueta}. ` : ''}Porcentaje de los puntos asignados que ya se visitaron.
+            {quincena ? `${quincena.etiqueta}. ` : ''}Porcentaje de los puntos asignados que cumplen la frecuencia mínima de visita (4 días distintos por semana).
             {enRiesgo > 0 && (
               <span className="ml-1 font-semibold text-primary-600">
                 {enRiesgo} {enRiesgo === 1 ? 'gestor va' : 'gestores van'} por debajo del 50%.
