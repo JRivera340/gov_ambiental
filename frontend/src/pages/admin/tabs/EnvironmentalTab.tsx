@@ -146,6 +146,26 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
 }) => {
   const [panelDerecho, setPanelDerecho] = useState<PanelDerecho>('tipos');
   const [listaAbierta, setListaAbierta] = useState(false);
+  const [descargandoXlsx, setDescargandoXlsx] = useState(false);
+
+  const handleDescargarXlsx = async () => {
+    setDescargandoXlsx(true);
+    try {
+      const blob = await activityService.descargarReporteXlsx();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pendientes-recogida.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.alert('No se pudo generar el informe. Intenta de nuevo.');
+    } finally {
+      setDescargandoXlsx(false);
+    }
+  };
 
   // ── Fusión de puntos ──────────────────────────────────────
   // Un punto padre absorbe los residuos de los hijos; los hijos se eliminan.
@@ -316,6 +336,14 @@ export const EnvironmentalTab: React.FC<EnvironmentalTabProps> = ({
               >
                 <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 5.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.814-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
                 En emergencia
+              </button>
+              <button
+                onClick={handleDescargarXlsx}
+                disabled={descargandoXlsx}
+                className="text-[11px] px-2.5 py-1.5 rounded-lg border font-bold flex items-center gap-1.5 bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                {descargandoXlsx ? 'Generando…' : 'Descargar informe Excel'}
               </button>
               <button
                 onClick={() => (modoFusion ? salirDeFusion() : setModoFusion(true))}
