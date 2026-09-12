@@ -30,7 +30,7 @@ describe('UsersProxyController', () => {
     expect(result).toEqual([{ id: 'g1', name: 'Ana' }]);
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/users/gestores/list'),
-      { headers: { Authorization: 'Bearer token-123' } },
+      { method: 'GET', headers: { Authorization: 'Bearer token-123' } },
     );
   });
 
@@ -75,7 +75,26 @@ describe('UsersProxyController', () => {
     expect(result).toEqual({ id: 'u1', name: 'Ana' });
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/users/u1'),
-      { headers: { Authorization: 'Bearer token-123' } },
+      { method: 'GET', headers: { Authorization: 'Bearer token-123' } },
+    );
+  });
+
+  it('deleteUser reenvia un DELETE al hub con el id en la ruta', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true }),
+    });
+    global.fetch = mockFetch as any;
+
+    const controller = new UsersProxyController();
+    const req = { headers: { authorization: 'Bearer token-123' } };
+    const result = await controller.deleteUser('u1', req as any);
+
+    expect(result).toEqual({ success: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/users/u1'),
+      { method: 'DELETE', headers: { Authorization: 'Bearer token-123' } },
     );
   });
 });

@@ -1,5 +1,8 @@
-import { Controller, Get, Param, Req, UseGuards, HttpException } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Req, UseGuards, HttpException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
 import { getEnv } from '../config/env';
 
 // Ambiental no tiene tabla de usuarios propia — la identidad viene del hub
@@ -11,10 +14,11 @@ import { getEnv } from '../config/env';
 // importa qué servicio hizo la llamada).
 @Controller('users')
 export class UsersProxyController {
-  private async proxyToHub(path: string, authHeader?: string) {
+  private async proxyToHub(path: string, authHeader?: string, method: string = 'GET') {
     const env = getEnv();
     try {
       const res = await fetch(`${env.HUB_API_URL}/api/users/${path}`, {
+        method,
         headers: authHeader ? { Authorization: authHeader } : {},
       });
       const body = await res.json().catch(() => null);
@@ -40,5 +44,15 @@ export class UsersProxyController {
   @Get(':id')
   async getUserById(@Param('id') id: string, @Req() req: any) {
     return this.proxyToHub(id, req.headers['authorization']);
+  }
+
+  // Borrar una cuenta de gestor inactiva (sin puntos asignados, cuentas de
+  // prueba, etc). Solo ADMIN — el hub también exige ADMIN del lado suyo,
+  // esto es una segunda capa antes de siquiera llamarlo.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Delete(':id')
+  async deleteUser(@Param('id') id: string, @Req() req: any) {
+    return this.proxyToHub(id, req.headers['authorization'], 'DELETE');
   }
 }
