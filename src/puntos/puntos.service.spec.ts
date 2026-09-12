@@ -350,3 +350,66 @@ describe('PuntosService — proyeccion publica', () => {
     await expect(service.findOnePublic('no-existe')).rejects.toThrow();
   });
 });
+
+describe('PuntosService — bitacora de actores', () => {
+  const makeService = () => {
+    const repo = new InMemoryPuntosRepository();
+    return { service: new PuntosService(repo, asignacionesStub as any, procesosStub as any, visitasStub as any, barriosStub as any), repo };
+  };
+
+  const bodyBase = {
+    tipoActor: 'PERSONA' as const,
+    nombre: 'Juan Perez',
+    cedulaNit: '123',
+    fecha: '2026-09-12T10:00:00.000Z',
+    tipoResiduo: 'RESIDUOS_ORDINARIOS',
+    actividadObservada: 'DISPOSICION',
+    cantidadAproximada: 'UNA_A_CINCO_BOLSAS',
+    descripcion: 'Deposito residuos en el punto',
+    evidenciaTipos: ['OBSERVACION_DIRECTA'],
+    numeroEvidencias: 1,
+    estado: 'IDENTIFICADO' as const,
+  };
+
+  it('crea un actor nuevo con su primer evento', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    const actualizado = await service.agregarBitacora('user-1', 'gestor@ejemplo.com', punto.id, bodyBase as any);
+    expect(actualizado.bitacoraActores).toHaveLength(1);
+    expect(actualizado.bitacoraActores[0].nombre).toBe('Juan Perez');
+    expect(actualizado.bitacoraActores[0].eventos).toHaveLength(1);
+  });
+
+  it('agrega un segundo evento al mismo actor si coincide la cedula', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await service.agregarBitacora('user-1', 'gestor@ejemplo.com', punto.id, bodyBase as any);
+    const actualizado = await service.agregarBitacora('user-1', 'gestor@ejemplo.com', punto.id, {
+      ...bodyBase,
+      estado: 'REINCIDENTE',
+    } as any);
+    expect(actualizado.bitacoraActores).toHaveLength(1);
+    expect(actualizado.bitacoraActores[0].eventos).toHaveLength(2);
+    expect(actualizado.bitacoraActores[0].estado).toBe('REINCIDENTE');
+  });
+
+  it('rechaza si no se selecciono ningun tipo de evidencia', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await expect(
+      service.agregarBitacora('user-1', 'gestor@ejemplo.com', punto.id, { ...bodyBase, evidenciaTipos: [] } as any),
+    ).rejects.toThrow();
+  });
+
+  it('rechaza fotografias sin archivos subidos', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await expect(
+      service.agregarBitacora('user-1', 'gestor@ejemplo.com', punto.id, {
+        ...bodyBase,
+        evidenciaTipos: ['FOTOGRAFIAS'],
+        evidenciaArchivos: [],
+      } as any),
+    ).rejects.toThrow();
+  });
+});

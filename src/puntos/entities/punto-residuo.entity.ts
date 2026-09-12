@@ -24,6 +24,9 @@ export type ResiduoNota = {
   photos: string[];
 };
 
+// Deprecado: reemplazado por PuntoActor/ActorEvento (bitacoraActores). No se
+// vuelve a escribir, se deja el tipo para no romper filas viejas en la
+// columna `bitacora` (ver migración 1788200000000-AddBitacoraActoresToPuntoResiduo.ts).
 export type ResiduoBitacoraEntry = {
   id: string;
   fecha: string;
@@ -34,6 +37,34 @@ export type ResiduoBitacoraEntry = {
   direccion: string;
   tipoResiduo: string;
   hora: string;
+};
+
+export type ActorTipo = 'PERSONA' | 'ESTABLECIMIENTO' | 'EMPRESA' | 'VEHICULO' | 'OTRO';
+export type EstadoActor = 'IDENTIFICADO' | 'EN_SEGUIMIENTO' | 'REINCIDENTE' | 'INTERVENIDO' | 'CASO_CERRADO';
+
+export type ActorEvento = {
+  id: string;
+  fecha: string; // ISO datetime completo del evento, no solo la hora
+  tipoResiduo: string;
+  actividadObservada: string;
+  cantidadAproximada: string;
+  descripcion: string;
+  evidenciaTipos: string[];
+  evidenciaArchivos: string[];
+  numeroEvidencias: number;
+  autorId: string;
+  autorNombre: string;
+};
+
+export type PuntoActor = {
+  id: string;
+  tipoActor: ActorTipo;
+  nombre: string;
+  cedulaNit: string;
+  placa?: string;
+  direccion?: string;
+  estado: EstadoActor;
+  eventos: ActorEvento[];
 };
 
 export type ResiduoEntry = {
@@ -151,10 +182,17 @@ export class PuntoResiduo {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   residuos!: ResiduoEntry[];
 
-  // Bitácora de actores del punto: personas que depositan residuos ahí,
-  // a nivel del punto completo, no de un residuo particular.
+  // Deprecado, ya no se escribe — ver bitacoraActores. Se deja la columna
+  // para no perder el historial legacy (migrado a bitacoraActores en
+  // 1788200000000-AddBitacoraActoresToPuntoResiduo.ts).
   @Column({ type: 'jsonb', default: () => "'[]'" })
   bitacora!: ResiduoBitacoraEntry[];
+
+  // Bitácora de actores del punto: personas/empresas/vehículos que depositan
+  // residuos ahí, agrupados (mismo actor puede tener varios eventos), a
+  // nivel del punto completo, no de un residuo particular.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  bitacoraActores!: PuntoActor[];
 
   // Respuestas de la encuesta dinámica "Puntos de Acumulación de Residuos"
   // (frecuenciaAcumulacion, tipoZona, tipoSuelo, camarasPunto,

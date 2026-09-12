@@ -2,10 +2,11 @@ import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PuntosRepository } from './puntos.repository';
 import { PUNTOS_REPOSITORY } from './puntos.tokens';
-import { EstadoPunto, PuntoResiduo, ResiduoEntry } from './entities/punto-residuo.entity';
+import { ActorEvento, EstadoPunto, PuntoActor, PuntoResiduo, ResiduoEntry } from './entities/punto-residuo.entity';
 import { CreatePuntoDto } from './dto/create-punto.dto';
 import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
+import { BitacoraActorDto } from './dto/bitacora-actor.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
 import { VisitasService } from '../visitas/visitas.service';
@@ -311,27 +312,58 @@ export class PuntosService {
     return this.repo.save(punto);
   }
 
-  async agregarBitacora(
-    userId: string,
-    email: string,
-    id: string,
-    body: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
-  ) {
+  async agregarBitacora(userId: string, email: string, id: string, body: BitacoraActorDto) {
+    if (!body.evidenciaTipos || body.evidenciaTipos.length === 0) {
+      throw new BadRequestException('Debe seleccionar al menos un tipo de evidencia');
+    }
+    const requiereArchivo = body.evidenciaTipos.some((t) => t !== 'OBSERVACION_DIRECTA');
+    if (requiereArchivo && (!body.evidenciaArchivos || body.evidenciaArchivos.length === 0)) {
+      throw new BadRequestException('Debe subir al menos un archivo de evidencia');
+    }
+
     const punto = await this.repo.findById(id);
     if (!punto) throw new NotFoundException('Punto no encontrado');
     const ahora = new Date();
-    const entrada = {
+
+    const claveNueva = (body.cedulaNit?.trim() || body.nombre?.trim() || '').toLowerCase();
+    const actores: PuntoActor[] = [...(punto.bitacoraActores || [])];
+    let actor = actores.find((a) => (a.cedulaNit?.trim() || a.nombre?.trim() || '').toLowerCase() === claveNueva);
+
+    const nuevoEvento: ActorEvento = {
       id: randomUUID(),
-      fecha: ahora.toISOString(),
+      fecha: body.fecha,
+      tipoResiduo: body.tipoResiduo,
+      actividadObservada: body.actividadObservada,
+      cantidadAproximada: body.cantidadAproximada,
+      descripcion: body.descripcion,
+      evidenciaTipos: body.evidenciaTipos,
+      evidenciaArchivos: body.evidenciaArchivos || [],
+      numeroEvidencias: body.numeroEvidencias,
       autorId: userId,
       autorNombre: email,
-      nombrePersona: body.nombrePersona,
-      cedula: body.cedula,
-      direccion: body.direccion,
-      tipoResiduo: body.tipoResiduo,
-      hora: body.hora,
     };
-    punto.bitacora = [...(punto.bitacora || []), entrada];
+
+    if (actor) {
+      actor.tipoActor = body.tipoActor;
+      actor.placa = body.placa;
+      actor.direccion = body.direccion;
+      actor.estado = body.estado;
+      actor.eventos = [...actor.eventos, nuevoEvento];
+    } else {
+      actor = {
+        id: randomUUID(),
+        tipoActor: body.tipoActor,
+        nombre: body.nombre,
+        cedulaNit: body.cedulaNit,
+        placa: body.placa,
+        direccion: body.direccion,
+        estado: body.estado,
+        eventos: [nuevoEvento],
+      };
+      actores.push(actor);
+    }
+
+    punto.bitacoraActores = actores;
     punto.ultimoSeguimientoAt = ahora;
     const guardado = await this.repo.save(punto);
     await this.registrarVisitaSinRomper(id, userId, ahora);

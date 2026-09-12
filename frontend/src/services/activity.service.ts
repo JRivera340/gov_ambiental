@@ -1,5 +1,5 @@
 import api from './api';
-import type { Activity, CreateActivityDTO } from '../types';
+import type { Activity, ActorTipo, CreateActivityDTO, EstadoActor } from '../types';
 
 // Recortado del monolito: acá solo quedan los métodos que usa el módulo
 // Ambiental (registro de punto, seguimiento, aprobación, residuos). Todo
@@ -96,12 +96,31 @@ export const activityService = {
     return normalizeActivity(data);
   },
 
-  async agregarBitacora(
-    puntoId: string,
-    data: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
-  ): Promise<Activity> {
+  async agregarBitacora(puntoId: string, data: {
+    tipoActor: ActorTipo;
+    nombre: string;
+    cedulaNit: string;
+    placa?: string;
+    direccion?: string;
+    fecha: string;
+    tipoResiduo: string;
+    actividadObservada: string;
+    cantidadAproximada: string;
+    descripcion: string;
+    evidenciaTipos: string[];
+    evidenciaArchivos?: string[];
+    numeroEvidencias: number;
+    estado: EstadoActor;
+  }): Promise<Activity> {
     const { data: activity } = await api.post<Activity>(`/puntos/${puntoId}/bitacora`, data);
     return normalizeActivity(activity);
+  },
+
+  // Informe Excel de puntos pendientes de recogida (marca en rojo los que
+  // llevan más días de la cuenta sin recoger, ver src/puntos/lib/emergencia.util.ts).
+  async descargarReporteXlsx(): Promise<Blob> {
+    const { data } = await api.get('/puntos/report-xlsx', { responseType: 'blob' });
+    return data;
   },
 
   /**

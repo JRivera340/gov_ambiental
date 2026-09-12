@@ -127,6 +127,7 @@ export interface ResiduoNota {
   photos: string[];
 }
 
+/** @deprecated reemplazado por PuntoActor/ActorEvento */
 export interface ResiduoBitacoraEntry {
   id: string;
   fecha: string;
@@ -137,6 +138,34 @@ export interface ResiduoBitacoraEntry {
   direccion: string;
   tipoResiduo: string;
   hora: string;
+}
+
+export type ActorTipo = 'PERSONA' | 'ESTABLECIMIENTO' | 'EMPRESA' | 'VEHICULO' | 'OTRO';
+export type EstadoActor = 'IDENTIFICADO' | 'EN_SEGUIMIENTO' | 'REINCIDENTE' | 'INTERVENIDO' | 'CASO_CERRADO';
+
+export interface ActorEvento {
+  id: string;
+  fecha: string;
+  tipoResiduo: string;
+  actividadObservada: string;
+  cantidadAproximada: string;
+  descripcion: string;
+  evidenciaTipos: string[];
+  evidenciaArchivos: string[];
+  numeroEvidencias: number;
+  autorId: string;
+  autorNombre: string;
+}
+
+export interface PuntoActor {
+  id: string;
+  tipoActor: ActorTipo;
+  nombre: string;
+  cedulaNit: string;
+  placa?: string;
+  direccion?: string;
+  estado: EstadoActor;
+  eventos: ActorEvento[];
 }
 
 export interface ResiduoEntry {
@@ -277,7 +306,7 @@ export interface Activity {
 
   // Bitácora de actores del punto (personas que depositan residuos ahí).
   // Nivel de punto, no de un residuo particular.
-  bitacora?: ResiduoBitacoraEntry[];
+  bitacoraActores?: PuntoActor[];
 
   // Respuestas de la encuesta dinámica a nivel de punto (frecuenciaAcumulacion,
   // tipoZona, camarasPunto, identificacionGenerador, etc), keyed por el

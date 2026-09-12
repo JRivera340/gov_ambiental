@@ -10,6 +10,7 @@ import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { MergeResiduosDto } from './dto/merge-residuos.dto';
 import { AprobarResiduoDto } from './dto/aprobar-residuo.dto';
+import { BitacoraActorDto } from './dto/bitacora-actor.dto';
 import { ReporteService } from '../reporte/reporte.service';
 import { getEnv } from '../config/env';
 
@@ -123,11 +124,7 @@ export class PuntosController {
 
   @Post(':id/bitacora')
   @Roles(Role.GESTOR_AMBIENTAL, Role.ADMIN)
-  agregarBitacora(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body() body: { nombrePersona: string; cedula: string; direccion: string; tipoResiduo: string; hora: string },
-  ) {
+  agregarBitacora(@Req() req: any, @Param('id') id: string, @Body() body: BitacoraActorDto) {
     return this.puntosService.agregarBitacora(req.user.userId, req.user.email, id, body);
   }
 
