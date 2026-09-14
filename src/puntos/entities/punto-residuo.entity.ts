@@ -54,6 +54,20 @@ export type ActorEvento = {
   numeroEvidencias: number;
   autorId: string;
   autorNombre: string;
+  // Solo aplica cuando tipoResiduo es ORGANICOS: ¿el día del reporte
+  // coincide con el día de recolección de basura en el punto? Diligenciado
+  // a mano por el gestor, no se cruza con la capa de sectores de recolección.
+  coincideRecoleccion?: boolean;
+  diaRecoleccion?: string; // 'LUNES'..'DOMINGO', solo si coincideRecoleccion
+  tieneBolsas?: boolean;
+  bolsasNegras?: number;
+  bolsasBlancas?: number;
+  // Auditoría de edición (solo ADMIN puede editar un evento ya guardado):
+  // quién lo corrigió y cuándo. El autor original (autorId/autorNombre) no
+  // se toca.
+  editadoPorId?: string;
+  editadoPorNombre?: string;
+  editadoEn?: string;
 };
 
 export type PuntoActor = {

@@ -10,8 +10,8 @@ export interface TipoResiduo {
 }
 
 export const RESIDUO_TIPOS: TipoResiduo[] = [
-  { value: 'RESIDUOS_ORDINARIOS', label: 'Residuos ordinarios', color: '#3b82f6' },
-  { value: 'RESIDUOS_VOLUMINOSOS', label: 'Residuos voluminosos', color: '#f97316' },
+  { value: 'RESIDUOS_ORDINARIOS', label: 'Ordinarios', color: '#3b82f6' },
+  { value: 'RESIDUOS_VOLUMINOSOS', label: 'Voluminosos', color: '#f97316' },
   { value: 'ESCOMBROS', label: 'Escombros', color: '#8b5cf6' },
   { value: 'ORGANICOS', label: 'Orgánicos', color: '#16a34a' },
   { value: 'ROPA', label: 'Ropa', color: '#db2777' },

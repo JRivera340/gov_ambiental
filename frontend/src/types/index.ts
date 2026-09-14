@@ -155,6 +155,14 @@ export interface ActorEvento {
   numeroEvidencias: number;
   autorId: string;
   autorNombre: string;
+  coincideRecoleccion?: boolean;
+  diaRecoleccion?: string;
+  tieneBolsas?: boolean;
+  bolsasNegras?: number;
+  bolsasBlancas?: number;
+  editadoPorId?: string;
+  editadoPorNombre?: string;
+  editadoEn?: string;
 }
 
 export interface PuntoActor {

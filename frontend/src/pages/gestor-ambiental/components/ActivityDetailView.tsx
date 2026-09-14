@@ -15,7 +15,6 @@ import { usePersistentState } from '../hooks/usePersistentState';
 import { useAuthStore } from '../../../store/authStore';
 import { useGestorAmbientalCtx } from '../context/GestorAmbientalContext';
 import { NotasResiduoModal } from './NotasResiduoModal';
-import { BitacoraPuntoModal } from './BitacoraPuntoModal';
 import { contarEventosBitacora } from '../lib/bitacoraActores';
 import type { ResiduoEntry } from '../../../types';
 
@@ -54,7 +53,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
   const [recogidosDesde, setRecogidosDesde] = usePersistentState<string>('gad_recDesde', '');
   const [recogidosHasta, setRecogidosHasta] = usePersistentState<string>('gad_recHasta', '');
   const [selectedResiduoForNota, setSelectedResiduoForNota] = useState<ResiduoEntry | null>(null);
-  const [showBitacora, setShowBitacora] = useState(false);
 
   const user = useAuthStore((s) => s.user);
   const canAddNota = user?.role === 'GESTOR_AMBIENTAL' || user?.role === 'ADMIN';
@@ -101,7 +99,7 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
           </button>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowBitacora(true)}
+              onClick={() => window.open(`/gestor-ambiental/bitacora/${activity.id}`, '_blank')}
               className="relative flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl shadow-md border border-slate-600/50 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
@@ -631,17 +629,6 @@ export const ActivityDetailView: React.FC<ActivityDetailViewProps> = ({
         />
       )}
 
-      {showBitacora && (
-        <BitacoraPuntoModal
-          activity={activity}
-          canAdd={canAddNota}
-          onClose={() => setShowBitacora(false)}
-          onUpdated={(updated) => {
-            if (onActivityUpdated) onActivityUpdated(updated);
-          }}
-          setToast={setToast || (() => {})}
-        />
-      )}
     </div>
   );
 };

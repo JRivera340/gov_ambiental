@@ -128,6 +128,18 @@ export class PuntosController {
     return this.puntosService.agregarBitacora(req.user.userId, req.user.email, id, body);
   }
 
+  @Patch(':id/bitacora/:actorId/eventos/:eventoId')
+  @Roles(Role.ADMIN)
+  editarBitacora(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('actorId') actorId: string,
+    @Param('eventoId') eventoId: string,
+    @Body() body: BitacoraActorDto,
+  ) {
+    return this.puntosService.editarBitacora(req.user.userId, req.user.email, id, actorId, eventoId, body);
+  }
+
   @Post('merge')
   @Roles(Role.ADMIN, Role.GESTOR_AMBIENTAL, Role.VALIDADOR_AMBIENTAL)
   merge(@Body() body: MergeResiduosDto) {

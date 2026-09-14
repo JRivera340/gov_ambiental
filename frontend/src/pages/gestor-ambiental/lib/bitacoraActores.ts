@@ -33,6 +33,16 @@ export const EVIDENCIA_TIPO_OPTIONS = [
   { value: 'OBSERVACION_DIRECTA', label: 'Observación directa' },
 ];
 
+export const DIA_SEMANA_OPTIONS = [
+  { value: 'LUNES', label: 'Lunes' },
+  { value: 'MARTES', label: 'Martes' },
+  { value: 'MIERCOLES', label: 'Miércoles' },
+  { value: 'JUEVES', label: 'Jueves' },
+  { value: 'VIERNES', label: 'Viernes' },
+  { value: 'SABADO', label: 'Sábado' },
+  { value: 'DOMINGO', label: 'Domingo' },
+];
+
 export const ESTADO_ACTOR_OPTIONS: Array<{ value: string; label: string; color: string }> = [
   { value: 'IDENTIFICADO', label: 'Identificado', color: '#eab308' },
   { value: 'EN_SEGUIMIENTO', label: 'En seguimiento', color: '#3b82f6' },
@@ -49,6 +59,7 @@ export const getActividadObservadaLabel = (value: string) => labelDe(ACTIVIDAD_O
 export const getCantidadAproximadaLabel = (value: string) => labelDe(CANTIDAD_APROXIMADA_OPTIONS, value);
 export const getTipoActorLabel = (value: string) => labelDe(TIPO_ACTOR_OPTIONS, value);
 export const getEvidenciaTipoLabel = (value: string) => labelDe(EVIDENCIA_TIPO_OPTIONS, value);
+export const getDiaSemanaLabel = (value: string) => labelDe(DIA_SEMANA_OPTIONS, value);
 
 export function getEstadoActor(value: string) {
   return ESTADO_ACTOR_OPTIONS.find((o) => o.value === value) ?? { value, label: value, color: '#6b7280' };

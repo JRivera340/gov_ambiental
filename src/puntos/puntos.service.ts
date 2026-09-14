@@ -341,6 +341,11 @@ export class PuntosService {
       numeroEvidencias: body.numeroEvidencias,
       autorId: userId,
       autorNombre: email,
+      coincideRecoleccion: body.coincideRecoleccion,
+      diaRecoleccion: body.diaRecoleccion,
+      tieneBolsas: body.tieneBolsas,
+      bolsasNegras: body.bolsasNegras,
+      bolsasBlancas: body.bolsasBlancas,
     };
 
     if (actor) {
@@ -368,6 +373,62 @@ export class PuntosService {
     const guardado = await this.repo.save(punto);
     await this.registrarVisitaSinRomper(id, userId, ahora);
     return guardado;
+  }
+
+  // Solo ADMIN (ver controller): corrige un evento ya guardado con
+  // exactamente los mismos campos del formulario de alta. No cuenta como
+  // visita nueva (no dispara registrarVisitaSinRomper) ni toca autorId/
+  // autorNombre del evento original — solo deja rastro de quién lo editó.
+  async editarBitacora(
+    userId: string,
+    email: string,
+    id: string,
+    actorId: string,
+    eventoId: string,
+    body: BitacoraActorDto,
+  ) {
+    if (!body.evidenciaTipos || body.evidenciaTipos.length === 0) {
+      throw new BadRequestException('Debe seleccionar al menos un tipo de evidencia');
+    }
+    const requiereArchivo = body.evidenciaTipos.some((t) => t !== 'OBSERVACION_DIRECTA');
+    if (requiereArchivo && (!body.evidenciaArchivos || body.evidenciaArchivos.length === 0)) {
+      throw new BadRequestException('Debe subir al menos un archivo de evidencia');
+    }
+
+    const punto = await this.repo.findById(id);
+    if (!punto) throw new NotFoundException('Punto no encontrado');
+    const actor = (punto.bitacoraActores || []).find((a) => a.id === actorId);
+    if (!actor) throw new NotFoundException('Actor no encontrado');
+    const evento = actor.eventos.find((e) => e.id === eventoId);
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+
+    actor.tipoActor = body.tipoActor;
+    actor.nombre = body.nombre;
+    actor.cedulaNit = body.cedulaNit;
+    actor.placa = body.placa;
+    actor.direccion = body.direccion;
+    actor.estado = body.estado;
+
+    evento.fecha = body.fecha;
+    evento.tipoResiduo = body.tipoResiduo;
+    evento.actividadObservada = body.actividadObservada;
+    evento.cantidadAproximada = body.cantidadAproximada;
+    evento.descripcion = body.descripcion;
+    evento.evidenciaTipos = body.evidenciaTipos;
+    evento.evidenciaArchivos = body.evidenciaArchivos || [];
+    evento.numeroEvidencias = body.numeroEvidencias;
+    evento.coincideRecoleccion = body.coincideRecoleccion;
+    evento.diaRecoleccion = body.diaRecoleccion;
+    evento.tieneBolsas = body.tieneBolsas;
+    evento.bolsasNegras = body.bolsasNegras;
+    evento.bolsasBlancas = body.bolsasBlancas;
+    evento.editadoPorId = userId;
+    evento.editadoPorNombre = email;
+    evento.editadoEn = new Date().toISOString();
+
+    // Reasignar para que TypeORM detecte el cambio en la columna jsonb.
+    punto.bitacoraActores = [...punto.bitacoraActores];
+    return this.repo.save(punto);
   }
 
   async mergeResiduos(parentId: string, childIdsRaw: string[]) {

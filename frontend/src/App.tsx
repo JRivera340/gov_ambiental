@@ -7,6 +7,8 @@ import { EditActivity } from './pages/EditActivity';
 import { ValidadorMapaDashboard } from './pages/validador/ValidadorMapaDashboard';
 import { ValidadorPanelDashboard } from './pages/validador/ValidadorPanelDashboard';
 import { ValidadorActivityDetailPage } from './pages/validador/ValidadorActivityDetailPage';
+import { BitacoraPuntoPage } from './pages/gestor-ambiental/pages/BitacoraPuntoPage';
+import { BitacoraActorPage } from './pages/gestor-ambiental/pages/BitacoraActorPage';
 import PublicPuntoPage from './pages/public/PublicPuntoPage';
 import { HandoffPage } from './pages/HandoffPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -63,6 +65,14 @@ function App() {
       <Route
         path="/gestor-ambiental/editar-actividad/:id"
         element={<RutaProtegida><EditActivity /></RutaProtegida>}
+      />
+      <Route
+        path="/gestor-ambiental/bitacora/:id"
+        element={<RutaProtegida><BitacoraPuntoPage /></RutaProtegida>}
+      />
+      <Route
+        path="/gestor-ambiental/bitacora/:id/actor/:actorId"
+        element={<RutaProtegida><BitacoraActorPage /></RutaProtegida>}
       />
 
       <Route

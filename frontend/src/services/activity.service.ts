@@ -1,6 +1,28 @@
 import api from './api';
 import type { Activity, ActorTipo, CreateActivityDTO, EstadoActor } from '../types';
 
+export interface BitacoraActorPayload {
+  tipoActor: ActorTipo;
+  nombre: string;
+  cedulaNit: string;
+  placa?: string;
+  direccion?: string;
+  fecha: string;
+  tipoResiduo: string;
+  actividadObservada: string;
+  cantidadAproximada: string;
+  descripcion: string;
+  evidenciaTipos: string[];
+  evidenciaArchivos?: string[];
+  numeroEvidencias: number;
+  estado: EstadoActor;
+  coincideRecoleccion?: boolean;
+  diaRecoleccion?: string;
+  tieneBolsas?: boolean;
+  bolsasNegras?: number;
+  bolsasBlancas?: number;
+}
+
 // Recortado del monolito: acá solo quedan los métodos que usa el módulo
 // Ambiental (registro de punto, seguimiento, aprobación, residuos). Todo
 // apunta a /puntos en vez de /sorver/activities, y el backend de este repo
@@ -96,23 +118,14 @@ export const activityService = {
     return normalizeActivity(data);
   },
 
-  async agregarBitacora(puntoId: string, data: {
-    tipoActor: ActorTipo;
-    nombre: string;
-    cedulaNit: string;
-    placa?: string;
-    direccion?: string;
-    fecha: string;
-    tipoResiduo: string;
-    actividadObservada: string;
-    cantidadAproximada: string;
-    descripcion: string;
-    evidenciaTipos: string[];
-    evidenciaArchivos?: string[];
-    numeroEvidencias: number;
-    estado: EstadoActor;
-  }): Promise<Activity> {
+  async agregarBitacora(puntoId: string, data: BitacoraActorPayload): Promise<Activity> {
     const { data: activity } = await api.post<Activity>(`/puntos/${puntoId}/bitacora`, data);
+    return normalizeActivity(activity);
+  },
+
+  // Solo ADMIN: corrige un evento ya guardado (y los datos del actor).
+  async editarBitacora(puntoId: string, actorId: string, eventoId: string, data: BitacoraActorPayload): Promise<Activity> {
+    const { data: activity } = await api.patch<Activity>(`/puntos/${puntoId}/bitacora/${actorId}/eventos/${eventoId}`, data);
     return normalizeActivity(activity);
   },
 
