@@ -9,6 +9,7 @@ import { Loading } from '../../../components/Loading';
 import type { Activity, ActorEvento } from '../../../types';
 import { tipoResiduoLabels } from '../lib/constants';
 import { BitacoraEventoForm } from '../components/BitacoraEventoForm';
+import type { ActorTipo, EstadoActor } from '../../../types';
 import {
   getEstadoActor,
   getTipoActorLabel,
@@ -16,6 +17,8 @@ import {
   getCantidadAproximadaLabel,
   getEvidenciaTipoLabel,
   getDiaSemanaLabel,
+  TIPO_ACTOR_OPTIONS,
+  ESTADO_ACTOR_OPTIONS,
 } from '../lib/bitacoraActores';
 
 const EvidenciaThumb: React.FC<{ archivo: string }> = ({ archivo }) => {
@@ -30,6 +33,134 @@ const EvidenciaThumb: React.FC<{ archivo: string }> = ({ archivo }) => {
         </div>
       )}
     </div>
+  );
+};
+
+interface EditarIdentidadFormProps {
+  tipoActor: ActorTipo;
+  nombre: string;
+  cedulaNit: string;
+  placa?: string;
+  direccion?: string;
+  estado: EstadoActor;
+  onCancel: () => void;
+  onSubmit: (values: { tipoActor: ActorTipo; nombre: string; cedulaNit: string; placa?: string; direccion?: string; estado: EstadoActor }) => Promise<void>;
+}
+
+const EditarIdentidadForm: React.FC<EditarIdentidadFormProps> = ({
+  tipoActor: tipoActorInicial,
+  nombre: nombreInicial,
+  cedulaNit: cedulaNitInicial,
+  placa: placaInicial,
+  direccion: direccionInicial,
+  estado: estadoInicial,
+  onCancel,
+  onSubmit,
+}) => {
+  const [tipoActor, setTipoActor] = useState<ActorTipo>(tipoActorInicial);
+  const [nombre, setNombre] = useState(nombreInicial);
+  const [cedulaNit, setCedulaNit] = useState(cedulaNitInicial);
+  const [placa, setPlaca] = useState(placaInicial ?? '');
+  const [direccion, setDireccion] = useState(direccionInicial ?? '');
+  const [estado, setEstado] = useState<EstadoActor>(estadoInicial);
+  const [saving, setSaving] = useState(false);
+
+  const formValido = nombre.trim() && cedulaNit.trim();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formValido) return;
+    setSaving(true);
+    try {
+      await onSubmit({
+        tipoActor,
+        nombre: nombre.trim(),
+        cedulaNit: cedulaNit.trim(),
+        placa: placa.trim() || undefined,
+        direccion: direccion.trim() || undefined,
+        estado,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <select
+        value={tipoActor}
+        onChange={(e) => setTipoActor(e.target.value as ActorTipo)}
+        className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
+      >
+        {TIPO_ACTOR_OPTIONS.map((t) => (
+          <option key={t.value} value={t.value}>{t.label}</option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
+        placeholder="Nombre / razón social"
+        className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={cedulaNit}
+          onChange={(e) => setCedulaNit(e.target.value)}
+          placeholder="Cédula / NIT"
+          className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
+        />
+        <input
+          type="text"
+          value={placa}
+          onChange={(e) => setPlaca(e.target.value)}
+          placeholder="Placa (si aplica)"
+          className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
+        />
+      </div>
+      <input
+        type="text"
+        value={direccion}
+        onChange={(e) => setDireccion(e.target.value)}
+        placeholder="Dirección del actor (opcional)"
+        className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
+      />
+      <div>
+        <label className="block text-[11px] font-bold text-slate-500 mb-1">Estado del actor</label>
+        <div className="flex flex-wrap gap-2">
+          {ESTADO_ACTOR_OPTIONS.map((op) => (
+            <button
+              key={op.value}
+              type="button"
+              onClick={() => setEstado(op.value as EstadoActor)}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
+                estado === op.value ? 'border-slate-700 bg-slate-50' : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full" style={{ background: op.color }} />
+              {op.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="w-full sm:w-auto px-5 py-3 rounded-xl text-sm font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-all"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={saving || !formValido}
+          className="w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-black text-white bg-slate-700 hover:bg-slate-800 shadow-lg shadow-slate-700/20 transition-all disabled:opacity-50"
+        >
+          {saving ? 'Guardando...' : 'Guardar cambios'}
+        </button>
+      </div>
+    </form>
   );
 };
 
@@ -52,6 +183,7 @@ export const BitacoraActorPage: React.FC = () => {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [editandoEventoId, setEditandoEventoId] = useState<string | null>(null);
+  const [editandoIdentidad, setEditandoIdentidad] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const load = async () => {
@@ -109,18 +241,53 @@ export const BitacoraActorPage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-black text-neutral-900">Identificación del actor</h2>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: estadoInfo.color }} />
-              <span className="text-xs font-bold text-neutral-700">{estadoInfo.label}</span>
-            </span>
+            {editandoIdentidad ? null : (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: estadoInfo.color }} />
+                  <span className="text-xs font-bold text-neutral-700">{estadoInfo.label}</span>
+                </span>
+                {isAdmin && (
+                  <button
+                    onClick={() => setEditandoIdentidad(true)}
+                    className="text-[10px] font-black text-slate-600 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Campo label="Tipo de actor">{getTipoActorLabel(actor.tipoActor)}</Campo>
-            <Campo label="Nombre / razón social">{actor.nombre}</Campo>
-            <Campo label="Cédula / NIT">{actor.cedulaNit}</Campo>
-            <Campo label="Placa">{actor.placa || '—'}</Campo>
-            <Campo label="Dirección">{actor.direccion || '—'}</Campo>
-          </div>
+          {editandoIdentidad ? (
+            <EditarIdentidadForm
+              tipoActor={actor.tipoActor}
+              nombre={actor.nombre}
+              cedulaNit={actor.cedulaNit}
+              placa={actor.placa}
+              direccion={actor.direccion}
+              estado={actor.estado}
+              onCancel={() => setEditandoIdentidad(false)}
+              onSubmit={async (values) => {
+                try {
+                  const updated = await activityService.editarActorIdentidad(activity.id, actor.id, values);
+                  setActivity(updated);
+                  showToast('Actor actualizado', 'success');
+                  setEditandoIdentidad(false);
+                } catch (err: any) {
+                  showToast(err?.response?.data?.message || 'Error al guardar los cambios', 'error');
+                  throw err;
+                }
+              }}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <Campo label="Tipo de actor">{getTipoActorLabel(actor.tipoActor)}</Campo>
+              <Campo label="Nombre / razón social">{actor.nombre}</Campo>
+              <Campo label="Cédula / NIT">{actor.cedulaNit}</Campo>
+              <Campo label="Placa">{actor.placa || '—'}</Campo>
+              <Campo label="Dirección">{actor.direccion || '—'}</Campo>
+            </div>
+          )}
         </div>
 
         <div>
@@ -185,6 +352,7 @@ export const BitacoraActorPage: React.FC = () => {
                       <Campo label="Tipo de residuo">{tipoResiduoLabels[evento.tipoResiduo] || evento.tipoResiduo}</Campo>
                       <Campo label="Actividad observada">{getActividadObservadaLabel(evento.actividadObservada)}</Campo>
                       <Campo label="Cantidad aproximada">{getCantidadAproximadaLabel(evento.cantidadAproximada)}</Campo>
+                      <Campo label="Número de evidencias">{evento.numeroEvidencias}</Campo>
                       {evento.coincideRecoleccion !== undefined && (
                         <Campo label="¿Coincide con recolección?">
                           {evento.coincideRecoleccion ? `Sí — ${getDiaSemanaLabel(evento.diaRecoleccion || '')}` : 'No'}
@@ -195,6 +363,7 @@ export const BitacoraActorPage: React.FC = () => {
                           {evento.tieneBolsas ? `${evento.bolsasNegras ?? 0} negras, ${evento.bolsasBlancas ?? 0} blancas` : 'No'}
                         </Campo>
                       )}
+                      <Campo label="Diligenciado por">{evento.autorNombre}</Campo>
                     </div>
                     <Campo label="Descripción">{evento.descripcion || '—'}</Campo>
                     <div className="mt-4">
@@ -208,7 +377,7 @@ export const BitacoraActorPage: React.FC = () => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-neutral-400 italic">Sin archivos — {evento.numeroEvidencias} evidencia(s) reportada(s)</p>
+                        <p className="text-xs text-neutral-400 italic">Sin archivos adjuntos</p>
                       )}
                     </div>
                     {evento.editadoPorNombre && (

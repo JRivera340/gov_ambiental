@@ -129,6 +129,19 @@ export const activityService = {
     return normalizeActivity(activity);
   },
 
+  // Solo ADMIN: corrige la identificación del actor sin tocar sus eventos.
+  async editarActorIdentidad(puntoId: string, actorId: string, data: {
+    tipoActor: ActorTipo;
+    nombre: string;
+    cedulaNit: string;
+    placa?: string;
+    direccion?: string;
+    estado: EstadoActor;
+  }): Promise<Activity> {
+    const { data: activity } = await api.patch<Activity>(`/puntos/${puntoId}/bitacora/${actorId}`, data);
+    return normalizeActivity(activity);
+  },
+
   // Informe Excel de puntos pendientes de recogida (marca en rojo los que
   // llevan más días de la cuenta sin recoger, ver src/puntos/lib/emergencia.util.ts).
   async descargarReporteXlsx(): Promise<Blob> {

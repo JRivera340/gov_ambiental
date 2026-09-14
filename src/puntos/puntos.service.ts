@@ -7,6 +7,7 @@ import { CreatePuntoDto } from './dto/create-punto.dto';
 import { UpdatePuntoDto } from './dto/update-punto.dto';
 import { SeguimientoDto } from './dto/seguimiento.dto';
 import { BitacoraActorDto } from './dto/bitacora-actor.dto';
+import { BitacoraActorIdentidadDto } from './dto/bitacora-actor-identidad.dto';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { ProcesosService } from '../procesos/procesos.service';
 import { VisitasService } from '../visitas/visitas.service';
@@ -373,6 +374,26 @@ export class PuntosService {
     const guardado = await this.repo.save(punto);
     await this.registrarVisitaSinRomper(id, userId, ahora);
     return guardado;
+  }
+
+  // Solo ADMIN: corrige la identificación del actor (nombre, cédula, placa,
+  // dirección, estado) sin tocar ningún evento — para cuando solo hace falta
+  // corregir un dato del actor, sin entrar a un evento puntual.
+  async editarActorIdentidad(id: string, actorId: string, body: BitacoraActorIdentidadDto) {
+    const punto = await this.repo.findById(id);
+    if (!punto) throw new NotFoundException('Punto no encontrado');
+    const actor = (punto.bitacoraActores || []).find((a) => a.id === actorId);
+    if (!actor) throw new NotFoundException('Actor no encontrado');
+
+    actor.tipoActor = body.tipoActor;
+    actor.nombre = body.nombre;
+    actor.cedulaNit = body.cedulaNit;
+    actor.placa = body.placa;
+    actor.direccion = body.direccion;
+    actor.estado = body.estado;
+
+    punto.bitacoraActores = [...punto.bitacoraActores];
+    return this.repo.save(punto);
   }
 
   // Solo ADMIN (ver controller): corrige un evento ya guardado con

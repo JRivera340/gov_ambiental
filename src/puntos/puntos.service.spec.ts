@@ -444,4 +444,37 @@ describe('PuntosService — bitacora de actores', () => {
       service.editarBitacora('admin-1', 'admin@ejemplo.com', punto.id, 'no-existe', 'no-existe', bodyBase as any),
     ).rejects.toThrow();
   });
+
+  it('editarActorIdentidad corrige la identificacion del actor sin tocar sus eventos', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    const conActor = await service.agregarBitacora('user-1', 'gestor@ejemplo.com', punto.id, bodyBase as any);
+    const actorId = conActor.bitacoraActores[0].id;
+
+    const editado = await service.editarActorIdentidad(punto.id, actorId, {
+      tipoActor: 'EMPRESA',
+      nombre: 'Empresa Corregida SAS',
+      cedulaNit: '900123456',
+      placa: 'ABC123',
+      direccion: 'Nueva direccion',
+      estado: 'EN_SEGUIMIENTO',
+    });
+
+    const actor = editado.bitacoraActores[0];
+    expect(actor.tipoActor).toBe('EMPRESA');
+    expect(actor.nombre).toBe('Empresa Corregida SAS');
+    expect(actor.cedulaNit).toBe('900123456');
+    expect(actor.estado).toBe('EN_SEGUIMIENTO');
+    expect(actor.eventos).toHaveLength(1);
+  });
+
+  it('editarActorIdentidad lanza NotFoundException si el actor no existe', async () => {
+    const { service } = makeService();
+    const punto = await service.create('user-1', { lat: 1, lng: 1, barrio: 'A' });
+    await expect(
+      service.editarActorIdentidad(punto.id, 'no-existe', {
+        tipoActor: 'PERSONA', nombre: 'X', cedulaNit: '1', estado: 'IDENTIFICADO',
+      }),
+    ).rejects.toThrow();
+  });
 });
