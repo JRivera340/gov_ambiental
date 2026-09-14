@@ -344,16 +344,19 @@ export const BitacoraPuntoModal: React.FC<BitacoraPuntoModalProps> = ({
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
-                <select
-                  value={actividadObservada}
-                  onChange={(e) => setActividadObservada(e.target.value)}
-                  className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
-                >
-                  <option value="">Actividad observada</option>
-                  {ACTIVIDAD_OBSERVADA_OPTIONS.map((a) => (
-                    <option key={a.value} value={a.value}>{a.label}</option>
-                  ))}
-                </select>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Actividad observada</label>
+                  <select
+                    value={actividadObservada}
+                    onChange={(e) => setActividadObservada(e.target.value)}
+                    className="w-full bg-white border-2 border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 outline-none font-medium"
+                  >
+                    <option value="">Selecciona una opción</option>
+                    {ACTIVIDAD_OBSERVADA_OPTIONS.map((a) => (
+                      <option key={a.value} value={a.value}>{a.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <select
                   value={cantidadAproximada}
                   onChange={(e) => setCantidadAproximada(e.target.value)}
