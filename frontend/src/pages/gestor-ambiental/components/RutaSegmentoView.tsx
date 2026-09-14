@@ -152,9 +152,9 @@ export const RutaSegmentoView: React.FC = () => {
                   {parada.diasVencido >= 4 && !parada.visitado && (
                     <p className="text-[10px] text-red-600 font-medium ml-6">{parada.diasVencido}d vencido</p>
                   )}
-                  {!parada.visitado && parada.requeridoPorMitad !== undefined && (
+                  {!parada.visitado && parada.regimenFrecuencia === 'parejas' && (
                     <p className="text-[10px] text-neutral-500 ml-6">
-                      Visitas esta semana: {parada.diasMitadActual ?? 0}/{parada.requeridoPorMitad}
+                      Parejas de visita esta quincena: {parada.paresMitadActual ?? 0}/{parada.paresRequeridos ?? 2}
                     </p>
                   )}
                   {parada.visitado && parada.fechaVisita && (
@@ -238,9 +238,9 @@ export const RutaSegmentoView: React.FC = () => {
               {!paradaSeleccionada.visitado && paradaSeleccionada.diasVencido >= 4 && (
                 <p className="text-[11px] text-red-600 font-medium">{paradaSeleccionada.diasVencido} días vencido</p>
               )}
-              {!paradaSeleccionada.visitado && paradaSeleccionada.requeridoPorMitad !== undefined && (
+              {!paradaSeleccionada.visitado && paradaSeleccionada.regimenFrecuencia === 'parejas' && (
                 <p className="text-[11px] text-neutral-500">
-                  Visitas esta semana: {paradaSeleccionada.diasMitadActual ?? 0}/{paradaSeleccionada.requeridoPorMitad}
+                  Parejas de visita esta quincena: {paradaSeleccionada.paresMitadActual ?? 0}/{paradaSeleccionada.paresRequeridos ?? 2}
                 </p>
               )}
               {paradaSeleccionada.tiposResiduo.length > 0 && (

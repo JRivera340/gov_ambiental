@@ -26,15 +26,26 @@ export type ResumenDesempeno = {
   actualTotal: number;
 };
 
-export const DIAS_REQUERIDOS_POR_MITAD = 4;
+// A partir de esta quincena (16 de septiembre de 2026 en adelante, para
+// siempre) rige la regla de parejas de días consecutivos. Antes de esta
+// fecha rige la regla vieja (1 sola visita en el rango ya cuenta): la
+// regla nueva se aplicó primero de forma retroactiva y dejó a gestores que
+// sí trabajaban en 0% a mitad de una quincena que ya habían empezado bajo
+// la regla vieja — este corte evita repetirlo.
+export const CUTOVER_REGIMEN_PARES = '2026-09-16T05:00:00.000Z'; // 2026-09-16T00:00 hora Bogotá (UTC-5)
+
+export const PARES_REQUERIDOS_POR_MITAD = 2;
 
 export type ProgresoFrecuencia = {
-  // Días distintos de visita en la mitad de quincena que está corriendo AHORA
-  // — lo que el gestor necesita ver para saber si le falta volver esta semana.
-  diasMitadActual: number;
-  // Días distintos en la otra mitad (la que ya pasó o la que viene).
-  diasMitadRestante: number;
-  requerido: number;
+  // 'parejas': la quincena corre bajo la regla nueva. 'simple': quincena
+  // vieja, 1 visita ya alcanza, no hay progreso pendiente que mostrar.
+  regimen: 'parejas' | 'simple';
+  // Parejas de días consecutivos completadas en la mitad que está corriendo
+  // AHORA — lo que el gestor necesita ver para saber si le falta volver.
+  paresMitadActual: number;
+  // Parejas completadas en la otra mitad (la que ya pasó o la que viene).
+  paresMitadRestante: number;
+  paresRequeridos: number;
   cumpleMitadActual: boolean;
   cumpleMitadRestante: boolean;
 };
@@ -147,25 +158,55 @@ export class VisitasService {
     return { porPunto, corte };
   }
 
-  // Ids de puntos que el gestor visitó con la frecuencia mínima exigida: al
-  // menos 4 días DISTINTOS de visita en CADA mitad de la quincena (no solo un
-  // toque inicial y nunca más — ese era el bug: un punto con una sola visita
-  // en toda la quincena salía "visitado" al 100%). Reemplaza a
-  // getIdsVisitadosEnRango en todo cálculo de cumplimiento.
+  // ¿Esta quincena corre bajo la regla nueva de parejas? Frontera inclusiva:
+  // la quincena que arranca justo en el cutover ya es régimen nuevo.
+  private esRegimenNuevo(inicioISO: string): boolean {
+    return new Date(inicioISO).getTime() >= new Date(CUTOVER_REGIMEN_PARES).getTime();
+  }
+
+  // Cuenta parejas de días consecutivos DISJUNTAS dentro de un set de días
+  // visitados: greedy de izquierda a derecha, cada día se usa como máximo una
+  // vez. "lunes, martes, jueves, viernes" da 2 parejas. "lunes, miércoles,
+  // jueves, viernes" da 1 sola (miércoles-jueves consume esos dos días, viernes
+  // queda suelto). Tres días seguidos ("lunes, martes, miércoles") dan 1 pareja,
+  // no cuentan como una racha de 2.
+  private contarParesDeDiasConsecutivos(dias: Set<string>): number {
+    const DIA_MS = 24 * 60 * 60 * 1000;
+    const ordenados = Array.from(dias).map((iso) => new Date(iso).getTime()).sort((a, b) => a - b);
+    let pares = 0;
+    let i = 0;
+    while (i < ordenados.length - 1) {
+      if (ordenados[i + 1] - ordenados[i] === DIA_MS) {
+        pares++;
+        i += 2;
+      } else {
+        i++;
+      }
+    }
+    return pares;
+  }
+
+  // Ids de puntos que el gestor visitó con la frecuencia mínima exigida por la
+  // regla nueva: al menos 2 parejas de días consecutivos en CADA mitad de la
+  // quincena (no solo un toque inicial y nunca más). Solo aplica a quincenas
+  // en régimen nuevo — ver esRegimenNuevo / CUTOVER_REGIMEN_PARES.
   async getIdsCumplenFrecuenciaEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
     const { porPunto } = await this.contarDiasPorMitad(gestorId, desdeISO, hastaISO);
     const resultado = new Set<string>();
     for (const [puntoId, [mitad1, mitad2]] of porPunto) {
-      if (mitad1.size >= DIAS_REQUERIDOS_POR_MITAD && mitad2.size >= DIAS_REQUERIDOS_POR_MITAD) {
+      const pares1 = this.contarParesDeDiasConsecutivos(mitad1);
+      const pares2 = this.contarParesDeDiasConsecutivos(mitad2);
+      if (pares1 >= PARES_REQUERIDOS_POR_MITAD && pares2 >= PARES_REQUERIDOS_POR_MITAD) {
         resultado.add(puntoId);
       }
     }
     return resultado;
   }
 
-  // Progreso crudo de frecuencia por punto, para mostrarle al gestor cuánto le
-  // falta en la ruta — no solo "visitado sí/no" al final, sino "vas 2 de 4
-  // esta semana" mientras la quincena sigue corriendo.
+  // Progreso crudo de frecuencia por punto (régimen nuevo únicamente), para
+  // mostrarle al gestor cuánto le falta en la ruta — no solo "visitado sí/no"
+  // al final, sino "vas 1 de 2 parejas esta mitad" mientras la quincena sigue
+  // corriendo.
   async getProgresoFrecuencia(
     gestorId: string,
     desdeISO: string,
@@ -177,14 +218,15 @@ export class VisitasService {
 
     const resultado = new Map<string, ProgresoFrecuencia>();
     for (const [puntoId, mitades] of porPunto) {
-      const diasMitadActual = mitades[mitadActualIdx].size;
-      const diasMitadRestante = mitades[mitadActualIdx === 0 ? 1 : 0].size;
+      const paresMitadActual = this.contarParesDeDiasConsecutivos(mitades[mitadActualIdx]);
+      const paresMitadRestante = this.contarParesDeDiasConsecutivos(mitades[mitadActualIdx === 0 ? 1 : 0]);
       resultado.set(puntoId, {
-        diasMitadActual,
-        diasMitadRestante,
-        requerido: DIAS_REQUERIDOS_POR_MITAD,
-        cumpleMitadActual: diasMitadActual >= DIAS_REQUERIDOS_POR_MITAD,
-        cumpleMitadRestante: diasMitadRestante >= DIAS_REQUERIDOS_POR_MITAD,
+        regimen: 'parejas',
+        paresMitadActual,
+        paresMitadRestante,
+        paresRequeridos: PARES_REQUERIDOS_POR_MITAD,
+        cumpleMitadActual: paresMitadActual >= PARES_REQUERIDOS_POR_MITAD,
+        cumpleMitadRestante: paresMitadRestante >= PARES_REQUERIDOS_POR_MITAD,
       });
     }
     return resultado;
@@ -197,17 +239,30 @@ export class VisitasService {
   async getPlanConVisitas(gestorId: string, ahora = new Date()) {
     const plan = await this.rutasSemanalesService.getPlanQuincena(gestorId, ahora);
     const q = plan.quincena;
-    const visitados = await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO);
-    const progresoPorPunto = await this.getProgresoFrecuencia(gestorId, q.inicioISO, q.finISO, ahora);
+    const nuevo = this.esRegimenNuevo(q.inicioISO);
+
+    const visitados = nuevo
+      ? await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO)
+      : await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+
+    // En régimen viejo no hay "progreso" que mostrar — 1 visita ya alcanza —
+    // así que progresoVisitas queda con el default 'simple' para todo punto.
+    const progresoPorPunto = nuevo
+      ? await this.getProgresoFrecuencia(gestorId, q.inicioISO, q.finISO, ahora)
+      : new Map<string, ProgresoFrecuencia>();
+
+    const DEFAULT_SIMPLE: ProgresoFrecuencia = {
+      regimen: 'simple',
+      paresMitadActual: 0,
+      paresMitadRestante: 0,
+      paresRequeridos: 0,
+      cumpleMitadActual: true,
+      cumpleMitadRestante: true,
+    };
+
     const progresoVisitas: Record<string, ProgresoFrecuencia> = {};
     for (const puntoId of q.planificados) {
-      progresoVisitas[puntoId] = progresoPorPunto.get(puntoId) ?? {
-        diasMitadActual: 0,
-        diasMitadRestante: 0,
-        requerido: DIAS_REQUERIDOS_POR_MITAD,
-        cumpleMitadActual: false,
-        cumpleMitadRestante: false,
-      };
+      progresoVisitas[puntoId] = progresoPorPunto.get(puntoId) ?? DEFAULT_SIMPLE;
     }
     return {
       ...plan,
@@ -235,7 +290,9 @@ export class VisitasService {
 
     return Promise.all(
       quincenas.map(async (q) => {
-        const visitadosIds = await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO);
+        const visitadosIds = this.esRegimenNuevo(q.inicioISO)
+          ? await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO)
+          : await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
         const paradas = q.paradas.map((p) => ({ ...p, visitado: visitadosIds.has(p.puntoId) }));
         // Sin visitar primero: es lo que el supervisor necesita ver.
         paradas.sort((a, b) => {
@@ -268,8 +325,7 @@ export class VisitasService {
     for (const id of gestorIds) {
       const plan = await this.rutasSemanalesService.getPlanQuincena(id, ahora);
       const q = plan.quincena;
-      const cumpleFrecuenciaIds = await this.getIdsCumplenFrecuenciaEnRango(id, q.inicioISO, q.finISO);
-      const visitados = q.planificados.filter((puntoId) => cumpleFrecuenciaIds.has(puntoId)).length;
+      const nuevo = this.esRegimenNuevo(q.inicioISO);
 
       // Visitas a puntos que ya no están en el plan (reasignados o sin
       // asignación): se muestran aparte para que ningún trabajo real quede
@@ -277,6 +333,13 @@ export class VisitasService {
       // (no frecuencia) — es solo para no perder de vista trabajo hecho fuera
       // del plan, no mide cumplimiento.
       const visitadosIdsCrudo = await this.getIdsVisitadosEnRango(id, q.inicioISO, q.finISO);
+      // Régimen viejo usa la misma consulta cruda como criterio de
+      // cumplimiento (1 visita ya alcanza) — se reusa en vez de repetirla.
+      const cumpleIds = nuevo
+        ? await this.getIdsCumplenFrecuenciaEnRango(id, q.inicioISO, q.finISO)
+        : visitadosIdsCrudo;
+      const visitados = q.planificados.filter((puntoId) => cumpleIds.has(puntoId)).length;
+
       const enPlan = new Set(q.planificados);
       const visitasFueraDePlan = [...visitadosIdsCrudo].filter((puntoId) => !enPlan.has(puntoId)).length;
 
