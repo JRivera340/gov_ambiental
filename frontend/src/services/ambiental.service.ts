@@ -51,6 +51,8 @@ export interface ProgresoFrecuenciaDTO {
   paresRequeridos: number;
   cumpleMitadActual: boolean;
   cumpleMitadRestante: boolean;
+  /** Días distintos (sin exigir pareja) visitados en la mitad actual. */
+  diasMitadActual: number;
 }
 export interface PlanQuincenaDTO {
   gestorId: string;

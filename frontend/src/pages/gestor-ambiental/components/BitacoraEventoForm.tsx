@@ -13,12 +13,19 @@ import {
   DIA_SEMANA_OPTIONS,
 } from '../lib/bitacoraActores';
 
+const EXTENSIONES_VIDEO = ['.mp4', '.mov', '.webm', '.3gp'];
+
 const EvidenciaThumb: React.FC<{ archivo: string }> = ({ archivo }) => {
   const url = useFileUrl(archivo);
+  const esVideo = EXTENSIONES_VIDEO.some((ext) => archivo.toLowerCase().endsWith(ext));
   return (
     <div className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
       {url ? (
-        <img src={url} alt="Evidencia" className="w-full h-full object-cover" />
+        esVideo ? (
+          <video src={url} className="w-full h-full object-cover" muted />
+        ) : (
+          <img src={url} alt="Evidencia" className="w-full h-full object-cover" />
+        )
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>

@@ -61,12 +61,17 @@ export class FilesService {
         throw new BadRequestException('El PDF no puede exceder 10MB');
       }
     } else if (folder === 'photos') {
-      const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      if (!allowedMimeTypes.includes(file.mimetype)) {
-        throw new BadRequestException('Las fotos deben ser JPG, PNG o WebP');
+      const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'];
+      const isVideo = allowedVideoTypes.includes(file.mimetype);
+      if (!isVideo && !allowedImageTypes.includes(file.mimetype)) {
+        throw new BadRequestException('El archivo debe ser JPG, PNG, WebP o un video (MP4, MOV, WebM, 3GP)');
       }
-      if (file.size > 10 * 1024 * 1024) {
-        throw new BadRequestException('Cada foto no puede exceder 10MB');
+      // Los videos de evidencia pesan bastante más que una foto — el límite de
+      // fotos (10MB) los rechazaría casi siempre.
+      const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        throw new BadRequestException(isVideo ? 'El video no puede exceder 100MB' : 'Cada foto no puede exceder 10MB');
       }
     }
 

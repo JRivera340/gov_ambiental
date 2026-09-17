@@ -167,6 +167,7 @@ export function useRutaAmbiental(
         paresMitadActual: progresoVisitas?.[a.id]?.paresMitadActual ?? 0,
         paresRequeridos: progresoVisitas?.[a.id]?.paresRequeridos ?? 2,
         regimenFrecuencia: progresoVisitas?.[a.id]?.regimen ?? 'simple',
+        diasMitadActual: progresoVisitas?.[a.id]?.diasMitadActual ?? 0,
       };
     });
   }, [activities, user, puntosAsignados, visitadosIds, arrastreIds, progresoVisitas]);

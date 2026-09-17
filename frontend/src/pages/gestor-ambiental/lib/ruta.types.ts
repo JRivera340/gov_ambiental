@@ -15,6 +15,8 @@ export interface ParadaRuta {
   paresMitadActual?: number;
   paresRequeridos?: number;
   regimenFrecuencia?: 'parejas' | 'simple';
+  /** Días distintos (sin exigir pareja) visitados en la mitad actual — evidencia de que hubo visita hoy aunque todavía no cuente como cumplido. */
+  diasMitadActual?: number;
 }
 
 export interface SegmentoRuta {

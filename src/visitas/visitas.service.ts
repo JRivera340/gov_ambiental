@@ -48,6 +48,12 @@ export type ProgresoFrecuencia = {
   paresRequeridos: number;
   cumpleMitadActual: boolean;
   cumpleMitadRestante: boolean;
+  // Días distintos (crudos, sin exigir que formen pareja) que el gestor
+  // visitó en la mitad actual. Sin esto, un gestor que fue hoy por primera
+  // vez se ve idéntico a uno que no ha ido nunca (ambos en 0 parejas) — este
+  // campo es lo único que evidencia que sí hubo trabajo hoy aunque todavía
+  // no cuente como cumplido.
+  diasMitadActual: number;
 };
 
 @Injectable()
@@ -227,6 +233,7 @@ export class VisitasService {
         paresRequeridos: PARES_REQUERIDOS_POR_MITAD,
         cumpleMitadActual: paresMitadActual >= PARES_REQUERIDOS_POR_MITAD,
         cumpleMitadRestante: paresMitadRestante >= PARES_REQUERIDOS_POR_MITAD,
+        diasMitadActual: mitades[mitadActualIdx].size,
       });
     }
     return resultado;
@@ -258,6 +265,7 @@ export class VisitasService {
       paresRequeridos: 0,
       cumpleMitadActual: true,
       cumpleMitadRestante: true,
+      diasMitadActual: 0,
     };
 
     const progresoVisitas: Record<string, ProgresoFrecuencia> = {};

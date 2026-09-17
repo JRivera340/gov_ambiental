@@ -144,6 +144,10 @@ export class FilesController {
       png: 'image/png',
       webp: 'image/webp',
       pdf: 'application/pdf',
+      mp4: 'video/mp4',
+      mov: 'video/quicktime',
+      webm: 'video/webm',
+      '3gp': 'video/3gpp',
     };
     return contentTypes[ext || ''] || 'application/octet-stream';
   }

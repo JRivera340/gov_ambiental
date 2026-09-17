@@ -155,6 +155,11 @@ export const RutaSegmentoView: React.FC = () => {
                   {!parada.visitado && parada.regimenFrecuencia === 'parejas' && (
                     <p className="text-[10px] text-neutral-500 ml-6">
                       Parejas de visita esta quincena: {parada.paresMitadActual ?? 0}/{parada.paresRequeridos ?? 2}
+                      {(parada.diasMitadActual ?? 0) > 0 && (
+                        <span className="text-amber-600 font-medium">
+                          {' '}· fue {parada.diasMitadActual} día{(parada.diasMitadActual ?? 0) !== 1 ? 's' : ''} esta mitad, falta volver un día seguido
+                        </span>
+                      )}
                     </p>
                   )}
                   {parada.visitado && parada.fechaVisita && (
@@ -241,6 +246,11 @@ export const RutaSegmentoView: React.FC = () => {
               {!paradaSeleccionada.visitado && paradaSeleccionada.regimenFrecuencia === 'parejas' && (
                 <p className="text-[11px] text-neutral-500">
                   Parejas de visita esta quincena: {paradaSeleccionada.paresMitadActual ?? 0}/{paradaSeleccionada.paresRequeridos ?? 2}
+                  {(paradaSeleccionada.diasMitadActual ?? 0) > 0 && (
+                    <span className="block text-amber-600 font-medium">
+                      Fue {paradaSeleccionada.diasMitadActual} día{(paradaSeleccionada.diasMitadActual ?? 0) !== 1 ? 's' : ''} esta mitad — falta volver un día seguido para que cuente
+                    </span>
+                  )}
                 </p>
               )}
               {paradaSeleccionada.tiposResiduo.length > 0 && (
