@@ -26,7 +26,7 @@ const ESTADO_LABEL: Record<SegmentoRuta['estado'], string> = {
 };
 
 export const RutaActivaView: React.FC = () => {
-  const { rutaActiva, entrarSegmento, finalizarRuta, cancelarRuta, setViewMode } = useGestorAmbientalCtx();
+  const { rutaActiva, entrarSegmento, finalizarRuta, cancelarRuta, setViewMode, plan } = useGestorAmbientalCtx();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showCancelar, setShowCancelar] = useState(false);
 
@@ -84,6 +84,15 @@ export const RutaActivaView: React.FC = () => {
           <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${porcentaje}%` }} />
         </div>
         <p className="text-[10px] text-neutral-400 mt-1">{porcentaje}% completado</p>
+        {/* El % de arriba exige parejas de días consecutivos por punto — un
+            gestor puede estar en 0% y aun así haber trabajado hoy. Esta línea
+            muestra el trabajo crudo de hoy para que no se vea como "no hizo
+            nada" mientras la frecuencia todavía no cierra. */}
+        {plan && plan.puntosHoy > 0 && (
+          <p className="mt-2 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1">
+            ✓ Hoy visitaste {plan.puntosHoy} punto{plan.puntosHoy !== 1 ? 's' : ''}
+          </p>
+        )}
         {todosCompletados && (
           <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
             <p className="text-[11px] font-bold text-green-700">✓ Todos los puntos visitados</p>

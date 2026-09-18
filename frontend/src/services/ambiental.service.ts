@@ -58,6 +58,10 @@ export interface PlanQuincenaDTO {
   gestorId: string;
   asignados: number;
   quincena: QuincenaPlanDTO;
+  /** Actividad cruda de hoy, independiente del % de cumplimiento de la quincena. */
+  visitoHoy: boolean;
+  puntosHoy: number;
+  ultimaVisitaAt: string | null;
 }
 
 export interface ParadaHistorialDTO {
@@ -89,6 +93,10 @@ export interface DesempenoGestorDTO {
   visitados: number;
   pct: number;
   visitasFueraDePlan: number;
+  /** Actividad cruda de hoy, independiente del % de cumplimiento. */
+  visitoHoy: boolean;
+  puntosHoy: number;
+  ultimaVisitaAt: string | null;
 }
 export interface ResumenDesempenoDTO {
   quincenaInicioISO: string;

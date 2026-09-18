@@ -62,6 +62,14 @@ const makeRepo = () => {
               return { puntoResiduoId: v.puntoResiduoId, dia };
             });
         },
+        // Usado por getActividadHoy: MAX(fecha) de todas las visitas del
+        // gestor, sin filtro de rango (a diferencia de getRawMany acá arriba).
+        getRawOne: async () => {
+          const delGestor = store.filter((v) => v.gestorId === filtros.gestorId);
+          if (delGestor.length === 0) return { max: null };
+          const max = delGestor.reduce((m, v) => (new Date(v.fecha) > new Date(m) ? v.fecha : m), delGestor[0].fecha);
+          return { max };
+        },
       };
       return qb;
     },

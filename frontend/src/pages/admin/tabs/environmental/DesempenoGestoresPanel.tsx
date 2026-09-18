@@ -13,6 +13,18 @@ const ORDENES: { key: Orden; label: string }[] = [
   { key: 'nombre', label: 'Nombre' },
 ];
 
+// "hace 5 min", "hace 2 h", "ayer 14:32" — para no mostrar un ISO crudo.
+function formatUltimaVisita(iso: string): string {
+  const fecha = new Date(iso);
+  const ahora = new Date();
+  const minutos = Math.round((ahora.getTime() - fecha.getTime()) / 60000);
+  if (minutos < 1) return 'hace instantes';
+  if (minutos < 60) return `hace ${minutos} min`;
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return `hace ${horas} h`;
+  return fecha.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 function pctColor(pct: number): string {
   if (pct >= 80) return '#16a34a';
   if (pct >= 50) return '#EAB308';
@@ -158,6 +170,21 @@ export const DesempenoGestoresPanel: React.FC<Props> = ({ onVerPunto }) => {
                 <div className="min-w-0">
                   <h3 className="text-[13px] font-bold text-neutral-900 truncate">{nombreDe(g.gestorId)}</h3>
                   <p className="text-[11px] text-neutral-500 tabular">{g.asignados} puntos asignados</p>
+                  {/* Actividad cruda de hoy: independiente del % de cumplimiento
+                      (que exige parejas de días consecutivos) — sin esto un
+                      gestor que sí trabajó hoy se ve igual que uno que no ha
+                      ido nunca, ambos en 0%. */}
+                  {g.visitoHoy ? (
+                    <p className="text-[10px] font-bold text-green-600 flex items-center gap-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      Visitó hoy · {g.puntosHoy} punto{g.puntosHoy !== 1 ? 's' : ''}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] font-medium text-neutral-400 mt-0.5">
+                      Sin actividad hoy
+                      {g.ultimaVisitaAt && ` · última visita ${formatUltimaVisita(g.ultimaVisitaAt)}`}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="tabular text-2xl font-extrabold leading-none" style={{ color: pctColor(g.pct) }}>{g.pct}%</p>

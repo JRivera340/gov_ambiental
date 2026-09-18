@@ -14,6 +14,13 @@ export type DesempenoGestor = {
   visitados: number;
   pct: number;
   visitasFueraDePlan: number;
+  // Actividad cruda de HOY, independiente del % de cumplimiento — un gestor
+  // puede haber trabajado hoy y seguir en 0% (le falta el día consecutivo
+  // para que la pareja cuente). Sin esto el dashboard admin se ve idéntico
+  // para "no ha ido nunca" y "fue hoy, todavía no cumple".
+  visitoHoy: boolean;
+  puntosHoy: number;
+  ultimaVisitaAt: string | null;
 };
 
 export type ResumenDesempeno = {
@@ -103,6 +110,48 @@ export class VisitasService {
       if (fila.gestorId) ids.add(fila.gestorId);
     }
     return Array.from(ids);
+  }
+
+  // Límites [00:00, 23:59:59.999] del día en curso, en hora Bogotá — mismo
+  // offset fijo que usa ciclo-quincenal.util (Colombia no tiene horario de
+  // verano). Necesario para "actividad de hoy": la fecha de la visita se
+  // guarda en UTC y un corte a medianoche UTC movería el día para todos.
+  private limitesDelDia(fecha: Date): [Date, Date] {
+    const BOGOTA_OFFSET_MS = 5 * 3600000;
+    const bogota = new Date(fecha.getTime() - BOGOTA_OFFSET_MS);
+    const inicioBogota = Date.UTC(bogota.getUTCFullYear(), bogota.getUTCMonth(), bogota.getUTCDate());
+    const finBogota = inicioBogota + 24 * 3600000 - 1;
+    return [new Date(inicioBogota + BOGOTA_OFFSET_MS), new Date(finBogota + BOGOTA_OFFSET_MS)];
+  }
+
+  // Actividad cruda de HOY para un gestor: si tocó algún punto (dentro o
+  // fuera del plan) y cuándo fue su última visita en general. Es la señal que
+  // le falta al dashboard admin y a la ruta del gestor para distinguir
+  // "no ha trabajado" de "trabajó hoy pero aún no completa la frecuencia".
+  async getActividadHoy(gestorId: string, ahora: Date = new Date()): Promise<{
+    visitoHoy: boolean;
+    puntosHoy: number;
+    ultimaVisitaAt: string | null;
+  }> {
+    const [desde, hasta] = this.limitesDelDia(ahora);
+    const hoy = await this.repo
+      .createQueryBuilder('v')
+      .select('DISTINCT v."puntoResiduoId"', 'puntoResiduoId')
+      .where('v."gestorId" = :gestorId', { gestorId })
+      .andWhere('v.fecha BETWEEN :desde AND :hasta', { desde, hasta })
+      .getRawMany<{ puntoResiduoId: string }>();
+
+    const ultima = await this.repo
+      .createQueryBuilder('v')
+      .select('MAX(v.fecha)', 'max')
+      .where('v."gestorId" = :gestorId', { gestorId })
+      .getRawOne<{ max: Date | null }>();
+
+    return {
+      visitoHoy: hoy.length > 0,
+      puntosHoy: hoy.length,
+      ultimaVisitaAt: ultima?.max ? new Date(ultima.max).toISOString() : null,
+    };
   }
 
   // Ids de puntos que el gestor visitó al menos una vez dentro de un rango de
@@ -247,6 +296,7 @@ export class VisitasService {
     const plan = await this.rutasSemanalesService.getPlanQuincena(gestorId, ahora);
     const q = plan.quincena;
     const nuevo = this.esRegimenNuevo(q.inicioISO);
+    const actividadHoy = await this.getActividadHoy(gestorId, ahora);
 
     const visitados = nuevo
       ? await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO)
@@ -274,6 +324,7 @@ export class VisitasService {
     }
     return {
       ...plan,
+      ...actividadHoy,
       quincena: {
         ...q,
         visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)),
@@ -350,6 +401,7 @@ export class VisitasService {
 
       const enPlan = new Set(q.planificados);
       const visitasFueraDePlan = [...visitadosIdsCrudo].filter((puntoId) => !enPlan.has(puntoId)).length;
+      const actividadHoy = await this.getActividadHoy(id, ahora);
 
       gestores.push({
         gestorId: id,
@@ -358,6 +410,7 @@ export class VisitasService {
         visitados,
         pct: q.planificados.length > 0 ? Math.round((visitados / q.planificados.length) * 100) : 0,
         visitasFueraDePlan,
+        ...actividadHoy,
       });
     }
 
