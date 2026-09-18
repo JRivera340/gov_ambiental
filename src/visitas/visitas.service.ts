@@ -193,19 +193,30 @@ export class VisitasService {
     hastaISO: string,
   ): Promise<{ porPunto: Map<string, [Set<string>, Set<string>]>; corte: Date }> {
     const [inicio, corte, fin] = this.mitadesDeQuincena(desdeISO, hastaISO);
+    // Antes se truncaba el día con SQL (`date_trunc('day', v.fecha)`), que
+    // agrupa según el timezone de SESIÓN de Postgres — en Railway eso es UTC,
+    // no Bogotá. Una visita entre las 7pm y medianoche hora Bogotá cae en el
+    // día UTC siguiente, así que dos visitas en días consecutivos reales
+    // podían terminar en el mismo bucket (o saltarse uno) y la pareja nunca
+    // se formaba: el punto quedaba "sin visitar" aunque el gestor sí hubiera
+    // vuelto al día siguiente. Se trae la fecha cruda y el día se calcula acá
+    // con el mismo offset fijo que usa el resto del módulo (ciclo-quincenal.util,
+    // getActividadHoy), sin depender de ningún timezone de sesión.
+    const BOGOTA_OFFSET_MS = 5 * 3600000;
     const filas = await this.repo
       .createQueryBuilder('v')
       .select('v."puntoResiduoId"', 'puntoResiduoId')
-      .addSelect(`date_trunc('day', v.fecha)`, 'dia')
+      .addSelect('v.fecha', 'fecha')
       .where('v."gestorId" = :gestorId', { gestorId })
       .andWhere('v.fecha BETWEEN :desde AND :hasta', { desde: inicio, hasta: fin })
-      .distinct(true)
-      .getRawMany<{ puntoResiduoId: string; dia: Date }>();
+      .getRawMany<{ puntoResiduoId: string; fecha: Date }>();
 
     // puntoId -> [días distintos mitad 1, días distintos mitad 2]
     const porPunto = new Map<string, [Set<string>, Set<string>]>();
     for (const fila of filas) {
-      const dia = new Date(fila.dia);
+      const bogota = new Date(new Date(fila.fecha).getTime() - BOGOTA_OFFSET_MS);
+      const diaBogotaUTC = Date.UTC(bogota.getUTCFullYear(), bogota.getUTCMonth(), bogota.getUTCDate());
+      const dia = new Date(diaBogotaUTC + BOGOTA_OFFSET_MS);
       const idxMitad = dia.getTime() < corte.getTime() ? 0 : 1;
       if (!porPunto.has(fila.puntoResiduoId)) porPunto.set(fila.puntoResiduoId, [new Set(), new Set()]);
       porPunto.get(fila.puntoResiduoId)![idxMitad].add(dia.toISOString());

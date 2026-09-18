@@ -56,11 +56,7 @@ const makeRepo = () => {
               const t = new Date(v.fecha).getTime();
               return t >= desde && t <= hasta;
             })
-            .map((v) => {
-              const d = new Date(v.fecha);
-              const dia = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-              return { puntoResiduoId: v.puntoResiduoId, dia };
-            });
+            .map((v) => ({ puntoResiduoId: v.puntoResiduoId, fecha: new Date(v.fecha) }));
         },
         // Usado por getActividadHoy: MAX(fecha) de todas las visitas del
         // gestor, sin filtro de rango (a diferencia de getRawMany acá arriba).
@@ -231,6 +227,23 @@ describe('VisitasService', () => {
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     const inicio = new Date(QUINCENA.inicioISO).getTime();
     for (const i of [0, 2, 3, 4]) await service.registrarVisita('p1', 'g1', new Date(inicio + i * DIA_MS));
+
+    const progreso = await service.getProgresoFrecuencia('g1', QUINCENA.inicioISO, QUINCENA.finISO, AHORA);
+    expect(progreso.get('p1')!.paresMitadActual).toBe(1);
+  });
+
+  it('visita a las 11pm de un día y a la 1am del siguiente cuentan como 2 días consecutivos (regla de Bogotá, no de la sesión de la BD)', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    const inicio = new Date(QUINCENA.inicioISO).getTime();
+    const HORA_MS = 3600000;
+    // 23:00 hora Bogotá del día 0 y 01:00 hora Bogotá del día 1: son 2 días
+    // de calendario Bogotá distintos y consecutivos, pero ambos instantes
+    // caen en el MISMO día calendario UTC (04:00 y 06:00 UTC del mismo día).
+    // Si el agrupamiento usara el timezone de sesión de Postgres (UTC) en vez
+    // de Bogotá, se verían como 1 solo día y la pareja nunca se formaría.
+    await service.registrarVisita('p1', 'g1', new Date(inicio + 23 * HORA_MS));
+    await service.registrarVisita('p1', 'g1', new Date(inicio + 25 * HORA_MS));
 
     const progreso = await service.getProgresoFrecuencia('g1', QUINCENA.inicioISO, QUINCENA.finISO, AHORA);
     expect(progreso.get('p1')!.paresMitadActual).toBe(1);
