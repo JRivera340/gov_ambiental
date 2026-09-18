@@ -269,6 +269,30 @@ export class VisitasService {
     return resultado;
   }
 
+  // Ids de puntos con el trabajo de AL MENOS UNA mitad ya hecho (2 parejas en
+  // esa mitad), sin exigir la otra todavía. Existe porque getIdsCumplenFrecuenciaEnRango
+  // exige las DOS mitades — correcto para medir cumplimiento real al cierre
+  // de la quincena (getResumenDesempeno, getHistorialConVisitas) — pero
+  // inservible como checkmark del día a día: la mitad 2 literalmente no ha
+  // pasado todavía al arrancar la quincena, así que ningún punto podía
+  // marcarse visitado hasta el día 8+ sin importar cuánto trabajara el
+  // gestor en la primera semana (ver reporte: 32 puntos tocados el día 1 del
+  // régimen nuevo, "Progreso general 0/63"). Esta versión es la que alimenta
+  // la ruta del gestor (getPlanConVisitas) — le da el check apenas completa
+  // la mitad que le tocaba, sin esperar a la que todavía no empieza.
+  async getIdsProgresaFrecuenciaEnRango(gestorId: string, desdeISO: string, hastaISO: string): Promise<Set<string>> {
+    const { porPunto } = await this.contarDiasPorMitad(gestorId, desdeISO, hastaISO);
+    const resultado = new Set<string>();
+    for (const [puntoId, [mitad1, mitad2]] of porPunto) {
+      const pares1 = this.contarParesDeDiasConsecutivos(mitad1);
+      const pares2 = this.contarParesDeDiasConsecutivos(mitad2);
+      if (pares1 >= PARES_REQUERIDOS_POR_MITAD || pares2 >= PARES_REQUERIDOS_POR_MITAD) {
+        resultado.add(puntoId);
+      }
+    }
+    return resultado;
+  }
+
   // Progreso crudo de frecuencia por punto (régimen nuevo únicamente), para
   // mostrarle al gestor cuánto le falta en la ruta — no solo "visitado sí/no"
   // al final, sino "vas 1 de 2 parejas esta mitad" mientras la quincena sigue
@@ -309,8 +333,11 @@ export class VisitasService {
     const nuevo = this.esRegimenNuevo(q.inicioISO);
     const actividadHoy = await this.getActividadHoy(gestorId, ahora);
 
+    // Régimen nuevo usa el criterio de UNA mitad (OR), no el de cumplimiento
+    // final (AND, exige las dos) — ver getIdsProgresaFrecuenciaEnRango. Esto
+    // es el checkmark del día a día del gestor, no la medición de cierre.
     const visitados = nuevo
-      ? await this.getIdsCumplenFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO)
+      ? await this.getIdsProgresaFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO)
       : await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
 
     // En régimen viejo no hay "progreso" que mostrar — 1 visita ya alcanza —

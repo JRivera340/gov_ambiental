@@ -299,6 +299,25 @@ describe('VisitasService', () => {
     expect(plan.quincena.planificados).toHaveLength(3);
   });
 
+  it('getPlanConVisitas marca visitado con SOLO la mitad actual cumplida — la ruta del gestor no espera a una mitad que todavía no pasa', async () => {
+    const repo = makeRepo();
+    const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
+    const inicio = new Date(QUINCENA.inicioISO).getTime();
+    // 2 parejas en la mitad 1, nada en la mitad 2 (todavía no llega). Bajo
+    // getIdsCumplenFrecuenciaEnRango (AND, admin/historial) esto NO cumple.
+    // La ruta del gestor debe marcarlo visitado igual: ya hizo lo que le
+    // tocaba por ahora.
+    for (const i of [0, 1, 3, 4]) await service.registrarVisita('p1', 'g1', new Date(inicio + i * DIA_MS));
+
+    const plan = await service.getPlanConVisitas('g1', AHORA);
+    expect(plan.quincena.visitados).toEqual(['p1']);
+
+    // El % de cumplimiento del admin sigue exigiendo las dos mitades: no debe
+    // inflarse por este mismo cambio.
+    const resumen = await service.getResumenDesempeno('g1', AHORA);
+    expect(resumen.gestores[0].visitados).toBe(0);
+  });
+
   it('getPlanConVisitas expone el progreso de frecuencia por punto (régimen de parejas)', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
