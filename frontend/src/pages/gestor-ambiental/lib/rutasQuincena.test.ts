@@ -16,6 +16,7 @@ const quincena = (over: Partial<QuincenaPlanDTO> = {}): QuincenaPlanDTO => ({
   regular: [],
   planificados: [],
   visitados: [],
+  seguimientoCumplido: [],
   ...over,
 });
 

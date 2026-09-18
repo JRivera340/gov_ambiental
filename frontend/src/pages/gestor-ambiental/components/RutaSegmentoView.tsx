@@ -125,11 +125,13 @@ export const RutaSegmentoView: React.FC = () => {
             <div
               key={parada.puntoId}
               className={`p-3 rounded-xl border transition-all ${
-                parada.visitado
+                parada.seguimientoCumplido
                   ? 'border-green-100 bg-green-50 opacity-60'
-                  : parada.diasVencido >= 4
-                    ? 'border-red-100 bg-red-50'
-                    : 'border-neutral-100 bg-white hover:border-neutral-200'
+                  : parada.visitado
+                    ? 'border-amber-100 bg-amber-50'
+                    : parada.diasVencido >= 4
+                      ? 'border-red-100 bg-red-50'
+                      : 'border-neutral-100 bg-white hover:border-neutral-200'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -137,12 +139,13 @@ export const RutaSegmentoView: React.FC = () => {
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span
                       className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-white"
-                      style={{ background: parada.visitado ? '#16a34a' : color }}
+                      style={{ background: parada.seguimientoCumplido ? '#16a34a' : parada.visitado ? '#d97706' : color }}
                     >
                       {parada.numeroSegmento}
                     </span>
                     <span className="text-[11px] font-bold text-neutral-800 truncate">{parada.barrio || 'Sin barrio'}</span>
-                    {parada.visitado && <span className="text-[10px] text-green-600 font-bold">✓</span>}
+                    {parada.seguimientoCumplido && <span className="text-[10px] text-green-600 font-bold">✓✓</span>}
+                    {parada.visitado && !parada.seguimientoCumplido && <span className="text-[10px] text-amber-600 font-bold">✓</span>}
                   </div>
                   {parada.tiposResiduo.length > 0 && (
                     <p className="text-[10px] text-neutral-500 ml-6">
@@ -152,7 +155,10 @@ export const RutaSegmentoView: React.FC = () => {
                   {parada.diasVencido >= 4 && !parada.visitado && (
                     <p className="text-[10px] text-red-600 font-medium ml-6">{parada.diasVencido}d vencido</p>
                   )}
-                  {!parada.visitado && parada.regimenFrecuencia === 'parejas' && (
+                  {/* Se muestra hasta que cumpla la pareja, no solo hasta la
+                      primera visita: "visitado" ya da crédito con un toque,
+                      pero acá seguimos necesitando que vuelva al día siguiente. */}
+                  {!parada.seguimientoCumplido && parada.regimenFrecuencia === 'parejas' && (
                     <p className="text-[10px] text-neutral-500 ml-6">
                       Parejas de visita esta quincena: {parada.paresMitadActual ?? 0}/{parada.paresRequeridos ?? 2}
                       {(parada.diasMitadActual ?? 0) > 0 && (
@@ -163,18 +169,25 @@ export const RutaSegmentoView: React.FC = () => {
                     </p>
                   )}
                   {parada.visitado && parada.fechaVisita && (
-                    <p className="text-[10px] text-green-600 ml-6">
+                    <p className={`text-[10px] ml-6 ${parada.seguimientoCumplido ? 'text-green-600' : 'text-amber-700'}`}>
                       {format(new Date(parada.fechaVisita), 'HH:mm', { locale: es })}
                     </p>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  {parada.visitado && (
+                  {parada.seguimientoCumplido ? (
                     <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">
-                      ✓ Visitado
+                      ✓✓ Seguimiento OK
                     </span>
-                  )}
-                  {!parada.visitado && (
+                  ) : parada.visitado ? (
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                      ✓ Visitado — falta volver
+                    </span>
+                  ) : null}
+                  {/* Sigue disponible aunque ya lo haya "visitado" una vez —
+                      mientras falte el seguimiento (volver al día siguiente)
+                      todavía tiene que ir. */}
+                  {!parada.seguimientoCumplido && (
                     <button
                       onClick={() => openDirections(parada.lat, parada.lng)}
                       className="text-[10px] font-bold px-2 py-1 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all"
@@ -233,17 +246,18 @@ export const RutaSegmentoView: React.FC = () => {
                 <p className="text-xs font-black text-neutral-900">
                   #{paradaSeleccionada.numeroSegmento} — {paradaSeleccionada.barrio || 'Sin barrio'}
                 </p>
-                {paradaSeleccionada.visitado && <span className="text-[10px] text-green-600 font-bold">✓</span>}
+                {paradaSeleccionada.seguimientoCumplido && <span className="text-[10px] text-green-600 font-bold">✓✓</span>}
+                {paradaSeleccionada.visitado && !paradaSeleccionada.seguimientoCumplido && <span className="text-[10px] text-amber-600 font-bold">✓</span>}
               </div>
               {paradaSeleccionada.visitado && paradaSeleccionada.fechaVisita && (
-                <p className="text-[10px] text-green-600">
+                <p className={`text-[10px] ${paradaSeleccionada.seguimientoCumplido ? 'text-green-600' : 'text-amber-700'}`}>
                   Visitado {format(new Date(paradaSeleccionada.fechaVisita), 'HH:mm', { locale: es })}
                 </p>
               )}
               {!paradaSeleccionada.visitado && paradaSeleccionada.diasVencido >= 4 && (
                 <p className="text-[11px] text-red-600 font-medium">{paradaSeleccionada.diasVencido} días vencido</p>
               )}
-              {!paradaSeleccionada.visitado && paradaSeleccionada.regimenFrecuencia === 'parejas' && (
+              {!paradaSeleccionada.seguimientoCumplido && paradaSeleccionada.regimenFrecuencia === 'parejas' && (
                 <p className="text-[11px] text-neutral-500">
                   Parejas de visita esta quincena: {paradaSeleccionada.paresMitadActual ?? 0}/{paradaSeleccionada.paresRequeridos ?? 2}
                   {(paradaSeleccionada.diasMitadActual ?? 0) > 0 && (
@@ -265,13 +279,17 @@ export const RutaSegmentoView: React.FC = () => {
               </svg>
             </button>
           </div>
-          {paradaSeleccionada.visitado && (
+          {paradaSeleccionada.seguimientoCumplido ? (
             <span className="inline-block mb-2 text-[10px] font-bold px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">
-              ✓ Visitado
+              ✓✓ Seguimiento OK
             </span>
-          )}
+          ) : paradaSeleccionada.visitado ? (
+            <span className="inline-block mb-2 text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+              ✓ Visitado — falta volver
+            </span>
+          ) : null}
           <div className="flex gap-2">
-            {!paradaSeleccionada.visitado && (
+            {!paradaSeleccionada.seguimientoCumplido && (
               <button
                 onClick={() => openDirections(paradaSeleccionada.lat, paradaSeleccionada.lng)}
                 className="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all"

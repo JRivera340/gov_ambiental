@@ -11,6 +11,8 @@ export interface ParadaRuta {
   diasSinSeguimiento: number;
   fechaVisita?: string;
   pendienteAnterior?: boolean;
+  /** Cumple la frecuencia real (pareja de días consecutivos en al menos una mitad) — subconjunto de `visitado`. `visitado` solo exige haber tocado el punto una vez. */
+  seguimientoCumplido?: boolean;
   /** Parejas de días consecutivos completadas en la mitad de quincena que corre ahora, contra el mínimo exigido. Solo aplica cuando regimenFrecuencia === 'parejas'. */
   paresMitadActual?: number;
   paresRequeridos?: number;

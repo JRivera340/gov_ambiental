@@ -36,8 +36,10 @@ export interface QuincenaPlanDTO {
   emergencia: string[];
   regular: string[];
   planificados: string[];
-  /** Puntos ya visitados. Solo viene de GET /visitas/plan. */
+  /** Puntos ya tocados al menos una vez (presencia cruda, crédito inmediato). Solo viene de GET /visitas/plan. */
   visitados: string[];
+  /** Puntos que además cumplen la frecuencia real (pareja de días consecutivos en al menos una mitad) — subconjunto de `visitados`. Solo viene de GET /visitas/plan. */
+  seguimientoCumplido: string[];
   /** Progreso de frecuencia por punto (parejas de días consecutivos por mitad, según el régimen vigente). Solo viene de GET /visitas/plan. */
   progresoVisitas?: Record<string, ProgresoFrecuenciaDTO>;
 }

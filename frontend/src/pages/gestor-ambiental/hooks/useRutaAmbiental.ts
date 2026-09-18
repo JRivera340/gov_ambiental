@@ -107,6 +107,15 @@ export function useRutaAmbiental(
     [quincena],
   );
 
+  // Subconjunto de visitadosIds que además cumple la frecuencia real (pareja
+  // de días consecutivos) — ver ProgresoFrecuenciaDTO. `visitado` solo pide
+  // haber tocado el punto una vez, esto es la señal de que además volvió al
+  // día siguiente.
+  const seguimientoCumplidoIds = useMemo(
+    () => new Set(quincena?.seguimientoCumplido ?? []),
+    [quincena],
+  );
+
   const progresoVisitas = quincena?.progresoVisitas;
 
   // ── Puntos candidatos para la ruta ─────────────────────────────
@@ -168,9 +177,10 @@ export function useRutaAmbiental(
         paresRequeridos: progresoVisitas?.[a.id]?.paresRequeridos ?? 2,
         regimenFrecuencia: progresoVisitas?.[a.id]?.regimen ?? 'simple',
         diasMitadActual: progresoVisitas?.[a.id]?.diasMitadActual ?? 0,
+        seguimientoCumplido: seguimientoCumplidoIds.has(a.id),
       };
     });
-  }, [activities, user, puntosAsignados, visitadosIds, arrastreIds, progresoVisitas]);
+  }, [activities, user, puntosAsignados, visitadosIds, seguimientoCumplidoIds, arrastreIds, progresoVisitas]);
 
   const puntosRef = useRef(puntosParaRuta);
   useEffect(() => {

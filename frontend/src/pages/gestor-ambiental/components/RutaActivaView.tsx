@@ -37,6 +37,14 @@ export const RutaActivaView: React.FC = () => {
   const porcentaje = rutaActiva.totalPuntos > 0
     ? Math.round((totalVisitados / rutaActiva.totalPuntos) * 100)
     : 0;
+  // Barra separada: cuántos de los ya visitados además cumplen la frecuencia
+  // real (volvió al día siguiente). `visitado` da crédito con un solo toque
+  // — esta barra es la que de verdad mide si están haciendo el seguimiento
+  // exigido, sin tapar el progreso crudo de arriba.
+  const totalSeguimiento = allParadas.filter(p => p.seguimientoCumplido).length;
+  const porcentajeSeguimiento = rutaActiva.totalPuntos > 0
+    ? Math.round((totalSeguimiento / rutaActiva.totalPuntos) * 100)
+    : 0;
   const todosCompletados = rutaActiva.segmentos.every(s => s.estado === 'completado');
   const center: [number, number] =
     allParadas.length > 0 ? [allParadas[0].lat, allParadas[0].lng] : [4.5981, -74.0758];
@@ -77,17 +85,30 @@ export const RutaActivaView: React.FC = () => {
 
       <div className="p-4 border-b border-neutral-100">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-bold text-neutral-600">Progreso general</span>
+          <span className="text-[11px] font-bold text-neutral-600">Puntos visitados</span>
           <span className="text-[11px] font-bold text-blue-600">{totalVisitados}/{rutaActiva.totalPuntos}</span>
         </div>
         <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${porcentaje}%` }} />
         </div>
-        <p className="text-[10px] text-neutral-400 mt-1">{porcentaje}% completado</p>
-        {/* El % de arriba exige parejas de días consecutivos por punto — un
-            gestor puede estar en 0% y aun así haber trabajado hoy. Esta línea
-            muestra el trabajo crudo de hoy para que no se vea como "no hizo
-            nada" mientras la frecuencia todavía no cierra. */}
+        <p className="text-[10px] text-neutral-400 mt-1">{porcentaje}% — al menos una vez cada uno</p>
+
+        {/* Barra separada: cuántos de esos puntos ya cumplen la frecuencia
+            real (volvió al día siguiente, en pareja). "Puntos visitados" de
+            arriba da crédito con un solo toque para que no se vea como "no
+            hizo nada" — esta de acá es la que de verdad mide el seguimiento
+            exigido, y la que decide el % de cumplimiento en el panel admin. */}
+        <div className="flex items-center justify-between mb-2 mt-3">
+          <span className="text-[11px] font-bold text-neutral-600">Seguimiento cumplido</span>
+          <span className="text-[11px] font-bold text-emerald-600">{totalSeguimiento}/{rutaActiva.totalPuntos}</span>
+        </div>
+        <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
+          <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${porcentajeSeguimiento}%` }} />
+        </div>
+        <p className="text-[10px] text-neutral-400 mt-1">
+          {porcentajeSeguimiento}% — volviste al día siguiente para completar la pareja
+        </p>
+
         {plan && plan.puntosHoy > 0 && (
           <p className="mt-2 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1">
             ✓ Hoy visitaste {plan.puntosHoy} punto{plan.puntosHoy !== 1 ? 's' : ''}

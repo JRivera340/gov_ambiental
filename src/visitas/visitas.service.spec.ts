@@ -289,28 +289,33 @@ describe('VisitasService', () => {
     expect(resumen.etiqueta).not.toMatch(/W\d/);
   });
 
-  it('getPlanConVisitas marca los puntos que cumplen la frecuencia en la quincena', async () => {
+  it('getPlanConVisitas marca visitado (presencia cruda) y seguimientoCumplido (pareja) por separado, con solo tocar el punto una vez', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
-    await visitarCumpliendoParejas(service, 'p2', 'g1', QUINCENA.inicioISO);
+    // Una sola visita, sin pareja: la ruta debe darle crédito inmediato en
+    // `visitados` (ya fue), pero `seguimientoCumplido` debe seguir vacío
+    // (todavía le falta volver al día siguiente).
+    await service.registrarVisita('p1', 'g1', new Date(QUINCENA.inicioISO));
 
     const plan = await service.getPlanConVisitas('g1', AHORA);
-    expect(plan.quincena.visitados).toEqual(['p2']);
+    expect(plan.quincena.visitados).toEqual(['p1']);
+    expect(plan.quincena.seguimientoCumplido).toEqual([]);
     expect(plan.quincena.planificados).toHaveLength(3);
   });
 
-  it('getPlanConVisitas marca visitado con SOLO la mitad actual cumplida — la ruta del gestor no espera a una mitad que todavía no pasa', async () => {
+  it('getPlanConVisitas marca seguimientoCumplido con SOLO la mitad actual cumplida — no espera a una mitad que todavía no pasa', async () => {
     const repo = makeRepo();
     const service = new VisitasService(repo as any, rutasStub as any, asignacionesStub as any);
     const inicio = new Date(QUINCENA.inicioISO).getTime();
     // 2 parejas en la mitad 1, nada en la mitad 2 (todavía no llega). Bajo
     // getIdsCumplenFrecuenciaEnRango (AND, admin/historial) esto NO cumple.
-    // La ruta del gestor debe marcarlo visitado igual: ya hizo lo que le
-    // tocaba por ahora.
+    // El indicador de seguimiento de la ruta debe marcarlo cumplido igual:
+    // ya hizo lo que le tocaba por ahora.
     for (const i of [0, 1, 3, 4]) await service.registrarVisita('p1', 'g1', new Date(inicio + i * DIA_MS));
 
     const plan = await service.getPlanConVisitas('g1', AHORA);
     expect(plan.quincena.visitados).toEqual(['p1']);
+    expect(plan.quincena.seguimientoCumplido).toEqual(['p1']);
 
     // El % de cumplimiento del admin sigue exigiendo las dos mitades: no debe
     // inflarse por este mismo cambio.
@@ -358,7 +363,7 @@ describe('VisitasService', () => {
 
   // Frontera del cutover: quien arranca justo en CUTOVER_REGIMEN_PARES ya usa
   // el régimen nuevo; el que arranca justo antes sigue en el régimen viejo.
-  it('quincena que arranca justo en el cutover usa el régimen nuevo (1 visita no basta)', async () => {
+  it('quincena que arranca justo en el cutover usa el régimen nuevo (1 visita no basta para el seguimiento, pero sí da crédito de "visitado")', async () => {
     const ahora = new Date(CUTOVER_REGIMEN_PARES);
     const q = limitesQuincena(ahora);
     expect(q.inicioISO).toBe(CUTOVER_REGIMEN_PARES);
@@ -373,7 +378,8 @@ describe('VisitasService', () => {
     const service = new VisitasService(repo as any, rutasStubLocal as any, asignacionesStub as any);
     await service.registrarVisita('p1', 'g1', ahora);
     const plan = await service.getPlanConVisitas('g1', ahora);
-    expect(plan.quincena.visitados).toEqual([]);
+    expect(plan.quincena.visitados).toEqual(['p1']);
+    expect(plan.quincena.seguimientoCumplido).toEqual([]);
   });
 
   it('quincena justo antes del cutover sigue en régimen viejo (1 visita basta)', async () => {

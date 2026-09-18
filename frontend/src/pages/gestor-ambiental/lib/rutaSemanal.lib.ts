@@ -38,6 +38,11 @@ export function hidratarParadas(dto: RutaSemanalDTO, puntos: ParadaRuta[]): Para
       diasSinSeguimiento: base?.diasSinSeguimiento ?? Infinity,
       fechaVisita: base?.fechaVisita,
       pendienteAnterior: base?.pendienteAnterior,
+      paresMitadActual: base?.paresMitadActual,
+      paresRequeridos: base?.paresRequeridos,
+      regimenFrecuencia: base?.regimenFrecuencia,
+      diasMitadActual: base?.diasMitadActual,
+      seguimientoCumplido: base?.seguimientoCumplido,
     };
   });
 }

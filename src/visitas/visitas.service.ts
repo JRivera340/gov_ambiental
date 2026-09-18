@@ -333,12 +333,18 @@ export class VisitasService {
     const nuevo = this.esRegimenNuevo(q.inicioISO);
     const actividadHoy = await this.getActividadHoy(gestorId, ahora);
 
-    // Régimen nuevo usa el criterio de UNA mitad (OR), no el de cumplimiento
-    // final (AND, exige las dos) — ver getIdsProgresaFrecuenciaEnRango. Esto
-    // es el checkmark del día a día del gestor, no la medición de cierre.
-    const visitados = nuevo
+    // "Visitado" en la ruta del gestor es presencia cruda: tocó el punto al
+    // menos una vez. Da crédito inmediato — antes esto exigía la pareja de
+    // días seguidos y el gestor veía 0% aunque sí estuviera trabajando.
+    const visitados = await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+    // "Seguimiento cumplido" es la regla real de frecuencia (2 días seguidos
+    // en al menos una mitad) — la barra/indicador SEPARADO que le dice al
+    // gestor y al supervisor si de verdad volvió al día siguiente, sin tapar
+    // el checkmark de "ya fui" que da `visitados`. En régimen viejo coincide
+    // con `visitados`: ahí 1 sola visita ya es cumplimiento.
+    const seguimientoCumplidoIds = nuevo
       ? await this.getIdsProgresaFrecuenciaEnRango(gestorId, q.inicioISO, q.finISO)
-      : await this.getIdsVisitadosEnRango(gestorId, q.inicioISO, q.finISO);
+      : visitados;
 
     // En régimen viejo no hay "progreso" que mostrar — 1 visita ya alcanza —
     // así que progresoVisitas queda con el default 'simple' para todo punto.
@@ -366,6 +372,7 @@ export class VisitasService {
       quincena: {
         ...q,
         visitados: q.planificados.filter((puntoId) => visitados.has(puntoId)),
+        seguimientoCumplido: q.planificados.filter((puntoId) => seguimientoCumplidoIds.has(puntoId)),
         progresoVisitas,
       },
     };
